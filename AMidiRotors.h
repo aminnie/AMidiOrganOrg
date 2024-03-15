@@ -79,7 +79,7 @@ public:
             wait(interval);
 
             // Send rotary change control value
-            int controllerNumber = 74;    //
+            int controllerNumber = CCBri;    //
             juce::MidiMessage ccMessage = juce::MidiMessage::controllerEvent(
                 midichannel,
                 controllerNumber,
@@ -145,7 +145,7 @@ public:
             wait(interval);
 
             // Send rotary change control value
-            int controllerNumber = 74;    //
+            int controllerNumber = CCBri;    //
             juce::MidiMessage ccMessage = juce::MidiMessage::controllerEvent(
                 midichannel,
                 controllerNumber,

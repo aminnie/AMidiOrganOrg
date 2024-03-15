@@ -34,7 +34,7 @@ public:
         // Get user home directory
         //File fileToSave = File::getCurrentWorkingDirectory().getChildFile(instrumentdname);
         File filespecialloc = File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
-            .getChildFile("AMidiOrgan");
+            .getChildFile(organdir);
 
         AMidiTrayIcon();
 

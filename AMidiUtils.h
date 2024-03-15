@@ -27,6 +27,8 @@ static const int numberpresets = 7;
 
 static const int defvelocityout = 64;
 
+static const int numbermodules = 6;
+
 // Tracking switching between tabs to trigger updates, e.g. from Sounds tab back to Upper
 static int lasttabidx = 1;
 static bool tabchanged = false;
@@ -34,20 +36,33 @@ static bool bvoiceupdated = false;
 static bool beffectsupdated = false;
 
 // Single config file supported with master panel file for each Midi mpdule supported
+static const String organdir = "AMidiOrgan";
+
 static const String defpanelfname = "masterinstrument.pnl";
 static String panelfname = "masterinstrument.pnl";
-static String configsname = "amidiconfigs.cfg";
+static String panelfullpathname = "";
+
+static String configfname = "amidiconfigs.cfg";
+static String pnlconfigfname = "amidiconfigs.cfg";
+static String configdir = "configs";
 static bool configchanged = false;
+static bool configreload = false;
+
+static String modulefname = "amidimodules.mod";
+static String defmodulefname = "mastermodules.mod";
 
 static String userdata = "";
 
 // Static Instrument module variable defaults. Changed when new module selected
 // To do: Consider moving to Singleton
 static int moduleidx = 1;
+static String instrumentdir = "instruments";
+static String instrumentfname = "maxplus.json";
 static String vendorname = "Deebach Blackbox";
 static String instrumentdname = "BlackBox";
-static String instrumentfname = "maxplus.json";
+
 static bool isrotary = true;
+static bool iszerobased = true;
 
 // Static voice from the 1st voice in selected Midi module. Used to create new panel file.
 static String sdefVoice;
@@ -62,6 +77,7 @@ static int lowersolo = 15;
 
 static int upperchan = 4;
 static int uppersolo = 1;
+
 
 //==============================================================================
 // Sliders can have custom snapping applied to their values,
@@ -163,6 +179,7 @@ enum MidiIOType {
     OUT4 = 4
 };
 
+
 // Reverse Lookup of Button to Button Group
 static int lookupPanelGroup(int panelbuttonidx) {
     if (panelbuttonidx < UPPERG2) return 0;
@@ -178,6 +195,142 @@ static int lookupPanelGroup(int panelbuttonidx) {
     else if (panelbuttonidx < BASSG4) return 10;
     else return 11;
 };
+
+
+//-------------------------------------------------------------------------
+// Keyboard Shortcuts Implementation
+//-------------------------------------------------------------------------
+
+//-------------------------------------------------------------------------
+/*
+Here's a brief overview of how you might use the ApplicationCommandManager:
+
+Define Commands: First, you define the commands your application will support. Each command 
+is given a unique ID and a description.
+
+Register Commands: You then register these commands with the ApplicationCommandManager, 
+typically during your application's initialization phase. This registration process 
+involves creating an instance of ApplicationCommandManager and using it to register 
+all your commands.
+
+Map Commands to Actions: Once commands are registered, you can map them to specific
+actions. This involves creating a class that inherits from ApplicationCommandTarget, 
+which provides the logic for what should happen when a command is invoked.
+
+Attach Triggers: The ApplicationCommandManager also allows you to attach various triggers
+to commands, such as keyboard shortcuts or GUI elements like buttons or menu items. This
+way, when the trigger is activated (e.g., a keyboard key is pressed), the corresponding 
+command is executed.
+
+Handling Commands: Finally, when a command is invoked (e.g., through a keyboard shortcut 
+or a menu selection), the ApplicationCommandManager routes the command to the appropriate
+ApplicationCommandTarget that can handle it, executing the associated action.
+
+https://forum.juce.com/t/keylistener-documentation-request/27360
+*/
+
+//Keyboard Shorcut Command IDs
+enum KeyPressCommandIDs {
+    btnTabUpper = 1,
+    btnTabLower = 2,
+    btnTabBass = 3,
+    btnUpperRotary = 5,
+    btnLowerRotary = 6,
+    btnPreset0 = 10,
+    btnPreset1 = 11,
+    btnPreset2 = 12,
+    btnPreset3 = 13,
+    btnPreset4 = 14,
+    btnPreset5 = 15,
+    btnPreset6 = 16
+};
+
+
+class KeyPressTarget final : public Component,
+    public ApplicationCommandTarget
+{
+public:
+    KeyPressTarget() { 
+        DBG("*** KeyPressTarget(): Constructing Shortcut Keys");
+    }
+
+    //==============================================================================
+    // No other command targets in this simple example so just return nullptr
+    ApplicationCommandTarget* getNextCommandTarget() override { return nullptr; }
+
+    void getAllCommands(Array<CommandID>& commands) override {
+
+        Array<CommandID> ids { 
+            KeyPressCommandIDs::btnTabUpper,
+            KeyPressCommandIDs::btnTabLower,
+            KeyPressCommandIDs::btnTabBass 
+        };
+
+        commands.addArray(ids);
+    }
+
+    void getCommandInfo(CommandID commandID, ApplicationCommandInfo& result) override
+    {
+        DBG("=== getCommandInfo() called");
+
+        switch (commandID)
+        {
+            case KeyPressCommandIDs::btnTabUpper:
+                DBG("*** getCommandInfo(): btnTabUpper");
+                result.setInfo("To Upper", "Go to Upper", "Other", 0);
+                result.addDefaultKeypress(KeyPress::upKey, ModifierKeys::noModifiers);
+                break;
+            case KeyPressCommandIDs::btnTabLower:
+                DBG("*** getCommandInfo(): btnTabLower");
+                result.setInfo("To Lower", "Go to Lower", "Other", 0);
+                result.addDefaultKeypress(KeyPress::leftKey, ModifierKeys::noModifiers);
+                break;
+            case KeyPressCommandIDs::btnTabBass:
+                DBG("*** getCommandInfo(): btnTabBass");
+                result.setInfo("To Bass&Drums", "Go to Bass&Drums", "Other", 0);
+                result.addDefaultKeypress(KeyPress::downKey, ModifierKeys::noModifiers);
+                break;
+            default:
+                break;
+        }
+    }
+
+    bool perform(const InvocationInfo& info) override
+    {
+        switch (info.commandID)
+        {
+            case KeyPressCommandIDs::btnTabUpper:
+                DBG("*** perform() : btnTabUpper");
+                break;
+            case KeyPressCommandIDs::btnTabLower:
+                DBG("*** perform(): btnTabLower");
+                break;
+            case KeyPressCommandIDs::btnTabBass:
+                DBG("*** perform(): btnTabBass");
+                break;
+            default:
+                return false;
+        }
+
+        return true;
+    }
+
+};
+
+
+class AMidiTrayIcon final : public SystemTrayIconComponent {
+public:
+    AMidiTrayIcon() {
+
+        juce::Image trayimage = juce::ImageFileFormat::loadFrom(BinaryData::keyboard_png, BinaryData::keyboard_pngSize);
+
+        juce::SystemTrayIconComponent::setIconImage(trayimage, trayimage);
+        setIconTooltip("AMidiOrgan");
+    }
+
+    ~AMidiTrayIcon() {}
+};
+
 
 //-------------------------------------------------------------------------
 // Utilities and static functions
@@ -199,17 +352,3 @@ static int check1to16(int val) {
     return val;
 }
 
-
-//==============================================================================
-class AMidiTrayIcon final : public SystemTrayIconComponent {
-public:
-    AMidiTrayIcon() {
-
-        juce::Image trayimage = juce::ImageFileFormat::loadFrom(BinaryData::keyboard_png, BinaryData::keyboard_pngSize);
-
-        juce::SystemTrayIconComponent::setIconImage(trayimage, trayimage);
-        setIconTooltip("AMidiOrgan");
-    }
-
-    ~AMidiTrayIcon() {}
-};

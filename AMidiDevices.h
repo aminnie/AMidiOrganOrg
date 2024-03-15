@@ -96,9 +96,15 @@ public:
             jassert(midiOutputs[index]->outDevice.get() == nullptr);
             midiOutputs[index]->outDevice = MidiOutput::openDevice(midiOutputs[index]->deviceInfo.identifier);
 
-            if (midiOutputs[index]->outDevice.get() == nullptr)
-            {
-                DBG("*** MidiDemo::openDevice: open output device for index = " << index << " failed!");
+            // Remember the MidiView Monitor so we can duplicate output to Monitor
+            if (midiOutputs[index]->deviceInfo.name == "MidiView")
+                midiviewidx = index;
+
+            if (midiOutputs[index]->outDevice.get() == nullptr) {
+                DBG("*** AMidiDevices::openDevice: open output device for index: " << index << " failed!");
+            }
+            else {
+                juce::Logger::writeToLog("*** AMidiDevices: Discovered device " + midiOutputs[index]->deviceInfo.name);
             }
         }
     }
@@ -227,9 +233,34 @@ public:
     // Send Midi Messages to all connected Output Devices
     void sendToOutputs(const MidiMessage& msg)
     {
-        for (auto midiOutput : midiOutputs)
-            if (midiOutput->outDevice != nullptr)
-                midiOutput->outDevice->sendMessageNow(msg);
+        // Send msg to all active Outputs
+        //for (auto midiOutput : midiOutputs) {
+        //    if (midiOutput->outDevice != nullptr) {
+        //        midiOutput->outDevice->sendMessageNow(msg);
+        //    }
+        //}
+
+        // Route Midi Message to appropriate channel
+        int outchan = msg.getChannel();
+        int outmodidx = 0;
+        if (outchan < 17)
+            outmodidx = moduleout[outchan];
+
+        if (outmodidx < midiOutputs.size()) {
+            if (midiOutputs[outmodidx]->outDevice.get() != nullptr) {
+                midiOutputs[outmodidx]->outDevice->sendMessageNow(msg);
+
+                DBG("*** sendToOutputs " << outchan << " to module " << outmodidx << " sent!");
+            }
+            else {
+                DBG("*** sendToOutputs " << outchan << " to module " << outmodidx << " failed!");
+            }
+        }
+
+        // If MidiView connected duplicate message for display in monitor
+        if (midiviewidx < midiOutputs.size()) {
+            midiOutputs[midiviewidx]->outDevice->sendMessageNow(msg);
+        }
     }
 
     void resetAllControllers()
@@ -288,6 +319,9 @@ public:
         // passing input channels through that sounds and not used!
         for (int i = 0; i < 17; i++) {
             passthroughin[i] = false;
+
+            // Exception: Pass Midi CTRL on channel 16 through
+            passthroughin[16] = true;
         }
 
         // Pass by velocity on Note On,but can be defaulted to 
@@ -304,6 +338,9 @@ public:
     int moduleout[17];
     bool passthroughin[17];
     bool velocityout[17];
+
+    // Remember the MidiView monitoring output channel for message duplication
+    int midiviewidx = 255;
 
     //==============================================================================
     ReferenceCountedArray<MidiDeviceListEntry> midiInputs, midiOutputs;
@@ -358,38 +395,14 @@ static int zinstcntInstrumentModules = 0;
 class InstrumentModules final : Component
 {
 public:
-    InstrumentModules() {
-        juce::Logger::writeToLog("== InstrumentModules(): Constructor " + std::to_string(zinstcntInstrumentModules++));
-
-        // Create and default Instruments. To be loaded from file in future
-        instrumentmodules.add(new InstrumentModule());
-        createInstrumentModule(0, "General Midi", "MidiGM", "midigm.json",
-            "Grand Piano", 0, 0, 1, false);
-
-        instrumentmodules.add(new InstrumentModule());
-        createInstrumentModule(1, "Deebach BlackBox", "BlackBox", "maxplus.json",
-            "Deebach Grand 1", 121, 8, 0, true);
-
-        instrumentmodules.add(new InstrumentModule());
-        createInstrumentModule(2, "Roland Integra7", "Integra7", "integra7.json",
-            "Piano", 87, 64, 1, false);
-
-        instrumentmodules.add(new InstrumentModule());
-        createInstrumentModule(3, "Ketron SD2", "KetronSD2", "ketronsd2.json",
-            "Grand Piano", 0, 2, 0, false);
-
-        instrumentmodules.add(new InstrumentModule());
-        createInstrumentModule(4, "Custom Midi", "Custom", "custom.json",
-            "Grand Piano", 0, 0, 1, false);
-    };
-
     ~InstrumentModules() {
-        DBG("== InstrumentModules(): Destructor " + std::to_string(--zinstcntInstrumentModules));
+        DBG("=S= InstrumentModules(): Destructor " + std::to_string(--zinstcntInstrumentModules));
     };
 
     bool createInstrumentModule(int moduleidx, String displayname,
-        String subdirectory, String modulename,
-        String voicename, int MSB, int LSB, int font, bool isrotary) {
+        String subdirectory, String modulename, String moduleidstring,
+        String voicename, int MSB, int LSB, int font, bool iszerobased,
+        bool isrotary, int rotortype, int rotorcc, int rotoroff, int rotorslow, int rotorfast) {
 
         if ((moduleidx < 0) || (moduleidx >= instrumentmodules.size())) {
             return false;
@@ -398,11 +411,20 @@ public:
         instrumentmodules[moduleidx]->setDisplayName(displayname);
         instrumentmodules[moduleidx]->setSubDirectory(subdirectory);
         instrumentmodules[moduleidx]->setModuleFileName(modulename);
+        instrumentmodules[moduleidx]->setModuleIdString(moduleidstring);
+
         instrumentmodules[moduleidx]->setDefVoiceName(voicename);
         instrumentmodules[moduleidx]->setDefMSB(MSB);
         instrumentmodules[moduleidx]->setDefLSB(LSB);
         instrumentmodules[moduleidx]->setDefFont(font);
+        instrumentmodules[moduleidx]->setIsZeroBased(iszerobased);
+
         instrumentmodules[moduleidx]->setIsRotary(isrotary);
+        instrumentmodules[moduleidx]->setRotorType(rotortype);
+        instrumentmodules[moduleidx]->setRotorCC(rotorcc);
+        instrumentmodules[moduleidx]->setRotorOff(rotoroff);
+        instrumentmodules[moduleidx]->setRotorSlow(rotorslow);
+        instrumentmodules[moduleidx]->setRotorFast(rotorfast);
 
         return true;
     };
@@ -415,11 +437,14 @@ public:
         vendorname = instrumentmodules[mmoduleidx]->getDisplayName();           //"Deebach Blackbox";
         instrumentdname = instrumentmodules[mmoduleidx]->getSubDirectory();     // "BlackBox";
         instrumentfname = instrumentmodules[mmoduleidx]->getModuleFileName();   //"maxplus.json";
-        isrotary = instrumentmodules[mmoduleidx]->getIsRotary();
+
         String sdefVoice = instrumentmodules[mmoduleidx]->getDefVoiceName();
         int sdefMSB = instrumentmodules[mmoduleidx]->getDefMSB();
         int sdefLSB = instrumentmodules[mmoduleidx]->getDefLSB();
         int sdefFont = instrumentmodules[mmoduleidx]->getDefFont();
+        iszerobased = instrumentmodules[mmoduleidx]->getIsZeroBased();
+
+        isrotary = instrumentmodules[mmoduleidx]->getIsRotary();
 
         return true;
     }
@@ -434,6 +459,10 @@ public:
 
     String getFileName(int moduleid) {
         return instrumentmodules[moduleid]->getModuleFileName();
+    }
+
+    String getModuleIdString(int moduleid) {
+        return instrumentmodules[moduleid]->getModuleIdString();
     }
 
     String getDefVoiceName(int moduleid) {
@@ -456,11 +485,195 @@ public:
         return instrumentmodules.size();
     }
 
+    bool isZeroBased(int moduleid) {
+        return instrumentmodules[moduleid]->getIsZeroBased();
+    }
+
+    bool isZeroBased(String fname) {
+
+        bool iszerobased = true;
+
+        for (auto modulevar : instrumentmodules) {
+            if (modulevar->getModuleFileName() == fname) {
+                iszerobased = modulevar->getIsZeroBased();
+                break;
+            }
+        }
+
+        return iszerobased;
+    }
+
     bool isRotary(int moduleid) {
         return instrumentmodules[moduleid]->getIsRotary();
     }
 
+    int getRotorType(int moduleid) {
+        return instrumentmodules[moduleid]->getRotorType();
+    }
+
+    int getRotorCC(int moduleid) {
+        return instrumentmodules[moduleid]->getRotorCC();
+    }
+
+    int getRotorOff(int moduleid) {
+        return instrumentmodules[moduleid]->getRotorOff();
+    }
+
+    int getRotorSlow(int moduleid) {
+        return instrumentmodules[moduleid]->getRotorSlow();
+    }
+
+    int getRotorFast(int moduleid) {
+        return instrumentmodules[moduleid]->getRotorFast();
+    }
+
+    //-------------------------------------------------------------------------
+// Create Value Tree Module
+//-------------------------------------------------------------------------
+    ValueTree createVTModules()
+    {
+        static Identifier devicemodulesType("devicemodule");           // Pre-create an Identifier
+        static Identifier defaultmoduleType("defaultmodule");
+
+        // Configs ValueTree
+        ValueTree vtmodules(devicemodulesType);
+
+        // Preset the user selected default module
+        vtmodules.setProperty(defaultmoduleType, moduleidx, nullptr);
+
+        if (!vtmodules.isValid()) {
+            juce::Logger::writeToLog("*** createVTModules(): An error occurred while creating final Modules ValueTree...");
+            // To do: Add more error handling
+        }
+
+        return vtmodules;
+    }
+
+    //-------------------------------------------------------------------------
+    // Save Modules Value Tree to Disk
+    //-------------------------------------------------------------------------
+    bool saveModules() {
+
+        DBG("*** saveModules(): Saving Device Modules file to disk");
+
+        // Prepare to save Instrument odules to Disk
+        File outputFile = File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
+            .getChildFile(organdir)
+            .getChildFile(configdir)
+            .getChildFile(modulefname);
+        if (outputFile.existsAsFile())
+        {
+            DBG("*** saveModules(): Modules file exists! Deleting to store new copy");
+            outputFile.deleteFile();
+        }
+        FileOutputStream output(outputFile);
+
+        vtmodules = createVTModules();
+
+        // For testing
+        //String vtxml = vtmodules.toXmlString();
+
+        //void ValueTree::writeToStream(OutputStream & output)	const
+        vtmodules.writeToStream(output);
+        output.flush();
+        if (output.getStatus().failed())
+        {
+            juce::Logger::writeToLog("*** saveModules(): Modules file save failed " + modulefname);
+            // To do: Add more error handling
+            return false;
+        }
+        juce::Logger::writeToLog("*** saveModules(): Modules file saved " + modulefname);
+
+        // Roundtip Save/Reload and update vars
+        //loadmodules();
+
+        return true;
+    }
+
+    //-------------------------------------------------------------------------
+    // Modules Load from known ValueTree
+    //-------------------------------------------------------------------------
+    bool loadVTModules()
+    {
+
+        static Identifier devicemodulesType("devicemodule");           // Pre-create an Identifier
+        static Identifier defaultmoduleType("defaultmodule");
+
+        if (!(vtmodules.isValid())) { //&& (vtmodules.getNumChildren() > 0))) {
+            juce::Logger::writeToLog("*** loadVTModules(): An error occurred while reading temp Modules ValueTree...");
+
+            // To do: Add more error handling
+            return false;
+        }
+
+        // For testing
+        //String vtxml = vtmodules.toXmlString();
+
+        moduleidx = vtmodules.getProperty(defaultmoduleType);
+
+        return true;
+    }
+
+    //-------------------------------------------------------------------------
+    // Load Value Tree Modules from Disk
+    //-------------------------------------------------------------------------
+    bool loadModules() {
+        juce::Logger::writeToLog("*** loadModules(): Loading Module file " + modulefname);
+
+        // Reload Value tree to test
+        // Prepare to read Configs Panel from Disk
+        File inputFile = File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
+            .getChildFile(organdir)
+            .getChildFile(configdir)
+            .getChildFile(modulefname);
+        if (!inputFile.existsAsFile())
+        {
+            juce::Logger::writeToLog("*** loadModules(): No Module file " + modulefname + " to load!");
+
+            inputFile = File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
+                .getChildFile(organdir)
+                .getChildFile(defmodulefname);
+            juce::Logger::writeToLog("*** loadModules(): Loading file mastermodules.cfg instead");
+        }
+
+        FileInputStream input(inputFile);
+        if (input.failedToOpen())
+        {
+            juce::Logger::writeToLog(" ***loadModuless(): Module file " + modulefname + " did not open! Need to recover from this...");
+
+            return false;
+        }
+        else
+        {
+            static Identifier modulesType("modules");   // Pre-create an Identifier
+            ValueTree temp_vtmodules(modulesType);
+
+            // static ValueTree ValueTree::readFromStream(InputStream & input)
+            temp_vtmodules = temp_vtmodules.readFromStream(input);
+
+            // For testing
+            //String xmlstring = temp_vtconfigs.toXmlString();
+
+            if (!(temp_vtmodules.isValid())) //&& (temp_vtconfigs.getNumChildren() > 0)))
+            {
+                juce::Logger::writeToLog("*** loadModules(): Module file read into temp ValueTree failed! No change to Configs");
+
+                // To do: Add some other error handling
+                return false;
+            }
+            else
+                vtmodules = temp_vtmodules;
+
+            loadVTModules();
+        }
+
+        return true;
+    }
+
+    juce_DeclareSingleton(InstrumentModules, true)
+
 private:
+
     // Private Instrument Module Class
     class InstrumentModule final {
     public:
@@ -490,6 +703,14 @@ private:
 
         String getModuleFileName() {
             return modulefilename;
+        }
+
+        void setModuleIdString(String smoduleidstring) {
+            moduleidstring = smoduleidstring;
+        }
+
+        String getModuleIdString() {
+            return moduleidstring;
         }
 
         void setDefVoiceName(String mdefvoicename) {
@@ -532,21 +753,111 @@ private:
             return isrotary;
         }
 
+        void setRotorType(int irotortype) {
+            rotortype = irotortype;
+        }
+
+        int getRotorType() {
+            return rotortype;
+        }
+
+        void setRotorCC(int irotorcc) {
+            rotorcc = irotorcc;
+        }
+
+        int getRotorCC() {
+            return rotorcc;
+        }
+
+        void setRotorOff(int irotoroff) {
+            rotoroff = irotoroff;
+        }
+
+        int getRotorOff() {
+            return rotoroff;
+        }
+
+        void setRotorSlow(int irotorslow) {
+            rotorslow = irotorslow;
+        }
+
+        int getRotorSlow() {
+            return rotorslow;
+        }
+
+        void setRotorFast(int irotorfast) {
+            rotorfast = irotorfast;
+        }
+
+        int getRotorFast() {
+            return rotorfast;
+        }
+
+        void setIsZeroBased(bool biszerobased) {
+            iszero = biszerobased;
+        }
+
+        bool getIsZeroBased() {
+            return iszero;
+        }
+
     private:
         String displayname;
         String subdirectory;
         String modulefilename;
+        String moduleidstring;
+
         String defvoicename;
         int defMSB;
         int defLSB;
         int defFont;
+        bool iszero;
+
         bool isrotary;
+        int rotortype;
+        int rotorcc;
+        int rotoroff;
+        int rotorslow;
+        int rotorfast;
+    };
+
+    // Singleton Constructor
+    InstrumentModules() {
+        juce::Logger::writeToLog("=S= InstrumentModules(): Constructor " + std::to_string(zinstcntInstrumentModules++));
+
+        // Create and default Instruments. To be loaded from file in future
+        instrumentmodules.add(new InstrumentModule());
+        createInstrumentModule(0, "MidiGM", "MidiGM", "midigm.json", "MIDI",
+            "Grand Piano", 0, 0, 1, true, 
+            false, 0, 0, 0, 0, 0);
+
+        instrumentmodules.add(new InstrumentModule());
+        createInstrumentModule(1, "Deebach BlackBox", "BlackBox", "maxplus.json", "Blackbox",
+            "Deebach Grand 1", 121, 8, 0, true, 
+            true, 2, 0x74, 0, 0, 0);
+
+        instrumentmodules.add(new InstrumentModule());
+        createInstrumentModule(2, "Roland Integra7", "Integra7", "integra7.json", "INTEGRA",
+            "Piano", 87, 64, 1, false, 
+            true, 1, 0x01, 0, 0x10, 0x60);
+
+        instrumentmodules.add(new InstrumentModule());
+        createInstrumentModule(3, "Ketron SD2", "KetronSD2", "ketronsd2.json", "SD2",
+            "Grand Piano", 0, 2, 0, true, 
+            true, 1, 0x1E, 0, 0x40, 0X7F);
+
+        instrumentmodules.add(new InstrumentModule());
+        createInstrumentModule(4, "CustomGM", "Custom", "custom.json", "MIDI",
+            "Grand Piano", 0, 0, 1, true, 
+            false, 0, 0, 0, 0, 0);
     };
 
     OwnedArray<InstrumentModule> instrumentmodules;
 
+    ValueTree vtmodules;
+
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(InstrumentModules)
 };
-
+juce_ImplementSingleton(InstrumentModules)
 

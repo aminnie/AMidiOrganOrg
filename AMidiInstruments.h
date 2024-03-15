@@ -227,11 +227,12 @@ private:
 static int zinstcntmidiinstruments = 0;
 class MidiInstruments final : public Component
 {
-
 public:
 
     bool loadMidiInstruments(const String& instrumentfname)
     {
+        String fname = instrumentfname;
+
         // Sample JSON Instrument File
             //std::string jsonText = R"(
             //     {"Vendor":"Max-Plus Instruments", "Instruments" : [["A-Piano", [3, 0, 121, 8, "Deebach Grand1"], [3, 0, 121, 0, "Classic Grand1"], [3, 0, 121, 3, "Classic Grand2"], [3, 0, 121, 9, "Italian Grand1"], [3, 0, 121, 25, "Sharp Piano3"], [3, 0, 121, 4, "Upright Piano1"], [3, 0, 121, 5, "Upright Piano2"], [3, 0, 121, 6, "Upright Piano3"], [3, 0, 121, 22, "SwedishGrand1"], [3, 1, 121, 0, "Pop Grand1"], [3, 1, 121, 5, "Pop Grand2"], [3, 1, 121, 7, "Pop Grand3"], [3, 1, 121, 9, "Pop Grand4"]], ["E-Piano", [3, 64, 121, 88, "Suitcase"], [3, 65, 121, 88, "MK-1"], [3, 66, 121, 88, "Straight Rhodes"], [3, 4, 121, 26, "RidersTremoloEP"]], ["Organ", [3, 65, 121, 101, "Jimmy Jazz 3rdPc"], [3, 78, 121, 100, "Beta Perc Organ"], [3, 90, 121, 100, "SpecFullDrw F/S"]]] }
@@ -243,7 +244,8 @@ public:
 
         // Read the instruments JSON file from disk into a string
         juce::File instrumentFile = File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
-            .getChildFile("AMidiOrgan")
+            .getChildFile(organdir)
+            .getChildFile(instrumentdir)
             .getChildFile(instrumentfname);
         if (!instrumentFile.existsAsFile()) {
             juce::Logger::writeToLog("*** loadMidiInstruments(): Failed to load " + instrumentfname + " instrument file");
@@ -255,26 +257,35 @@ public:
         auto instrumentText = instrumentFile.loadFileAsString();
 
         // Parse the JSON string into a var object.
-        jsonData = juce::JSON::parse(instrumentText);
+        jsonInstrumentData = juce::JSON::parse(instrumentText);
+
+        // Check if newly loaded Midi Instrument file is 0 or 1 based on the PC value
+        // For example: Integra7 needs 1 subtracted from PC value before send
+        // Track this value while the file is loaded for any new Voice selects
+        // and Voice Button assignments. Not used during realtime voice selects 
+        if (instrumentmodules->isZeroBased(fname))
+            iszerobased = true;
+        else
+            iszerobased = false;
 
         return true;
     }
 
     String getVendor()
     {
-        return jsonData["Vendor"];
+        return jsonInstrumentData["Vendor"];
     }
 
     String getCategory(int cat) {
         if (cat < 0)
             return "None";
 
-        return jsonData["Instruments"][cat][0];
+        return jsonInstrumentData["Instruments"][cat][0];
     }
 
     int getCategoryCount() {
 
-        int count = jsonData["Instruments"].size();
+        int count = jsonInstrumentData["Instruments"].size();
         return count;
     }
 
@@ -284,7 +295,7 @@ public:
 
         String svoice;
         try {
-            svoice = jsonData["Instruments"][cat][inst][4];
+            svoice = jsonInstrumentData["Instruments"][cat][inst][4];
         }
         catch (...) {
             svoice = "No Voice";
@@ -297,45 +308,52 @@ public:
         if ((cat < 0) || (inst < 0))
             return 0;
 
-        return jsonData["Instruments"][cat][inst][2];
+        return jsonInstrumentData["Instruments"][cat][inst][2];
     }
 
     int getLSB(int cat, int inst) {
         if ((cat < 0) || (inst < 0))
             return 0;
 
-        return jsonData["Instruments"][cat][inst][3];
+        return jsonInstrumentData["Instruments"][cat][inst][3];
     }
 
     int getFont(int cat, int inst) {
         if ((cat < 0) || (inst < 0))
             return 0;
 
-        return jsonData["Instruments"][cat][inst][1];
+        int insfont = jsonInstrumentData["Instruments"][cat][inst][1];
+
+        if ((!iszerobased) && (inst > 0)) insfont = insfont - 1;
+
+        return insfont;
     }
 
     int getCategoryVoiceCount(int cat) {
         if ((cat < 0) || (cat > getCategoryCount()))
             return 0;
 
-        return jsonData["Instruments"][cat].size();
+        return jsonInstrumentData["Instruments"][cat].size();
     }
 
     ~MidiInstruments() {
         DBG("=S= MidiInstruments(): Destructor " + std::to_string(--zinstcntmidiinstruments));
 
-        delete& jsonData;
+        delete& jsonInstrumentData;
     };
 
     juce_DeclareSingleton(MidiInstruments, true)
 
 private:
     // Private constructor so only one object instance can be created.
-    MidiInstruments() {
+    MidiInstruments() : instrumentmodules(InstrumentModules::getInstance())
+    {
         juce::Logger::writeToLog("=S= MidiInstruments(): Constructor " + std::to_string(zinstcntmidiinstruments++));
     }
 
-    juce::var jsonData;
+    juce::var jsonInstrumentData;
+
+    std::unique_ptr<InstrumentModules> instrumentmodules;
 
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MidiInstruments)

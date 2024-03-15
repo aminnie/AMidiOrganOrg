@@ -85,7 +85,7 @@ public:
         // Read the Panel JSON file from disk into a string
         //juce::File panelFile("C:/amidi/midifiles/panel_master.json");
         juce::File panelFile = File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
-            .getChildFile("AMidiOrgan")
+            .getChildFile(organdir)
             .getChildFile("panel_master.json");
         if (!panelFile.existsAsFile()) {
             juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::InfoIcon, "Panel file not found!", "panel_master.json");
@@ -334,6 +334,19 @@ struct ButtonGroup final : Component
         return muted;
     }
 
+    // Track Muted in Button Group for Preset purposes
+    bool isEffectDirty(int effnum, int effval) {
+
+        if ((effnum < 0) || (effnum > 9)) return false;
+
+        if (cureffectval[effnum] != effval) {
+            cureffectval[effnum] = effval;
+            return true;
+        }
+
+        return false;
+    }
+
     void setMuteButtonStatus(bool bmute) {
         muted = bmute;
     }
@@ -377,6 +390,8 @@ struct ButtonGroup final : Component
     int splitout = 0;
     String splitoutname = "--";
 
+    int cureffectval[10] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+
     int activevoicebutton = 0;
     Component::SafePointer<MuteButton>mutebuttonptr;
     Component::SafePointer<GroupComponent>groupcomponentptr;
@@ -390,7 +405,8 @@ struct ButtonGroup final : Component
 // Class: InstrumentPanel Singleton
 //==============================================================================
 static int zinstcntInstrumentPanel = 0;
-class InstrumentPanel : public Component
+class InstrumentPanel
+    : public Component
 {
 public:
 
@@ -560,7 +576,7 @@ public:
         // Next we proceed to load an instument panel file from disk
         if (fromdisk) {
 
-            if (!loadInstrumentPanel(instrumentdname, panelfname))
+            if (!loadInstrumentPanel(instrumentdname, panelfname, false)) //instrumentdir
             {
                 DBG("*** initInstrumentPanel(): Load InstrumentPanel from disk failed");
                 juce::Logger::writeToLog("*** initInstrumentPanel(): Failed to load " + panelfname + " instrument panel file");
@@ -590,7 +606,7 @@ public:
     //  File::getSpecialLocation (File::SpecialLocationType::currentExecutableFile).getSiblingFile ("MyData")
     //        .getChildFile ("MySpecialFile").getFullPathName();
     //-------------------------------------------------------------------------
-    bool loadInstrumentPanel(String instrumentdname, const String& panelfname) {
+    bool loadInstrumentPanel(String instrumentdir, const String& panelfname, bool bfullpath) {
 
         DBG("*** loadInstrumentPanel(): Loading Instrument Panel from disk");
 
@@ -599,10 +615,20 @@ public:
         {   // Scoping
             // Reload Value tree to test
             // Prepare to read Instrument Panel to Disk
-            File inputFile = File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
-                .getChildFile("AMidiOrgan")
-                .getChildFile(instrumentdname)
-                .getChildFile(panelfname);
+            File inputFile;
+
+            if (!bfullpath) {
+                // Compile Panel File name from components and remember as full path for future saves
+                inputFile = File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
+                    .getChildFile(organdir)
+                    .getChildFile(instrumentdir)
+                    .getChildFile(panelfname);
+
+                panelfullpathname = inputFile.getFullPathName();
+            }
+            else {
+                inputFile = File(panelfname);
+            }
 
             if (!inputFile.existsAsFile())
             {
@@ -611,8 +637,7 @@ public:
                 // To do: Add some other error handling
                 ///return false;
                 inputFile = File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
-                    .getChildFile("AMidiOrgan")
-                    .getChildFile(instrumentdname)
+                    .getChildFile(organdir)
                     .getChildFile(panelfname);
             }
 
@@ -659,15 +684,15 @@ public:
     // https://forum.juce.com/t/example-for-creating-a-file-and-doing-something-with-it/31998
     // Save current Instrument Panel to Disk
     //-------------------------------------------------------------------------
-    bool saveInstrumentPanel(String instrumentdname, const String& panelfname) {
+    bool saveInstrumentPanel(String instrumentdir, const String& panelfname) {
 
         juce::Logger::writeToLog("*** saveInstrumentPanel(): Saving Instrument Panel " + panelfname);
 
         {   // Scoping
             // Prepare to save Instrument Panel to Disk
             File outputFile = File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
-                .getChildFile("AMidiOrgan")
-                .getChildFile(instrumentdname)
+                .getChildFile(organdir)
+                .getChildFile(instrumentdir)
                 .getChildFile(panelfname);
 
             if (outputFile.existsAsFile())
@@ -686,6 +711,40 @@ public:
             if (output.getStatus().failed())
             {
                 juce::Logger::writeToLog("saveInstrumentPanel(): An error occurred in FileOutputStream " + panelfname);
+
+                // To do: Add more error handling
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    // Save Panel with Full Path Name
+    bool saveInstrumentPanel(const String& panelfullpathfname) {
+
+        juce::Logger::writeToLog("*** saveInstrumentPanel(): Saving Instrument Panel " + panelfullpathfname);
+
+        {   // Scoping
+            // Prepare to save Instrument Panel to Disk
+            File outputFile = File(panelfullpathfname);
+
+            if (outputFile.existsAsFile())
+            {
+                DBG("saveInstrumentPanel(): Panel file exists! Delete to store new copy");
+
+                outputFile.deleteFile();
+            }
+            FileOutputStream output(outputFile);
+
+            vtinstrumentpanel = createVTInstrumentPanel();
+
+            //void ValueTree::writeToStream(OutputStream & output)	const
+            vtinstrumentpanel.writeToStream(output);
+            output.flush();
+            if (output.getStatus().failed())
+            {
+                juce::Logger::writeToLog("saveInstrumentPanel(): An error occurred in FileOutputStream " + panelfullpathfname);
 
                 // To do: Add more error handling
                 return false;
@@ -772,6 +831,7 @@ private:
 
         static Identifier filenameType("filename");
         static Identifier vendorType("vendor");
+        static Identifier configfilenameType("configfilename");
 
         static Identifier svoiceType("svoice");
         static Identifier msbType("ccmsb");
@@ -797,6 +857,7 @@ private:
 
         vtinstrumentpanel.setProperty(filenameType, panelfname, nullptr);
         vtinstrumentpanel.setProperty(vendorType, vendorname, nullptr);
+        vtinstrumentpanel.setProperty(configfilenameType, configfname, nullptr);
 
         // Add VoiceButton Instruments from Panel to ValueTree
         for (int i = 0; i < numbervoicebuttons; i++)
@@ -916,6 +977,7 @@ private:
 
         static Identifier filenameType("filename");
         static Identifier vendorType("vendor");
+        static Identifier configfilenameType("configfilename");
 
         static Identifier svoiceType("svoice");
         static Identifier msbType("ccmsb");
@@ -938,10 +1000,14 @@ private:
 
         String filename = vtinstrumentpanel.getProperty(filenameType);
         String vendor = vtinstrumentpanel.getProperty(vendorType);
+        pnlconfigfname = vtinstrumentpanel.getProperty(configfilenameType);
+        // Flag a Config reload needed based on config paramter in Panel File
+        if ((configfname.compare(pnlconfigfname) == 0) ?
+            configreload = false : configreload = true);
 
         panelbuttonidx = 0;
 
-        int i;  // i tracks all Instruments and then mused to move on to Presets
+        int i;  // i tracks all Instruments and then used to move on to Presets
         for (i = 0; i < numbervoicebuttons; ++i)
         {
             // Temporary instrument to read the nodes into
@@ -1121,6 +1187,10 @@ public:
         addLabelAndSetStyle(lblsvoicetxt, false);
         lblsvoicetxt.setBounds(margin, margin + 110, 160, 50);
 
+        lblsvendornametxt.setText("Sound Filename", {});
+        addLabelAndSetStyle(lblsvendornametxt, false);
+        lblsvendornametxt.setBounds(margin + 220, margin + 200, 160, 50);
+
         tbroute = addToList(new TextButton("To Upper"));
         tbroute->setColour(TextButton::textColourOffId, Colours::black);
         tbroute->setColour(TextButton::textColourOnId, Colours::black);
@@ -1173,7 +1243,7 @@ public:
             // Used by Listener to trigger and update Button Text
             bvoiceupdated = true;
 
-            // Populate the Effects Page with last Button Instrument pressed and switch to tab
+            // Populate the Voices Page with last Button Instrument pressed and switch to tab
             tabs.setCurrentTabIndex(currenttabidx, true);
             //String sname = tabs.getCurrentTabName();
 
@@ -1297,7 +1367,7 @@ public:
 
     //-------------------------------------------------------------------------
     // Entry into Voice Panel: Parameters for last panel button pressed
-    bool setPanelButton(int panelbtnidx, String sgroup, int midiout, int tabindex) {
+    bool setPanelButton(int panelbtnidx, String sgroup, String sfilename, int midiout, int tabindex) {
 
         panelbuttonidx = panelbtnidx;
         currenttabidx = tabindex;
@@ -1332,6 +1402,14 @@ public:
         VoiceButton* ptrvoicebutton = instrumentpanel->getVoiceButton(panelbuttonidx);
         String svoice1 = ptrvoicebutton->getInstrument().getVoice();
         lblsvoicetxt.setText(svoice1, {});
+
+        // Load JSON Instrument Sound File for current Voice Button Group if not loaded
+        if ((sfilename != instrumentfname) && (sfilename != "")) {
+            instrumentfname = sfilename;
+
+            midiInstruments->loadMidiInstruments(instrumentfname);
+        }
+        lblsvendornametxt.setText(midiInstruments->getVendor(), {});
 
         // Trigger button to display first level menu
         nestedMenusButton.setEnabled(true);
@@ -1375,6 +1453,7 @@ private:
     juce::Label lblsgrouptxt{ "No Group" };
     juce::Label lblsvoice{ "Button Voice" };
     juce::Label lblsvoicetxt{ "No Voice" };
+    juce::Label lblsvendornametxt{ "Sound File" };
 
     TextButton  nestedMenusButton{ "Voices Menu" };
 
@@ -2005,12 +2084,14 @@ private:
 // Class: KeyboardManualPage - Construct and load
 //==============================================================================
 static int zinstcntmanualpage = 0;
-struct KeyboardManualPage final : public Component, public ComponentListener
+struct KeyboardPanelPage final : public Component, 
+    public ComponentListener
 {
-    KeyboardManualPage(TabbedComponent& tabs, PanelTabsType tabidx,
+    KeyboardPanelPage(TabbedComponent& tabs, PanelTabsType tabidx,
         EffectsPage& effectspage,
         VoicesPage& voicespage) :
         startTime(juce::Time::getMillisecondCounterHiRes() * 0.001),
+        instrumentmodules(InstrumentModules::getInstance()),
         midiInstruments(MidiInstruments::getInstance()), // Singletons if there isn't already one
         mididevices(MidiDevices::getInstance()),
         instrumentpanel(InstrumentPanel::getInstance())
@@ -2208,7 +2289,8 @@ struct KeyboardManualPage final : public Component, public ComponentListener
                         g1svol->setValue(((int)instrument.getVol() / 12.8));
 
                         // Send Vol, or send 0 if Button Group is muted
-                        if ((isdirty & MAPVOL) || (buttongroupismuted)) {
+                        if (ptrbuttongroup->isEffectDirty(0, instrument.getVol()) == true) {
+                            //if ((isdirty & MAPVOL) || (buttongroupismuted)) {
                             int channelvolume = instrument.getVol();
                             if (buttongroupismuted) channelvolume = 0;
 
@@ -2223,7 +2305,8 @@ struct KeyboardManualPage final : public Component, public ComponentListener
                         }
 
                         // Send Exp
-                        if (isdirty & MAPEXP) {
+                        if (ptrbuttongroup->isEffectDirty(1, instrument.getExp())) {
+                            //if (isdirty & MAPEXP) {
                             controllerNumber = CCExp;
                             ccMessage = juce::MidiMessage::controllerEvent(
                                 buttongroupmidiout,
@@ -2235,7 +2318,8 @@ struct KeyboardManualPage final : public Component, public ComponentListener
                         }
 
                         // Send Rev
-                        if (isdirty & MAPREV) {
+                        if (ptrbuttongroup->isEffectDirty(2, instrument.getRev())) {
+                            //if (isdirty & MAPREV) {
                             controllerNumber = CCRev;
                             ccMessage = juce::MidiMessage::controllerEvent(
                                 buttongroupmidiout,
@@ -2246,8 +2330,22 @@ struct KeyboardManualPage final : public Component, public ComponentListener
                             mididevices->sendToOutputs(ccMessage);
                         }
 
+                        // Send Cho
+                        if (ptrbuttongroup->isEffectDirty(3, instrument.getCho())) {
+                            //if (isdirty & MAPCHO) {
+                            controllerNumber = CCCho;
+                            ccMessage = juce::MidiMessage::controllerEvent(
+                                buttongroupmidiout,
+                                controllerNumber,
+                                instrument.getCho()
+                            );
+                            ccMessage.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
+                            mididevices->sendToOutputs(ccMessage);
+                        }
+
                         // Send Mod
-                        if (isdirty & MAPMOD) {
+                        if (ptrbuttongroup->isEffectDirty(4, instrument.getMod())) {
+                            //if (isdirty & MAPMOD) {
                             controllerNumber = CCMod;
                             ccMessage = juce::MidiMessage::controllerEvent(
                                 buttongroupmidiout,
@@ -2259,7 +2357,8 @@ struct KeyboardManualPage final : public Component, public ComponentListener
                         }
 
                         // Send Tim
-                        if (isdirty & MAPTIM) {
+                        if (ptrbuttongroup->isEffectDirty(5, instrument.getTim())) {
+                            //if (isdirty & MAPTIM) {
                             controllerNumber = CCTim;
                             ccMessage = juce::MidiMessage::controllerEvent(
                                 buttongroupmidiout,
@@ -2271,7 +2370,8 @@ struct KeyboardManualPage final : public Component, public ComponentListener
                         }
 
                         // Send Atk
-                        if (isdirty & MAPATK) {
+                        if (ptrbuttongroup->isEffectDirty(6, instrument.getAtk())) {
+                            //if (isdirty & MAPATK) {
                             controllerNumber = CCAtk;
                             ccMessage = juce::MidiMessage::controllerEvent(
                                 buttongroupmidiout,
@@ -2283,7 +2383,8 @@ struct KeyboardManualPage final : public Component, public ComponentListener
                         }
 
                         // Send Rel
-                        if (isdirty & MAPREL) {
+                        if (ptrbuttongroup->isEffectDirty(7, instrument.getRel())) {
+                            //if (isdirty & MAPREL) {
                             controllerNumber = CCRel;
                             ccMessage = juce::MidiMessage::controllerEvent(
                                 buttongroupmidiout,
@@ -2295,7 +2396,8 @@ struct KeyboardManualPage final : public Component, public ComponentListener
                         }
 
                         // Send Bri
-                        if (isdirty & MAPBRI) {
+                        if (ptrbuttongroup->isEffectDirty(8, instrument.getBri())) {
+                            //if (isdirty & MAPBRI) {
                             controllerNumber = CCBri;
                             ccMessage = juce::MidiMessage::controllerEvent(
                                 buttongroupmidiout,
@@ -2307,7 +2409,8 @@ struct KeyboardManualPage final : public Component, public ComponentListener
                         }
 
                         // Send Pan
-                        if (isdirty & MAPPAN) {
+                        if (ptrbuttongroup->isEffectDirty(9, instrument.getPan())) {
+                            //if (isdirty & MAPPAN) {
                             controllerNumber = CCPan;
                             ccMessage = juce::MidiMessage::controllerEvent(
                                 buttongroupmidiout,
@@ -2317,11 +2420,6 @@ struct KeyboardManualPage final : public Component, public ComponentListener
                             ccMessage.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
                             mididevices->sendToOutputs(ccMessage);
                         }
-
-                        //int bnumber = i;
-                        //int bgroup = sb->getRadioGroupId();
-                        //String strstatus = "Button " + juce::String((int)sb->getButtonId() + 1) + " " + instrument.getVoice();
-                        //statusLabel->setText(strstatus, juce::dontSendNotification);
                     };
 
                 // Default first button to send MIDI program change
@@ -2605,22 +2703,27 @@ struct KeyboardManualPage final : public Component, public ComponentListener
                         g2svol->setValue(((int)instrument.getVol() / 12.8));
 
                         // Send Vol, or send 0 if Button Group is muted
-                        if ((isdirty & MAPVOL) || (buttongroupismuted)) {
+                        if (ptrbuttongroup->isEffectDirty(0, instrument.getVol()) == true) {
+                            //if ((isdirty & MAPVOL) || (buttongroupismuted)) {
                             int channelvolume = instrument.getVol();
                             if (buttongroupismuted) channelvolume = 0;
 
-                            controllerNumber = CCVol;
-                            ccMessage = juce::MidiMessage::controllerEvent(
-                                buttongroupmidiout,
-                                controllerNumber,
-                                channelvolume
-                            );
-                            ccMessage.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
-                            mididevices->sendToOutputs(ccMessage);
+                            if (ptrbuttongroup->isEffectDirty(0, channelvolume)) {
+                                controllerNumber = CCVol;
+                                ccMessage = juce::MidiMessage::controllerEvent(
+                                    buttongroupmidiout,
+                                    controllerNumber,
+                                    channelvolume
+                                );
+                                ccMessage.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
+                                mididevices->sendToOutputs(ccMessage);
+                            }
+
                         }
 
                         // Send Exp
-                        if (isdirty & MAPEXP) {
+                        if (ptrbuttongroup->isEffectDirty(1, instrument.getExp())) {
+                            //if (isdirty & MAPEXP) {
                             controllerNumber = CCExp;
                             ccMessage = juce::MidiMessage::controllerEvent(
                                 buttongroupmidiout,
@@ -2632,7 +2735,8 @@ struct KeyboardManualPage final : public Component, public ComponentListener
                         }
 
                         // Send Rev
-                        if (isdirty & MAPREV) {
+                        if (ptrbuttongroup->isEffectDirty(2, instrument.getRev()) == true) {
+                            //if (isdirty & MAPREV) {
                             controllerNumber = CCRev;
                             ccMessage = juce::MidiMessage::controllerEvent(
                                 buttongroupmidiout,
@@ -2643,8 +2747,21 @@ struct KeyboardManualPage final : public Component, public ComponentListener
                             mididevices->sendToOutputs(ccMessage);
                         }
 
+                        if (ptrbuttongroup->isEffectDirty(3, instrument.getCho()) == true) {
+                            //if (isdirty & MAPCHO) {
+                            controllerNumber = CCCho;
+                            ccMessage = juce::MidiMessage::controllerEvent(
+                                buttongroupmidiout,
+                                controllerNumber,
+                                instrument.getCho()
+                            );
+                            ccMessage.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
+                            mididevices->sendToOutputs(ccMessage);
+                        }
+
                         // Send Mod
-                        if (isdirty & MAPMOD) {
+                        if (ptrbuttongroup->isEffectDirty(4, instrument.getMod()) == true) {
+                            //if (isdirty & MAPMOD) {
                             controllerNumber = CCMod;
                             ccMessage = juce::MidiMessage::controllerEvent(
                                 buttongroupmidiout,
@@ -2656,7 +2773,8 @@ struct KeyboardManualPage final : public Component, public ComponentListener
                         }
 
                         // Send Tim
-                        if (isdirty & MAPTIM) {
+                        if (ptrbuttongroup->isEffectDirty(5, instrument.getTim()) == true) {
+                            //if (isdirty & MAPTIM) {
                             controllerNumber = CCTim;
                             ccMessage = juce::MidiMessage::controllerEvent(
                                 buttongroupmidiout,
@@ -2665,10 +2783,12 @@ struct KeyboardManualPage final : public Component, public ComponentListener
                             );
                             ccMessage.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
                             mididevices->sendToOutputs(ccMessage);
+                            //}
                         }
 
                         // Send Atk
-                        if (isdirty & MAPATK) {
+                        if (ptrbuttongroup->isEffectDirty(6, instrument.getAtk()) == true) {
+                            //if (isdirty & MAPATK) {
                             controllerNumber = CCAtk;
                             ccMessage = juce::MidiMessage::controllerEvent(
                                 buttongroupmidiout,
@@ -2680,7 +2800,8 @@ struct KeyboardManualPage final : public Component, public ComponentListener
                         }
 
                         // Send Rel
-                        if (isdirty & MAPREL) {
+                        if (ptrbuttongroup->isEffectDirty(7, instrument.getRel()) == true) {
+                            //if (isdirty & MAPREL) {
                             controllerNumber = CCRel;
                             ccMessage = juce::MidiMessage::controllerEvent(
                                 buttongroupmidiout,
@@ -2692,7 +2813,8 @@ struct KeyboardManualPage final : public Component, public ComponentListener
                         }
 
                         // Send Bri
-                        if (isdirty & MAPBRI) {
+                        if (ptrbuttongroup->isEffectDirty(8, instrument.getBri()) == true) {
+                            //if (isdirty & MAPBRI) {
                             controllerNumber = CCBri;
                             ccMessage = juce::MidiMessage::controllerEvent(
                                 buttongroupmidiout,
@@ -2704,7 +2826,8 @@ struct KeyboardManualPage final : public Component, public ComponentListener
                         }
 
                         // Send Pan
-                        if (isdirty & MAPPAN) {
+                        if (ptrbuttongroup->isEffectDirty(9, instrument.getPan()) == true) {
+                            //if (isdirty & MAPPAN) {
                             controllerNumber = CCPan;
                             ccMessage = juce::MidiMessage::controllerEvent(
                                 instrument.getChannel(),
@@ -2714,14 +2837,6 @@ struct KeyboardManualPage final : public Component, public ComponentListener
                             ccMessage.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
                             mididevices->sendToOutputs(ccMessage);
                         }
-
-                        // Print the created MIDI message to the console
-                        //juce::Logger::writeToLog("Created MIDI CC Message: " + ccMessage.getDescription());
-
-                        //int bnumber = i;
-                        //int bgroup = sb->getRadioGroupId();
-                        //String strstatus = "Button " + juce::String((int)sb->getButtonId() + 1) + " " + instrument.getVoice();
-                        //statusLabel->setText(strstatus, juce::dontSendNotification);
                     };
 
                 // Default first button to send MIDI program change
@@ -3000,7 +3115,8 @@ struct KeyboardManualPage final : public Component, public ComponentListener
                         g3svol->setValue(((int)instrument.getVol() / 12.8));
 
                         // Send Vol, or send 0 if Button Group is muted
-                        if ((isdirty & MAPVOL) || (buttongroupismuted)) {
+                        if (ptrbuttongroup->isEffectDirty(0, instrument.getVol()) == true) {
+                            //if ((isdirty & MAPVOL) || (buttongroupismuted)) {
                             int channelvolume = instrument.getVol();
                             if (buttongroupismuted) channelvolume = 0;
 
@@ -3015,7 +3131,8 @@ struct KeyboardManualPage final : public Component, public ComponentListener
                         }
 
                         // Send Exp
-                        if (isdirty & MAPEXP) {
+                        if (ptrbuttongroup->isEffectDirty(1, instrument.getExp()) == true) {
+                            //if (isdirty & MAPEXP) {
                             controllerNumber = CCExp;
                             ccMessage = juce::MidiMessage::controllerEvent(
                                 buttongroupmidiout,
@@ -3027,7 +3144,8 @@ struct KeyboardManualPage final : public Component, public ComponentListener
                         }
 
                         // Send Rev
-                        if (isdirty & MAPREV) {
+                        if (ptrbuttongroup->isEffectDirty(2, instrument.getRev()) == true) {
+                            //if (isdirty & MAPREV) {
                             controllerNumber = CCRev;
                             ccMessage = juce::MidiMessage::controllerEvent(
                                 buttongroupmidiout,
@@ -3038,8 +3156,22 @@ struct KeyboardManualPage final : public Component, public ComponentListener
                             mididevices->sendToOutputs(ccMessage);
                         }
 
+                        // Send Cho
+                        if (ptrbuttongroup->isEffectDirty(3, instrument.getCho()) == true) {
+                            //if (isdirty & MAPCHO) {
+                            controllerNumber = CCCho;
+                            ccMessage = juce::MidiMessage::controllerEvent(
+                                buttongroupmidiout,
+                                controllerNumber,
+                                instrument.getCho()
+                            );
+                            ccMessage.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
+                            mididevices->sendToOutputs(ccMessage);
+                        }
+
                         // Send Mod
-                        if (isdirty & MAPMOD) {
+                        if (ptrbuttongroup->isEffectDirty(4, instrument.getMod()) == true) {
+                            //if (isdirty & MAPMOD) {
                             controllerNumber = CCMod;
                             ccMessage = juce::MidiMessage::controllerEvent(
                                 buttongroupmidiout,
@@ -3051,7 +3183,8 @@ struct KeyboardManualPage final : public Component, public ComponentListener
                         }
 
                         // Send Tim
-                        if (isdirty & MAPTIM) {
+                        if (ptrbuttongroup->isEffectDirty(5, instrument.getTim()) == true) {
+                            //if (isdirty & MAPTIM) {
                             controllerNumber = CCTim;
                             ccMessage = juce::MidiMessage::controllerEvent(
                                 buttongroupmidiout,
@@ -3063,7 +3196,8 @@ struct KeyboardManualPage final : public Component, public ComponentListener
                         }
 
                         // Send Atk
-                        if (isdirty & MAPATK) {
+                        if (ptrbuttongroup->isEffectDirty(6, instrument.getAtk()) == true) {
+                            //if (isdirty & MAPATK) {
                             controllerNumber = CCAtk;
                             ccMessage = juce::MidiMessage::controllerEvent(
                                 buttongroupmidiout,
@@ -3075,7 +3209,8 @@ struct KeyboardManualPage final : public Component, public ComponentListener
                         }
 
                         // Send Rel
-                        if (isdirty & MAPREL) {
+                        if (ptrbuttongroup->isEffectDirty(7, instrument.getRel()) == true) {
+                            //if (isdirty & MAPREL) {
                             controllerNumber = CCRel;
                             ccMessage = juce::MidiMessage::controllerEvent(
                                 buttongroupmidiout,
@@ -3087,7 +3222,8 @@ struct KeyboardManualPage final : public Component, public ComponentListener
                         }
 
                         // Send Bri
-                        if (isdirty & MAPBRI) {
+                        if (ptrbuttongroup->isEffectDirty(8, instrument.getBri()) == true) {
+                            //if (isdirty & MAPBRI) {
                             controllerNumber = CCBri;
                             ccMessage = juce::MidiMessage::controllerEvent(
                                 buttongroupmidiout,
@@ -3099,7 +3235,8 @@ struct KeyboardManualPage final : public Component, public ComponentListener
                         }
 
                         // Send Pan
-                        if (isdirty & MAPPAN) {
+                        if (ptrbuttongroup->isEffectDirty(9, instrument.getPan()) == true) {
+                            //if (isdirty & MAPPAN) {
                             controllerNumber = CCPan;
                             ccMessage = juce::MidiMessage::controllerEvent(
                                 buttongroupmidiout,
@@ -3109,14 +3246,6 @@ struct KeyboardManualPage final : public Component, public ComponentListener
                             ccMessage.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
                             mididevices->sendToOutputs(ccMessage);
                         }
-
-                        // Print the created MIDI message to the console
-                        //juce::Logger::writeToLog("Created MIDI CC Message: " + ccMessage.getDescription());
-
-                        //int bnumber = i;
-                        //int bgroup = sb->getRadioGroupId();
-                        //String strstatus = "Button " + juce::String((int)sb->getButtonId() + 1) + " " + instrument.getVoice();
-                        //statusLabel->setText(strstatus, juce::dontSendNotification);
                     };
 
                 // Default first button to send MIDI program change
@@ -3405,7 +3534,8 @@ struct KeyboardManualPage final : public Component, public ComponentListener
                         g4svol->setValue(((int)instrument.getVol() / 12.8));
 
                         // Send Vol, or send 0 if Button Group is muted
-                        if ((isdirty & MAPVOL) || (buttongroupismuted)) {
+                        if (ptrbuttongroup->isEffectDirty(0, instrument.getVol()) == true) {
+                            //if ((isdirty & MAPVOL) || (buttongroupismuted)) {
                             int channelvolume = instrument.getVol();
                             if (buttongroupismuted) channelvolume = 0;
 
@@ -3420,7 +3550,8 @@ struct KeyboardManualPage final : public Component, public ComponentListener
                         }
 
                         // Send Exp
-                        if (isdirty & MAPEXP) {
+                        if (ptrbuttongroup->isEffectDirty(1, instrument.getExp()) == true) {
+                            //if (isdirty & MAPEXP) {
                             controllerNumber = CCExp;
                             ccMessage = juce::MidiMessage::controllerEvent(
                                 instrument.getChannel(),
@@ -3432,7 +3563,8 @@ struct KeyboardManualPage final : public Component, public ComponentListener
                         }
 
                         // Send Rev
-                        if (isdirty & MAPREV) {
+                        if (ptrbuttongroup->isEffectDirty(2, instrument.getRev()) == true) {
+                            //if (isdirty & MAPREV) {
                             controllerNumber = CCRev;
                             ccMessage = juce::MidiMessage::controllerEvent(
                                 instrument.getChannel(),
@@ -3443,8 +3575,22 @@ struct KeyboardManualPage final : public Component, public ComponentListener
                             mididevices->sendToOutputs(ccMessage);
                         }
 
+                        // Send Cho
+                        if (ptrbuttongroup->isEffectDirty(3, instrument.getCho()) == true) {
+                            //if (isdirty & MAPCHO) {
+                            controllerNumber = CCMod;
+                            ccMessage = juce::MidiMessage::controllerEvent(
+                                instrument.getChannel(),
+                                controllerNumber,
+                                instrument.getMod()
+                            );
+                            ccMessage.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
+                            mididevices->sendToOutputs(ccMessage);
+                        }
+
                         // Send Mod
-                        if (isdirty & MAPMOD) {
+                        if (ptrbuttongroup->isEffectDirty(4, instrument.getMod()) == true) {
+                            //if (isdirty & MAPMOD) {
                             controllerNumber = CCMod;
                             ccMessage = juce::MidiMessage::controllerEvent(
                                 instrument.getChannel(),
@@ -3456,7 +3602,8 @@ struct KeyboardManualPage final : public Component, public ComponentListener
                         }
 
                         // Send Tim
-                        if (isdirty & MAPTIM) {
+                        if (ptrbuttongroup->isEffectDirty(5, instrument.getTim()) == true) {
+                            //if (isdirty & MAPTIM) {
                             controllerNumber = CCTim;
                             ccMessage = juce::MidiMessage::controllerEvent(
                                 instrument.getChannel(),
@@ -3468,7 +3615,8 @@ struct KeyboardManualPage final : public Component, public ComponentListener
                         }
 
                         // Send Atk
-                        if (isdirty & MAPATK) {
+                        if (ptrbuttongroup->isEffectDirty(6, instrument.getMod()) == true) {
+                            //if (isdirty & MAPATK) {
                             controllerNumber = CCAtk;
                             ccMessage = juce::MidiMessage::controllerEvent(
                                 instrument.getChannel(),
@@ -3480,7 +3628,8 @@ struct KeyboardManualPage final : public Component, public ComponentListener
                         }
 
                         // Send Rel
-                        if (isdirty & MAPREL) {
+                        if (ptrbuttongroup->isEffectDirty(7, instrument.getRel()) == true) {
+                            //if (isdirty & MAPREL) {
                             controllerNumber = CCRel;
                             ccMessage = juce::MidiMessage::controllerEvent(
                                 instrument.getChannel(),
@@ -3492,7 +3641,8 @@ struct KeyboardManualPage final : public Component, public ComponentListener
                         }
 
                         // Send Bri
-                        if (isdirty & MAPBRI) {
+                        if (ptrbuttongroup->isEffectDirty(8, instrument.getBri()) == true) {
+                            //if (isdirty & MAPBRI) {
                             controllerNumber = CCBri;
                             ccMessage = juce::MidiMessage::controllerEvent(
                                 instrument.getChannel(),
@@ -3504,7 +3654,8 @@ struct KeyboardManualPage final : public Component, public ComponentListener
                         }
 
                         // Send Pan
-                        if (isdirty & MAPPAN) {
+                        if (ptrbuttongroup->isEffectDirty(9, instrument.getPan()) == true) {
+                            //if (isdirty & MAPPAN) {
                             controllerNumber = CCPan;
                             ccMessage = juce::MidiMessage::controllerEvent(
                                 instrument.getChannel(),
@@ -3514,13 +3665,6 @@ struct KeyboardManualPage final : public Component, public ComponentListener
                             ccMessage.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
                             mididevices->sendToOutputs(ccMessage);
                         }
-
-                        // Print the created MIDI message to the console
-                        //juce::Logger::writeToLog("Created MIDI CC Message: " + ccMessage.getDescription());
-
-                        //int bgroup = sb->getRadioGroupId();
-                        //String strstatus = "Button " + juce::String((int)sb->getButtonId() + 1) + " " + instrument.getVoice();
-                        //statusLabel->setText(strstatus, juce::dontSendNotification);
                     };
 
                 // Default first button to send MIDI program change
@@ -3688,9 +3832,10 @@ struct KeyboardManualPage final : public Component, public ComponentListener
                     int panelgroupmidiout = ptrbuttongroup->midiout;
                     String panelgrouptitle = panelgroupname + "   [In:" + std::to_string(panelgroupmidiin) + " | Out:" + std::to_string(panelgroupmidiout) + "]";
 
-                    // Populate the Effects Page with last Button Instrument pressed and switch to tab
-                    voicespage.setPanelButton(panelbuttonidx, panelgrouptitle, panelgroupmidiout, currenttabidx);
+                    String sfilename = instrumentmodules->getFileName(ptrbuttongroup->moduleidx);
+                    voicespage.setPanelButton(panelbuttonidx, panelgrouptitle, sfilename, panelgroupmidiout, currenttabidx);
 
+                    // Populate the Effects Page with last Button Instrument pressed and switch to tab
                     tabs.setCurrentTabIndex(PTVoices, true);
                     //String sname = tabs->getCurrentTabName();
                 };
@@ -3885,6 +4030,7 @@ struct KeyboardManualPage final : public Component, public ComponentListener
             ButtonGroup* ptrbuttongroup = instrumentpanel->getButtonGroup(buttongroupidx);
             int buttongroupmidiin = ptrbuttongroup->midiin;
             int buttongroupmidiout = ptrbuttongroup->midiout;
+            int buttongroupmoduleidx = ptrbuttongroup->moduleidx;
             String buttongrouptitle = "Rotary   [In:" + std::to_string(buttongroupmidiin) + " | Out:" + std::to_string(buttongroupmidiout) + "]";
 
             int g5xoffset = mgroup;
@@ -3909,38 +4055,62 @@ struct KeyboardManualPage final : public Component, public ComponentListener
             tbrotslow->setToggleState(false, dontSendNotification);
             tbrotslow->onClick = [=]()
                 {
+                    int buttongroupidx = 0;
+                    if (tabidx == PTLower) {
+                        buttongroupidx = 4;
+                    }
+                    else if (tabidx == PTUpper) {
+                        buttongroupidx = 0;
+                    }
+
+                    ButtonGroup* ptrbuttongroup = instrumentpanel->getButtonGroup(buttongroupidx);
+                    int buttongroupmoduleidx = ptrbuttongroup->moduleidx;
+                    int buttongroupmidiout = ptrbuttongroup->midiout;
+
                     if (!tbrotslow->getToggleState())
                     {
+                        // Ignore Fast/Slow command if Rotor brake on
                         if (rotarybrake) return;
 
+                        if (instrumentmodules->getRotorType(buttongroupmoduleidx) == 1) {
+                            // Preset Rotor change control value to fast
+                            RotaryFastSlow(buttongroupmidiout,
+                                instrumentmodules->getRotorCC(buttongroupmoduleidx),        //74
+                                instrumentmodules->getRotorFast(buttongroupmoduleidx)
+                            );
+                        }
+                        else if (instrumentmodules->getRotorType(buttongroupmoduleidx) == 2) {
+                            rotorsarray.add(new RotaryFastThread(*this, buttongroupmidiout));
+                        }
+
                         tbrotslow->setButtonText("Fast");
-
-                        rotorsarray.add(new RotaryFastThread(*this, buttongroupmidiout));
-
                         isFastUpper = true;
                     }
                     else
                     {
                         if (rotarybrake) return;
 
+                        if (instrumentmodules->getRotorType(buttongroupmoduleidx) == 1) {
+                            // Preset Rotor change control value to slow
+                            RotaryFastSlow(buttongroupmidiout,
+                                instrumentmodules->getRotorCC(buttongroupmoduleidx),        //74
+                                instrumentmodules->getRotorSlow(buttongroupmoduleidx)
+                            );
+                        }
+                        else if (instrumentmodules->getRotorType(buttongroupmoduleidx) == 2) {
+                            rotorsarray.add(new RotarySlowThread(*this, buttongroupmidiout));
+                        }
+
                         tbrotslow->setButtonText("Slow");
-
-                        rotorsarray.add(new RotarySlowThread(*this, buttongroupmidiout));
-
                         isFastUpper = false;
                     }
                 };
 
             // Preset rotary change control value to slow
-            int controllerNumber = 74;    //
-            juce::MidiMessage ccMessage = juce::MidiMessage::controllerEvent(
-                gmidichan,
-                controllerNumber,
-                10
+            RotaryFastSlow(gmidichan, 
+                instrumentmodules->getRotorCC(buttongroupmoduleidx),        //74
+                instrumentmodules->getRotorSlow(buttongroupmoduleidx)
             );
-            ccMessage.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
-            mididevices->sendToOutputs(ccMessage);
-
             //// Check slow/fast startup as organ rotary seems to be out of sync at startp
             //// If we keep, then is the above redundant?
             tbrotslow->onClick();
@@ -3957,40 +4127,49 @@ struct KeyboardManualPage final : public Component, public ComponentListener
             tbrotbrake->setToggleState(false, dontSendNotification);
             tbrotbrake->onClick = [=]()
                 {
+                    int buttongroupidx = 0;
+                    if (tabidx == PTLower) {
+                        buttongroupidx = 4;
+                    }
+                    else if (tabidx == PTUpper) {
+                        buttongroupidx = 0;
+                    }
+
+                    ButtonGroup* ptrbuttongroup = instrumentpanel->getButtonGroup(buttongroupidx);
+                    int buttongroupmoduleidx = ptrbuttongroup->moduleidx;
+                    int buttongroupmidiout = ptrbuttongroup->midiout;
+
                     if (tbrotbrake->getToggleState())
                     {
+                        // Set Rotor Brake on
+                        RotaryFastSlow(buttongroupmidiout,
+                            instrumentmodules->getRotorCC(buttongroupmoduleidx),        //74
+                            instrumentmodules->getRotorOff(buttongroupmoduleidx)
+                        );
+
                         tbrotbrake->setButtonText("Brake On");
                         rotarybrake = true;
-
-                        // Send rotary change control value
-                        int controllerNumber = 74;    //
-                        juce::MidiMessage ccMessage = juce::MidiMessage::controllerEvent(
-                            buttongroupmidiout,
-                            controllerNumber,
-                            0
-                        );
-                        ccMessage.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
-                        mididevices->sendToOutputs(ccMessage);
 
                         tbrotslow->setEnabled(false);     // Disable rotor fast/slow changes
                     }
                     else
                     {
+                        // Set Rotor Brake off and restart Rotor at previous Fast or Slow
+                        if (isFastUpper) {
+                            RotaryFastSlow(buttongroupmidiout,
+                                instrumentmodules->getRotorCC(buttongroupmoduleidx),
+                                instrumentmodules->getRotorFast(buttongroupmoduleidx)
+                            );
+                        }
+                        else {
+                            RotaryFastSlow(buttongroupmidiout,
+                                instrumentmodules->getRotorCC(buttongroupmoduleidx),
+                                instrumentmodules->getRotorSlow(buttongroupmoduleidx)
+                            );
+                        }
+
                         tbrotbrake->setButtonText("Brake Off");
                         rotarybrake = false;
-
-                        // Send rotary change control value
-                        int controllerNumber = 74;    //
-                        int controllerValue = 10;
-                        if (isFastUpper) controllerValue = 63;
-
-                        juce::MidiMessage ccMessage = juce::MidiMessage::controllerEvent(
-                            buttongroupmidiout,
-                            controllerNumber,
-                            controllerValue
-                        );
-                        ccMessage.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
-                        mididevices->sendToOutputs(ccMessage);
 
                         tbrotslow->setEnabled(true);     // Enable rotor fast/slow changes
                     }
@@ -4069,7 +4248,8 @@ struct KeyboardManualPage final : public Component, public ComponentListener
                 {
                     DBG("*** KeyboardManualPage(): Saving Panel");
 
-                    bool bsaved = instrumentpanel->saveInstrumentPanel(instrumentdname, panelfname);
+                    //bool bsaved = instrumentpanel->saveInstrumentPanel(instrumentdname, panelfname);
+                    bool bsaved = instrumentpanel->saveInstrumentPanel(panelfullpathname);
 
                     String msgloaded;
                     if (!bsaved) {
@@ -4099,14 +4279,18 @@ struct KeyboardManualPage final : public Component, public ComponentListener
             tbSaveAs->onClick = [=]()
                 {
                     File fileToSave = File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
-                        .getChildFile("AMidiOrgan")
+                        .getChildFile(organdir)
                         .getChildFile(instrumentdname);
 
                     bool useNativeVersion = false;
+                    //filechooser.reset(new FileChooser("Save Panel As: Select existing or create new *.pnl",
+                    //    File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
+                    //    .getChildFile(organdir)
+                    //    .getChildFile(instrumentdname),
+                    //    "*.pnl", useNativeVersion));
+
                     filechooser.reset(new FileChooser("Save Panel As: Select existing or create new *.pnl",
-                        File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
-                        .getChildFile("AMidiOrgan")
-                        .getChildFile(instrumentdname),
+                        File(panelfullpathname),
                         "*.pnl", useNativeVersion));
 
                     filechooser->launchAsync(
@@ -4155,6 +4339,11 @@ struct KeyboardManualPage final : public Component, public ComponentListener
                     tbSave->setEnabled(false);
                 };
         }   // End - Save and Save As Buttons
+
+        lblpanelfile = addToList(new Label("Panel File", panelfname));
+        lblpanelfile->setColour(juce::Label::textColourId, juce::Colours::grey);
+        lblpanelfile->setJustificationType(juce::Justification::left);
+        lblpanelfile->setBounds(mgroup + 1240, 205, 200, 30);
 
     }   // End KeyboardManual Page Constructor
 
@@ -4439,10 +4628,12 @@ struct KeyboardManualPage final : public Component, public ComponentListener
 
             configchanged = false;
         }
+
+        lblpanelfile->setText(panelfname, {});
     }
 
     //-----------------------------------------------------------------------------
-    ~KeyboardManualPage()
+    ~KeyboardPanelPage()
     {
         DBG("== KeyboardManualPage(): Destructor " + std::to_string(--zinstcntmanualpage));
     }
@@ -4455,6 +4646,7 @@ private:
     std::unique_ptr<MidiInstruments> midiInstruments;
     std::unique_ptr<MidiDevices> mididevices;
     std::unique_ptr<InstrumentPanel> instrumentpanel;
+    std::unique_ptr<InstrumentModules> instrumentmodules;
 
     std::unique_ptr<FileChooser> filechooser;
 
@@ -4465,6 +4657,7 @@ private:
     TextButton* tbrotslow;
     TextButton* tbrotbrake;
 
+    Label* lblpanelfile;
     CommandButton* cbSave;
 
     bool isFastUpper = false;
@@ -4538,6 +4731,31 @@ private:
     }
 
     //-----------------------------------------------------------------------------
+    // Simple on Rotary Fast/Slow and On/Off toggles with Midi Devices doing the ramp up/down
+    void RotaryFastSlow(int midiout, int controllerNumber, int controllerValue) {
+        // Preset rotary change control value to slow
+        juce::MidiMessage ccMessage = juce::MidiMessage::controllerEvent(
+            midiout,
+            controllerNumber,
+            controllerValue
+        );
+        ccMessage.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
+        mididevices->sendToOutputs(ccMessage);
+    }
+
+    void RotaryOnOff(int midiout, int controllerNumber, int controllerValue) {
+        // Preset rotary change control value to fast
+        juce::MidiMessage ccMessage = juce::MidiMessage::controllerEvent(
+            midiout,
+            controllerNumber,
+            controllerValue
+        );
+        ccMessage.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
+        mididevices->sendToOutputs(ccMessage);
+    }
+
+
+    //-----------------------------------------------------------------------------
     // Function adds a component to a list and calls addAndMakeVisible on it
     template <typename ComponentType>
     ComponentType* addToList(ComponentType* newComp)
@@ -4547,7 +4765,7 @@ private:
         return newComp;
     }
 
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(KeyboardManualPage)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(KeyboardPanelPage)
 };
 
 
@@ -4558,13 +4776,14 @@ static int zinstcntMidiStartPage = 0;
 class MidiStartPage final : public Component,
     private MidiKeyboardState::Listener,
     private MidiInputCallback,
-    private AsyncUpdater
+    private AsyncUpdater,
+    public ComponentListener
 {
 public:
     MidiStartPage(TabbedComponent& tabs) : midiKeyboard(keyboardState, MidiKeyboardComponent::horizontalKeyboard),
         midiInputSelector(new MidiDeviceListBox("Midi Input Selector", *this, true)),
         midiOutputSelector(new MidiDeviceListBox("Midi Output Selector", *this, false)),
-        instrumentmodules(new InstrumentModules()),
+        instrumentmodules(InstrumentModules::getInstance()),
         midiInstruments(MidiInstruments::getInstance()),
         mididevices(MidiDevices::getInstance()),
         instrumentpanel(InstrumentPanel::getInstance())
@@ -4593,6 +4812,73 @@ public:
         addAndMakeVisible(midiInputSelector.get());
         addAndMakeVisible(midiOutputSelector.get());
 
+        addAndMakeVisible(loadConfigButton);
+        loadConfigButton.setButtonText("Load Config");
+        loadConfigButton.setColour(TextButton::textColourOffId, Colours::white);
+        loadConfigButton.setColour(TextButton::textColourOnId, Colours::white);
+        loadConfigButton.setColour(TextButton::buttonColourId, Colours::black.darker());
+        loadConfigButton.setColour(TextButton::buttonOnColourId, Colours::black.brighter());
+        loadConfigButton.setToggleState(false, dontSendNotification);
+        loadConfigButton.onClick = [=]()
+            {
+                File fileToSave = File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
+                    .getChildFile(organdir)
+                    .getChildFile(configdir);
+
+                bool useNativeVersion = false;
+                filechooser.reset(new FileChooser("Select Config file to load", 
+                    File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
+                    .getChildFile(organdir)
+                    .getChildFile(configdir),
+                    "*.cfg", useNativeVersion));
+
+                filechooser->launchAsync(
+                    FileBrowserComponent::openMode
+                    | FileBrowserComponent::canSelectFiles
+                    | FileBrowserComponent::filenameBoxIsReadOnly,
+                    [this](const FileChooser& chooser)
+                    {
+                        String selectedfname;
+                        String selectedfullpathfname;
+                        auto results = chooser.getURLResults();
+
+                        //for (auto result : results)
+                        //    selectedfname << (result.isLocalFile() ? result.getLocalFile().getFileName() //.getFullPathName()
+                        //        : result.toString(false));
+
+                        for (auto result : results) {
+                            if (result.isLocalFile()) {
+                                selectedfname = result.getLocalFile().getFileName();
+                                selectedfullpathfname = result.getLocalFile().getFullPathName();
+                            }
+                            else
+                                result.toString(false);
+                        }
+
+                        if (selectedfname == "") return;
+
+                        juce::Logger::writeToLog("*** MidiStartPage(): Loading Config Panel: " + selectedfname);
+
+                        // Replace with Load Config functionality
+                        //bool bloaded = instrumentpanel->loadInstrumentPanel(instrumentdname, selectedfname, true);
+                        //bool bloaded = instrumentpanel->loadInstrumentPanel(instrumentdname, selectedfullpathfname, true);
+                        bool bloaded = true;
+
+                        configfname = selectedfname; // Save Config File globally
+
+                        String msgloaded;
+                        if (bloaded == true) {
+                            msgloaded = "Loaded: " + configfname;
+                        }
+                        else {
+                            msgloaded = "Load failed: " + configfname;
+                        }
+
+                        if (TextButton* focused = &loadConfigButton)
+                            BubbleMessage(*focused, msgloaded, this->bubbleMessage);
+                    });
+            };
+
         addAndMakeVisible(loadPanelButton);
         loadPanelButton.setButtonText("Load Panel");
         loadPanelButton.setColour(TextButton::textColourOffId, Colours::white);
@@ -4603,13 +4889,13 @@ public:
         loadPanelButton.onClick = [=]()
             {
                 File fileToSave = File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
-                    .getChildFile("AMidiOrgan")
+                    .getChildFile(organdir)
                     .getChildFile(instrumentdname);
 
                 bool useNativeVersion = false;
-                filechooser.reset(new FileChooser("Select Button Panel file to load", 
+                filechooser.reset(new FileChooser("Select Button Panel file to load",
                     File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
-                    .getChildFile("AMidiOrgan")
+                    .getChildFile(organdir)
                     .getChildFile(instrumentdname),
                     "*.pnl", useNativeVersion));
 
@@ -4620,29 +4906,54 @@ public:
                     [this](const FileChooser& chooser)
                     {
                         String selectedfname;
+                        String selectedfullpathfname;
                         auto results = chooser.getURLResults();
 
-                        for (auto result : results)
-                            selectedfname << (result.isLocalFile() ? result.getLocalFile().getFileName() //.getFullPathName()
-                                : result.toString(false));
+                        //for (auto result : results)
+                        //    selectedfname << (result.isLocalFile() 
+                        //        ? result.getLocalFile().getFileName() //.getFullPathName()
+                        //        : result.toString(false));
+
+                        for (auto result : results) {
+                            if (result.isLocalFile()) {
+                                selectedfname = result.getLocalFile().getFileName();
+                                selectedfullpathfname = result.getLocalFile().getFullPathName();
+                            }
+                            else
+                                result.toString(false);
+                        }
+
+                        if (selectedfname == "") return;
 
                         juce::Logger::writeToLog("*** MidiStartPage(): Loading Instrument Panel: " + selectedfname);
 
-                        bool bloaded = instrumentpanel->loadInstrumentPanel(instrumentdname, selectedfname);
-                        panelfname = selectedfname; // Save Panel File globally
+                        bool bloaded = instrumentpanel->loadInstrumentPanel(instrumentdname, selectedfullpathfname, true);
+
+                        // Save Panel File globally
+                        panelfname = selectedfname;
+                        panelfullpathname = selectedfullpathfname; 
 
                         String msgloaded;
                         if (bloaded == true) {
-                            //statusLabel.setText("Loaded: " + panelfname, {});
-                            msgloaded = "Loaded: " + panelfname;
+                            msgloaded = "Loading\n Panel: " + panelfname + "\n Config: " + pnlconfigfname;
                         }
                         else {
-                            //statusLabel.setText("Load failed: " + panelfname, {});
-                            msgloaded = "Load failed: " + panelfname;
+                            msgloaded = "Panel load failed: " + panelfname;
                         }
 
                         if (TextButton* focused = &loadPanelButton)
                             BubbleMessage(*focused, msgloaded, this->bubbleMessage);
+
+                        panelfileLabel.setText(panelfname, {});
+
+                        // Flag mismatch between panel file and incorrect config file in red
+                        if ((configfname.compare(pnlconfigfname) == 0) ?
+                            configreload = false : configreload = true);
+
+                        if (configreload == true)
+                            configfileLabel.setColour(juce::Label::textColourId, juce::Colours::red.darker());
+                        else
+                            configfileLabel.setColour(juce::Label::textColourId, juce::Colours::grey);
                     });
             };
 
@@ -4657,68 +4968,80 @@ public:
             ApplicationQuit();
             };
 
-        // Quick Access Keyboard Buttons
         int mgroup = 10;
-        int xaccess = 20;
-        {
-            addAndMakeVisible(toModule);
-            toModule.setButtonText(vendorname);
-            toModule.setClickingTogglesState(false);
-            toModule.setColour(TextButton::textColourOffId, Colours::white);
-            toModule.setColour(TextButton::textColourOnId, Colours::white);
-            toModule.setColour(TextButton::buttonColourId, Colours::black);
-            toModule.setColour(TextButton::buttonOnColourId, Colours::black);
-            toModule.setBounds(mgroup, mgroup + 205, 160, 50);
-            toModule.setToggleState(true, dontSendNotification);
-            toModule.onClick = [=]()
+        addAndMakeVisible(toModule);
+        toModule.setButtonText(vendorname);
+        toModule.setClickingTogglesState(false);
+        toModule.setColour(TextButton::textColourOffId, Colours::white);
+        toModule.setColour(TextButton::textColourOnId, Colours::white);
+        toModule.setColour(TextButton::buttonColourId, Colours::black);
+        toModule.setColour(TextButton::buttonOnColourId, Colours::black);
+        toModule.setBounds(mgroup, mgroup + 205, 160, 50);
+        toModule.setToggleState(true, dontSendNotification);
+        toModule.onClick = [=]()
+            {
+                try
                 {
-                    try
+                    PopupMenu menu;
+                    int icount = instrumentmodules->getNumModules();
+                    // Do not use 0 as the index count as 0 is used to indicate no selection
+                    for (int i = 1; i <= icount; ++i)
                     {
-                        PopupMenu menu;
-                        int icount = instrumentmodules->getNumModules();
-                        // Do not use 0 as the index count as 0 is used to indicate no selection
-                        for (int i = 1; i <= icount; ++i)
-                        {
-                            menu.addItem(i, instrumentmodules->getDisplayName(i-1), true, true);
-                        }
-                        menu.showMenuAsync(PopupMenu::Options{}.withTargetComponent(toModule),
-                            [=](int result) {
-                                // If incomplete selection, abort
-                                if (result == 0) return;
-
-                                // Default Midi Instrument Module to Deebach until selected otherwise
-                                moduleidx = result - 1;
-                                instrumentmodules->setInstrumentModule(moduleidx);
-
-                                // Instantiate Midi Instruments and load sound file into JSON object
-                                // and Update Vendor Button text with new name
-                                midiInstruments->loadMidiInstruments(instrumentfname);
-                                String vendorname = midiInstruments->getVendor();
-                                toModule.setButtonText(vendorname);
-
-                                // Instantiate Instrument Panel from Master Panel on Disk when true
-                                bool bloaded = instrumentpanel->initInstrumentPanel(instrumentdname, defpanelfname, true);
-
-                                String msgloaded;
-                                if (bloaded == true) {
-                                    msgloaded = "Selected: " + vendorname;
-                                }
-                                else {
-                                    msgloaded = "Select failed! " + vendorname;
-                                }
-
-                                if (TextButton* focused = &toModule)
-                                    BubbleMessage(*focused, msgloaded, this->bubbleMessage);
-
-                                DBG("=== MidiStartPage(): Selected Module: " + std::to_string(result));
-                            });
+                        menu.addItem(i, instrumentmodules->getDisplayName(i - 1), true, true);
                     }
-                    catch (...) {
-                        DBG("=== MidiStartPage(): Aborted Modules select");
-                    }
-                };
+                    menu.showMenuAsync(PopupMenu::Options{}.withTargetComponent(toModule),
+                        [=](int result) {
+                            // If incomplete selection, abort
+                            if (result == 0) return;
 
-            xaccess = 820;
+                            // Default Midi Instrument Module to Deebach until selected otherwise
+                            moduleidx = result - 1;
+                            instrumentmodules->setInstrumentModule(moduleidx);
+
+                            // Save Device Modules includig index so we start with the same
+                            instrumentmodules->saveModules();
+
+                            // Instantiate Midi Instruments and load sound file into JSON object
+                            // and Update Vendor Button text with new name
+                            midiInstruments->loadMidiInstruments(instrumentfname);
+                            String vendorname = midiInstruments->getVendor();
+                            toModule.setButtonText(vendorname);
+
+                            // Instantiate Instrument Panel from Master Panel on Disk when true
+                            bool bloaded = instrumentpanel->loadInstrumentPanel(instrumentdname, defpanelfname, false);
+
+                            String msgloaded;
+                            if (bloaded == true) {
+                                msgloaded = "Loading module:\n " + vendorname;
+                            }
+                            else {
+                                msgloaded = "Module load failed!\n " + vendorname;
+                            }
+
+                            if (TextButton* focused = &toModule)
+                                BubbleMessage(*focused, msgloaded, this->bubbleMessage);
+
+                            DBG("=== MidiStartPage(): Module loaded: " + std::to_string(result));
+                        });
+                }
+                catch (...) {
+                    DBG("=== MidiStartPage(): Aborted Modules select");
+                }
+            };
+
+        addAndMakeVisible(panelfileLabel);
+        panelfileLabel.setColour(juce::Label::textColourId, juce::Colours::grey);
+        panelfileLabel.setJustificationType(juce::Justification::left);
+
+        addAndMakeVisible(configfileLabel);
+        configfileLabel.setColour(juce::Label::textColourId, juce::Colours::grey);
+        configfileLabel.setJustificationType(juce::Justification::left);
+
+        // Quick Access Keyboard Buttons
+        {
+            int mgroup = 10;
+            int xaccess = 720;
+
             addAndMakeVisible(toHelp);
             toHelp.setButtonText("Help");
             toHelp.setClickingTogglesState(false);
@@ -4748,7 +5071,7 @@ public:
                     tabs.setCurrentTabIndex(PTConfig, false);
                 };
 
-            xaccess = xaccess + 100;
+            xaccess = xaccess + 200;
             addAndMakeVisible(toUpperKBD);
             toUpperKBD.setButtonText("Upper");
             toUpperKBD.setClickingTogglesState(false);
@@ -4784,10 +5107,10 @@ public:
         statusLabel.setColour(juce::Label::textColourId, juce::Colours::grey);
         statusLabel.setJustificationType(juce::Justification::right);
 
-        updateDeviceLists();
-
-        // Default Midi Instrument Module to Deebach until selected otherwise
-        instrumentmodules->setInstrumentModule(1);
+        // Preset Device Modules includig index so we start with the same one as last saved
+        instrumentmodules->loadModules();
+        instrumentmodules->setInstrumentModule(moduleidx);
+        ////vendorname = instrumentmodules->getDisplayName(moduleidx);
 
         // Instantiate Midi Instruments and load sound file into JSON object
         // and Update Vendor Button text with new name
@@ -4810,6 +5133,22 @@ public:
 
         if (Label* focused = &statusLabel)
             BubbleMessage(*focused, msgloaded, this->bubbleMessage);
+
+        // Update with active devices and Channel Output based on Button Groups
+        updateDeviceLists();
+
+        // Dsplay current Panel File and Config Files in use. 
+        // Flag mismatch between panel file and incorrect config file in red
+        configfileLabel.setText(configfname, {});
+        panelfileLabel.setText(panelfname, {});
+
+        if ((configfname.compare(pnlconfigfname) == 0) ?
+            configreload = false : configreload = true);
+
+        if  (configreload == true)
+            configfileLabel.setColour(juce::Label::textColourId, juce::Colours::red.darker());
+        else
+            configfileLabel.setColour(juce::Label::textColourId, juce::Colours::grey);
     }
 
     //-----------------------------------------------------------------------------
@@ -4847,11 +5186,37 @@ public:
         pairButton.setBounds(margin, 2 * margin + 140,
             getWidth() - (2 * margin), 36);
 
+        //loadConfigButton.setBounds(1150, 235, 80, 30);
+
         loadPanelButton.setBounds(1250, 235, 80, 30);
 
         exitButton.setBounds(1350, 235, 80, 30);
 
+        panelfileLabel.setBounds(200, margin + 210, 160, 20);
+
+        configfileLabel.setBounds(200, margin + 230, 160, 20);
+
         statusLabel.setBounds(1180, margin + 200, 250, 20);
+    }
+
+    //-----------------------------------------------------------------------------
+    // Auto refresh functionalities as we tab back in
+    void broughtToFront() {
+
+        DBG("*** MiDiStartPage(): Brought To Front Tab " + std::to_string(0));
+
+        // Dsplay current Panel File and Config Files in use. 
+        // Flag mismatch between panel file and incorrect config file in red
+        configfileLabel.setText(configfname, {});
+        panelfileLabel.setText(panelfname, {});
+
+        if ((configfname.compare(pnlconfigfname) == 0) ?
+            configreload = false : configreload = true);
+
+        if (configreload == true)
+            configfileLabel.setColour(juce::Label::textColourId, juce::Colours::red.darker());
+        else
+            configfileLabel.setColour(juce::Label::textColourId, juce::Colours::grey);
     }
 
 private:
@@ -5107,6 +5472,8 @@ private:
     {
         for (const auto isInput : { true, false })
             updateDeviceList(isInput);
+
+        midiModulesToOutputChannels();
     }
 
     //-----------------------------------------------------------------------------
@@ -5116,6 +5483,67 @@ private:
         }
     );
 
+    //-----------------------------------------------------------------------------
+    // Map Static Supported Midi Mpdules assigned to Button Groups to Channels in order to
+    // support quick Channel to output Module during realtime Note Routing
+    bool midiModulesToOutputChannels() {
+
+        const ReferenceCountedArray<MidiDeviceListEntry>& midiDevices = mididevices->midiOutputs;
+
+        // Reset all Channel outputs. Note that any channel with device out 
+        // of 255 will not be output 
+        for (int i = 0; i < 17; i++)
+            mididevices->moduleout[i] = 255;
+
+        // Update all the Channel outs for every Button Group
+        for (int i = 0; i < numberbuttongroups; i++) {
+
+            bool bfound = false;
+
+            ButtonGroup* ptrbuttongroup = instrumentpanel->getButtonGroup(i);
+            int grpmidimod = ptrbuttongroup->getMidiModule();
+            int grpmidichan = ptrbuttongroup->midiout;
+
+            // Lookup Module short/search string and find match in the active Modules
+            String modidstring = instrumentmodules->getModuleIdString(grpmidimod).toLowerCase();
+
+            int outmod = 0;
+            for (auto& dev : midiDevices) {
+                String strdevicename = dev->deviceInfo.name.toLowerCase();
+
+                bfound = strdevicename.contains(modidstring);
+                if (bfound) {
+                    // Update the Midi send Channel to the Midi Out Modele confgured in Button Group
+                    mididevices->moduleout[grpmidichan] = outmod;
+
+                    juce::Logger::writeToLog("ModuleMapper: Out Device " + dev->deviceInfo.name
+                        + " on Button Group " + ptrbuttongroup->groupname
+                        + " to Channel " + std::to_string(grpmidichan)
+                    );
+                    break;
+                }
+
+                outmod++;
+            }
+
+            // No match for Button Group module specified
+            if (bfound == false) {
+                juce::Logger::writeToLog("ModuleMapper: No match for Button Group " + ptrbuttongroup->groupname
+                    + " and Channel " + std::to_string(grpmidichan)
+                );
+            }
+        }
+
+        for (int i = 0; i < 17; i++) {
+            DBG("MIDI Out channel " + std::to_string(i)
+                + " to " + std::to_string(mididevices->moduleout[i])
+            );
+        }
+
+        return true;
+    }
+
+    //-----------------------------------------------------------------------------
     // Quit the original WIndows Application.
     void ApplicationQuit() {
         if (JUCEApplicationBase::isStandaloneApp())
@@ -5127,14 +5555,13 @@ private:
     Label midiOutputLabel{ "Midi Output Label", "MIDI Output:" };
     Label incomingMidiLabel{ "Incoming Midi Label", "Received MIDI messages:" };
 
-    Label statusLabel{ "" };
-
     MidiKeyboardState keyboardState;
     MidiKeyboardComponent midiKeyboard;
 
     TextButton pairButton{ "MIDI Bluetooth Devices" };
 
     TextButton exitButton{ "Exit" };
+    TextButton loadConfigButton{ "Load Config" };
     TextButton loadPanelButton{ "Load Panel" };
 
     TextButton toModule{ "To Modules" };
@@ -5142,6 +5569,10 @@ private:
     TextButton toUpperKBD{ "To Upper" };
     TextButton toLowerKBD{ "To Lower" };
     TextButton toConfig{ "To Config" };
+
+    Label panelfileLabel{ "Panel File" ,  "Panel File" };
+    Label configfileLabel { "Config File",  "Config File" };
+    Label statusLabel{ "" };
 
     ////ReferenceCountedArray<MidiDeviceListEntry> midiInputs, midiOutputs;
     std::unique_ptr<MidiDeviceListBox> midiInputSelector, midiOutputSelector;
@@ -5185,7 +5616,7 @@ public:
         // Prepare to read Help Panel from Disk
         String helpfname = "help.txt";
         File inputFile = File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
-            .getChildFile("AMidiOrgan")
+            .getChildFile(organdir)
             .getChildFile(helpfname);
         if (!inputFile.existsAsFile())
         {
@@ -5218,7 +5649,7 @@ class ConfigPage final : public Component
 {
 public:
     ConfigPage(TabbedComponent& tabs) :
-        instrumentmodules(new InstrumentModules()),
+        instrumentmodules(InstrumentModules::getInstance()),
         mididevices(MidiDevices::getInstance()), // Singleton if there isn't already one
         instrumentpanel(InstrumentPanel::getInstance()) // Singleton if there isn't already one
     {
@@ -5229,7 +5660,8 @@ public:
         ValueTree vtconfigs(ConfigsType);
 
         // 1. Load the system Confg from disk - mostly Button Group IO mappings 
-        loadConfigs("amidiconfigs.cfg");
+        loadConfigs(configfname);
+        lblconfigfile.setText(configfname, {});
 
         // 2. Prepare Midi IO Map router Map by reading initial Confg into IOMap array
         //    for quick access during Midi IO routing (sendToOutputs())
@@ -5242,16 +5674,16 @@ public:
 
         // Add controls to view and edit Button Group
         // To do: Combobox colors not working and not easy since it consists of multiple items!
-        addAndMakeVisible(comboBox);
-        comboBox.setColour(TextButton::textColourOffId, Colours::black);
-        comboBox.setColour(TextButton::textColourOnId, Colours::black);
-        comboBox.setColour(TextButton::buttonColourId, Colours::lightgrey);
-        comboBox.setColour(TextButton::buttonOnColourId, Colours::antiquewhite);
-        comboBox.setBounds(20, 30, 200, 30);
-        comboBox.setEditableText(false);
-        comboBox.setJustificationType(Justification::centred);
-        comboBox.onChange = [=]() {
-            int i = comboBox.getSelectedId() - 1;   // Combobox is 1 based
+        addAndMakeVisible(comboConfig);
+        comboConfig.setColour(TextButton::textColourOffId, Colours::black);
+        comboConfig.setColour(TextButton::textColourOnId, Colours::black);
+        comboConfig.setColour(TextButton::buttonColourId, Colours::lightgrey);
+        comboConfig.setColour(TextButton::buttonOnColourId, Colours::antiquewhite);
+        comboConfig.setBounds(20, 30, 200, 30);
+        comboConfig.setEditableText(false);
+        comboConfig.setJustificationType(Justification::centred);
+        comboConfig.onChange = [=]() {
+            int i = comboConfig.getSelectedId() - 1;   // Combobox is 1 based
 
             String sgroup = "Group (None): ";
             if (instrumentpanel->getButtonGroup(i)->midikeyboard == KBDUPPER)
@@ -5307,11 +5739,11 @@ public:
             else if (instrumentpanel->getButtonGroup(i - 1)->midikeyboard == KBDLOWER) sgroup = "Panel Lower: ";
             else if (instrumentpanel->getButtonGroup(i - 1)->midikeyboard == KBDBASS) sgroup = "Panel Bass: ";
 
-            comboBox.addItem(sgroup + instrumentpanel->getButtonGroup(i - 1)->groupname, i);
+            comboConfig.addItem(sgroup + instrumentpanel->getButtonGroup(i - 1)->groupname, i);
         }
 
         // Select first itemin dropdown on creation
-        comboBox.setSelectedId(1);
+        comboConfig.setSelectedId(1);
 
         addAndMakeVisible(SoundModule);
         SoundModule.setButtonText(instrumentmodules->getDisplayName(moduleidx));
@@ -5337,7 +5769,7 @@ public:
                         if (result == 0) return;
 
                         int locmoduleidx = result - 1;
-                        int i = comboBox.getSelectedId() - 1;
+                        int i = comboConfig.getSelectedId() - 1;
                         instrumentpanel->getButtonGroup(i)->setMidiModule(locmoduleidx);
 
                         SoundModule.setButtonText(instrumentmodules->getDisplayName(locmoduleidx));
@@ -5367,7 +5799,7 @@ public:
         txtGroupName.setBounds(180, 105, 200, 24);
         txtGroupName.setText("Group Name");
         txtGroupName.onFocusLost = [=]() {
-            int i = comboBox.getSelectedId() - 1;   // Combobox is 1 based
+            int i = comboConfig.getSelectedId() - 1;   // Combobox is 1 based
             instrumentpanel->getButtonGroup(i)->groupname = txtGroupName.getText();
 
             saveButton.setEnabled(true);
@@ -5394,7 +5826,7 @@ public:
         txtMidiIn.setBounds(180, 135, 100, 24);
         txtMidiIn.setText("Midi In");
         txtMidiIn.onFocusLost = [=]() {
-            int i = comboBox.getSelectedId() - 1;   // Combobox is 1 based
+            int i = comboConfig.getSelectedId() - 1;   // Combobox is 1 based
 
             int val = txtMidiIn.getText().getIntValue();
             if ((val < 1) || (val > 16)) {
@@ -5417,7 +5849,7 @@ public:
         txtMidiOut.setBounds(560, 135, 100, 24);
         txtMidiOut.setText("Midi Out");
         txtMidiOut.onFocusLost = [=]() {
-            int i = comboBox.getSelectedId() - 1;   // Combobox is 1 based
+            int i = comboConfig.getSelectedId() - 1;   // Combobox is 1 based
 
             int val = txtMidiOut.getText().getIntValue();
             if ((val < 1) || (val > 16)) {
@@ -5442,7 +5874,7 @@ public:
         txtSplit.setBounds(560, 165, 100, 24);
         txtSplit.setText("--");
         txtSplit.onFocusLost = [=]() {
-            int i = comboBox.getSelectedId() - 1;   // Combobox is 1 based
+            int i = comboConfig.getSelectedId() - 1;   // Combobox is 1 based
 
             String sval = txtSplit.getText();
             if ((sval.length() != 2) && (sval.length() != 3)) {
@@ -5474,7 +5906,7 @@ public:
         txtOctave.setBounds(180, 165, 100, 24);
         txtOctave.setText("0");
         txtOctave.onFocusLost = [=]() {
-            int i = comboBox.getSelectedId() - 1;   // Combobox is 1 based
+            int i = comboConfig.getSelectedId() - 1;   // Combobox is 1 based
 
             int val = txtOctave.getText().getIntValue();
             if ((val < -3) || (val > 3)) {
@@ -5498,7 +5930,7 @@ public:
         toggleVelocity.onClick = [=]() {
             velocitystate = toggleVelocity.getToggleState();
 
-            int i = comboBox.getSelectedId() - 1;   // Combobox is 1 based
+            int i = comboConfig.getSelectedId() - 1;   // Combobox is 1 based
             instrumentpanel->getButtonGroup(i)->velocity = velocitystate;
 
             saveButton.setEnabled(true);
@@ -5506,6 +5938,80 @@ public:
             juce::String stateString = velocitystate ? "ON" : "OFF";
             juce::Logger::outputDebugString("Velocity changed to " + stateString);
         };
+
+        addAndMakeVisible(loadConfigButton);
+        loadConfigButton.setButtonText("Load");
+        loadConfigButton.setColour(TextButton::textColourOffId, Colours::white);
+        loadConfigButton.setColour(TextButton::textColourOnId, Colours::white);
+        loadConfigButton.setColour(TextButton::buttonColourId, Colours::black.darker());
+        loadConfigButton.setColour(TextButton::buttonOnColourId, Colours::black.brighter());
+        loadConfigButton.setBounds(20, 225, 80, 30);
+        loadConfigButton.setToggleState(false, dontSendNotification);
+        loadConfigButton.onClick = [=]()
+            {
+                File fileToSave = File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
+                    .getChildFile(organdir)
+                    .getChildFile(configdir);
+
+                bool useNativeVersion = false;
+                filechooser.reset(new FileChooser("Select Config file to load",
+                    File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
+                    .getChildFile(organdir)
+                    .getChildFile(configdir),
+                    "*.cfg", useNativeVersion));
+
+                filechooser->launchAsync(
+                    FileBrowserComponent::openMode
+                    | FileBrowserComponent::canSelectFiles
+                    | FileBrowserComponent::filenameBoxIsReadOnly,
+                    [this](const FileChooser& chooser)
+                    {
+                        String selectedfname = "";
+                        String selectedfullpathfname;
+                        auto results = chooser.getURLResults();
+
+                        //for (auto result : results)
+                        //    selectedfname << (result.isLocalFile() ? result.getLocalFile().getFileName() //.getFullPathName()
+                        //        : result.toString(false));
+
+                        for (auto result : results) {
+                            if (result.isLocalFile()) {
+                                selectedfname = result.getLocalFile().getFileName();
+                                selectedfullpathfname = result.getLocalFile().getFullPathName();
+                            }
+                            else {
+                                result.toString(false);
+                            }
+                        }
+
+                        if (selectedfname == "") return;
+
+                        juce::Logger::writeToLog("*** MidiStartPage(): Loading Config Panel: " + selectedfname);
+
+                        // Replace with Load Config functionality
+                        bool bloaded = loadConfigs(selectedfname);
+
+                        configfname = selectedfname; // Save Config File globally
+
+                        lblconfigfile.setText(configfname, {});
+
+                        configchanged = true;
+
+                        // Select first itemin dropdown on creation
+                        comboConfig.setSelectedId(1);
+
+                        String msgloaded;
+                        if (bloaded == true) {
+                            msgloaded = "Loading:\n " + configfname;
+                        }
+                        else {
+                            msgloaded = "Load failed:\n " + configfname;
+                        }
+
+                        if (TextButton* focused = &loadConfigButton)
+                            BubbleMessage(*focused, msgloaded, this->bubbleMessage);
+                    });
+            };
 
         // Save Config changes, and enable VoiceButton ComponentGroup Title Updates
         addAndMakeVisible(saveButton);
@@ -5515,10 +6021,12 @@ public:
         saveButton.setColour(TextButton::buttonColourId, Colours::black.darker());
         saveButton.setColour(TextButton::buttonOnColourId, Colours::black.brighter());
         saveButton.setBounds(20, 225, 80, 30);
-
+        saveButton.setBounds(120, 225, 80, 30);
         saveButton.setEnabled(false);
         saveButton.onClick = [=]() {
-            bool bsaved = saveConfigs();
+            bool bsaved = saveConfigs(configfname);
+
+            configchanged = true;
 
             String msgloaded;
             if (!bsaved) {
@@ -5533,10 +6041,85 @@ public:
             if (TextButton* focused = &saveButton)
                 BubbleMessage(*focused, msgloaded, this->bubbleMessage);
 
-            configchanged = true;
-
             saveButton.setEnabled(false);
             };
+
+        addAndMakeVisible(saveAsButton);
+        saveAsButton.setButtonText("Save As");
+        saveAsButton.setColour(TextButton::textColourOffId, Colours::white);
+        saveAsButton.setColour(TextButton::textColourOnId, Colours::white);
+        saveAsButton.setColour(TextButton::buttonColourId, Colours::black.darker());
+        saveAsButton.setColour(TextButton::buttonOnColourId, Colours::black.brighter());
+        saveAsButton.setBounds(220, 225, 80, 30);
+        saveAsButton.setToggleState(false, dontSendNotification);
+        saveAsButton.onClick = [=]() {
+            File fileToSave = File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
+                .getChildFile(organdir)
+                .getChildFile(configdir);
+
+            bool useNativeVersion = false;
+            filechooser.reset(new FileChooser("Save Config As: Select existing or create new *.cfg",
+                File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
+                .getChildFile(organdir)
+                .getChildFile(configdir),
+                "*.cfg", useNativeVersion));
+
+            filechooser->launchAsync(
+                FileBrowserComponent::saveMode
+                | FileBrowserComponent::canSelectFiles
+                | FileBrowserComponent::warnAboutOverwriting,
+                [=](const FileChooser& chooser)
+                {
+                    //String selectedfname;
+                    bool bsaved = false;
+
+                    auto results = chooser.getURLResults();
+
+                    for (auto result : results)
+                        selconfigfname << (result.isLocalFile() ? result.getLocalFile().getFileName()
+                            : result.toString(false));
+
+                    if (selconfigfname.length() != 0) {
+                        int extpos = selconfigfname.indexOf(0, ".");
+                        if (extpos == -1) {
+                            DBG("*** Save Config: Extension not defined as .cfg. Adding extension");
+
+                            selconfigfname = selconfigfname + ".cfg";
+                        }
+
+                        // Update static/global config file name and save to this file
+                        configfname = selconfigfname;
+                        bool bsaved = saveConfigs(configfname);
+
+                        configchanged = true;
+
+                        String msgloaded;
+                        if (!bsaved) {
+                            msgloaded = "Save as failed: " + configfname;
+                            juce::Logger::writeToLog("*** ConfigPage(): Save As failed! " + configfname);
+                        }
+                        else {
+                            msgloaded = "Saved as: " + configfname;
+                            juce::Logger::writeToLog("*** ConfigPage(): Saved As " + configfname);
+                        }
+
+                        if (TextButton* focused = &saveAsButton)
+                            BubbleMessage(*focused, msgloaded, this->bubbleMessage);
+                    }
+                    else {
+                        ////statusLabel->setText("Empty file name save! " + configfname, juce::dontSendNotification);
+                    }
+                });
+
+                saveAsButton.setEnabled(false);
+
+                lblconfigfile.setText(configfname, {});
+            };
+
+        addAndMakeVisible(lblconfigfile);
+        lblconfigfile.setColour(juce::Label::textColourId, juce::Colours::grey);
+        lblconfigfile.setJustificationType(juce::Justification::left);
+        lblconfigfile.setBounds(520, 225, 120, 30);
 
         // Quick Access Keyboard Buttons
         int xaccess = 920;
@@ -5653,16 +6236,19 @@ private:
 
     ValueTree vtconfigs;
 
-    ComboBox comboBox{ "Combo" };
+    ComboBox comboConfig{ "ConfigCombo" };
     GroupComponent group{ "group", "Button Group Configs" };
     juce::TextButton SoundModule;
     juce::TextEditor txtGroupName, txtMidiIn, txtMidiOut, txtSplit, txtOctave;
     juce::Label lblKeyboard, lblGroupName, lblButtonCount, lblMidiIn, lblMidiOut, lblSplit, lblOctave;
-    juce::Label lblPassthrough,lblVelocity, label11, label31;
+    juce::Label lblPassthrough,lblVelocity, lblconfigfile, label11, label31;
     juce::ToggleButton togglePassthrough, toggleVelocity;
-    juce::TextButton saveButton, resetButton, exitButton;
+    juce::TextButton loadConfigButton, saveButton, saveAsButton, resetButton, exitButton;
     juce::TextButton toUpperKBD, toLowerKBD, toBassKBD;
     bool mutestate, velocitystate, passthroughstate;
+
+    String selconfigfname;
+    std::unique_ptr<FileChooser> filechooser;
 
     std::unique_ptr<BubbleMessageComponent> bubbleMessage;
 
@@ -5757,12 +6343,15 @@ private:
         // Preset Input Passthrough to false (ignore). To be turned on only for 
         // Button Group input channels and when passthrough option is selected in Config
         // When Config optons is false, the following Button Group settings will override
-        // and enable only the configred input channels
+        // and enable only the configured input channels
         for (i = 0; i < 17; i++) {
             if (passthroughstate == true)
                 mididevices->passthroughin[i] = true;
             else
                 mididevices->passthroughin[i] = false;
+
+            // Enable Midi Control Channel 16 Passthrough, e.g. for Volume from Organ
+            mididevices->passthroughin[16] = true;
         }
 
         // Now update and add additional channel mappings (layering) 
@@ -5889,14 +6478,16 @@ private:
     // https://forum.juce.com/t/example-for-creating-a-file-and-doing-something-with-it/31998
     // Save current Configs to Disk
     //-------------------------------------------------------------------------
-    bool saveConfigs() {
+    bool saveConfigs(String configfile) {
 
         DBG("*** saveConfigs(): Saving Config file from disk");
 
         // Prepare to save Instrument Configs to Disk
         File outputFile = File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
-            .getChildFile("AMidiOrgan")
-            .getChildFile(configsname);
+            .getChildFile(organdir)
+            .getChildFile(configdir)
+            .getChildFile(configfile);
+
         if (outputFile.existsAsFile())
         {
             DBG("*** saveConfigs(): Configs file exists! Deleting to store new copy");
@@ -5914,11 +6505,11 @@ private:
         output.flush();
         if (output.getStatus().failed())
         {
-            juce::Logger::writeToLog("*** saveConfigs(): Config file save failed " + configsname);
+            juce::Logger::writeToLog("*** saveConfigs(): Config file save failed " + configfname);
             // To do: Add more error handling
             return false;
         }
-        juce::Logger::writeToLog("*** saveConfigs(): Config file saved " + configsname);
+        juce::Logger::writeToLog("*** saveConfigs(): Config file saved " + configfname);
 
         // Roundtip Save/Reload and update vars
         //loadConfigs(configsname);
@@ -5926,8 +6517,12 @@ private:
         // If not save and reload, then update Keyboard Handler fast lookup variables
         presetMidiIOMap();
 
+        // Recalculate Module to Midi Output 
+        ModulesToChannelMap();
+
         return true;
     }
+
 
     //-------------------------------------------------------------------------
     // Configs Load from known ValueTree
@@ -6011,14 +6606,16 @@ private:
         // Reload Value tree to test
         // Prepare to read Configs Panel from Disk
         File inputFile = File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
-            .getChildFile("AMidiOrgan")
+            .getChildFile(organdir)
+            .getChildFile(configdir)
             .getChildFile(configsname);
+
         if (!inputFile.existsAsFile())
         {
             juce::Logger::writeToLog("*** loadConfigs(): No Config file " + configsname + " to load!");
 
             inputFile = File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
-                .getChildFile("AMidiOrgan")
+                .getChildFile(organdir)
                 .getChildFile("masterconfigs.cfg");
             juce::Logger::writeToLog("*** loadConfigs(): Loading file masterConfigs.cfg instead");
         }
@@ -6065,7 +6662,6 @@ private:
         return true;
     }
 
-
     //-------------------------------------------------------------------------
     // Load Keyboard Handler Quick Lookups
     // To do: Refactor away from static vars!
@@ -6077,6 +6673,66 @@ private:
 
         lowerchan = instrumentpanel->getButtonGroup(7)->midiin;
         lowersolo = instrumentpanel->getButtonGroup(7)->midiout;
+    }
+
+    //-------------------------------------------------------------------------
+    // ModulesToChannelMap() - Maps Midi Modules to Output Channels
+    //-------------------------------------------------------------------------
+    bool ModulesToChannelMap() {
+
+        const ReferenceCountedArray<MidiDeviceListEntry>& midiDevices = mididevices->midiOutputs;
+
+        // Reset all Channel outputs. Note that any channel with device out 
+        // of 255 will not be output 
+        for (int i = 0; i < 17; i++)
+            mididevices->moduleout[i] = 255;
+
+        // Update all the Channel outs for every Button Group
+        for (int i = 0; i < numberbuttongroups; i++) {
+
+            bool bfound = false;
+
+            ButtonGroup* ptrbuttongroup = instrumentpanel->getButtonGroup(i);
+            int grpmidimod = ptrbuttongroup->getMidiModule();
+            int grpmidichan = ptrbuttongroup->midiout;
+
+            // Lookup Module short/search string and find match in the active Modules
+            String modidstring = instrumentmodules->getModuleIdString(grpmidimod);
+
+            int outmod = 0;
+            for (auto& dev : midiDevices) {
+                String strdevicename = dev->deviceInfo.name;
+
+                bfound = strdevicename.contains(modidstring);
+                if (bfound) {
+                    // Update the Midi send Channel to the Midi Out Modele confgured in Button Group
+                    mididevices->moduleout[grpmidichan] = outmod;
+
+                    juce::Logger::writeToLog("*** ModulesToChannelMap: Out Device " + strdevicename
+                        + " on Button Group " + ptrbuttongroup->groupname
+                        + " to Channel " + std::to_string(grpmidichan)
+                    );
+                    break;
+                }
+
+                outmod++;
+            }
+
+            // No match for Button Group module specified
+            if (bfound == false) {
+                juce::Logger::writeToLog("*** ModulesToChannelMap: No match for Button Group " + ptrbuttongroup->groupname
+                    + " and Channel " + std::to_string(grpmidichan)
+                );
+            }
+        }
+
+        for (int i = 0; i < 17; i++) {
+            DBG("*** ModulesToChannelMap: MIDI Out channel " + std::to_string(i)
+                + " to " + std::to_string(mididevices->moduleout[i])
+            );
+        }
+
+        return true;
     }
 
 
@@ -6098,8 +6754,9 @@ private:
 //==============================================================================
 // Configure the Menu Tabs and load Page Componens into the tabs
 //==============================================================================
-struct MenuTabs final : public TabbedComponent
+class MenuTabs final : public TabbedComponent
 {
+public:
     MenuTabs (bool isRunningComponenTransforms)
         : TabbedComponent (TabbedButtonBar::TabsAtTop)
     {
@@ -6111,12 +6768,22 @@ struct MenuTabs final : public TabbedComponent
         EffectsPage* effectspage = new EffectsPage(*this);
         VoicesPage* voicespage = new VoicesPage(*this);
 
+        // Create MidiStart Page
         addTab("Start",        colour, new MidiStartPage(*this), true);
-        addTab("Upper",        colour, new KeyboardManualPage(*this, PTUpper, *effectspage, *voicespage), true);
-        addTab("Lower",        colour, new KeyboardManualPage(*this, PTLower, *effectspage, *voicespage), true);
-        addTab("Bass&Drums",   colour, new KeyboardManualPage(*this, PTBass, *effectspage, *voicespage), true);
+
+        // Create Upper, Lower and Bass&Drum Pages
+        //KeyboardPanelPage* upperpanel = new KeyboardPanelPage(*this, PTUpper, *effectspage, *voicespage);
+        addTab("Upper",        colour, new KeyboardPanelPage(*this, PTUpper, *effectspage, *voicespage), true);
+        //KeyboardPanelPage* lowerpanel = new KeyboardPanelPage(*this, PTLower, *effectspage, *voicespage);
+        addTab("Lower",        colour, new KeyboardPanelPage(*this, PTLower, *effectspage, *voicespage), true);
+        //KeyboardPanelPage* basspanel = new KeyboardPanelPage(*this, PTBass, *effectspage, *voicespage);
+        addTab("Bass&Drums",   colour, new KeyboardPanelPage(*this, PTBass, *effectspage, *voicespage), true);
+
+        // Create Voices and Effects Pages
         addTab("Sounds",       colour, voicespage, true);
         addTab("Effects",      colour, effectspage, true);
+
+        // Create Config and Help Pages
         addTab("Config",       colour, configspage, true);
         addTab("Help",         colour, new HelpPage(), true);
 
@@ -6125,6 +6792,8 @@ struct MenuTabs final : public TabbedComponent
         // Set default tab
         this->setCurrentTabIndex(PTStart, true);
         String sname = this->getCurrentTabName();
+
+        //this->grabKeyboardFocus();
     }
 
     // Small star button that is put inside one of the tabs
@@ -6153,7 +6822,10 @@ struct MenuTabs final : public TabbedComponent
 
     private:
         bool runningComponenTransforms;
+
     };
+
+private:
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MenuTabs)
 };
@@ -6162,11 +6834,19 @@ struct MenuTabs final : public TabbedComponent
 //==============================================================================
 // Struct: AMidiControl - Make Menu Tabs run
 //==============================================================================
-struct AMidiControl final : public Component
+class AMidiControl final : public Component
 {
+public:
     AMidiControl(bool isRunningComponenTransforms = false)
         : tabs (isRunningComponenTransforms)
     {
+        // Register the commands that the target component can perform
+        commandManager.registerAllCommandsForTarget(&keyTarget);
+
+        // Then add command manager key mappings as a KeyListener to the top-level component
+        // so it is notified of key presses
+        getTopLevelComponent()->addKeyListener(commandManager.getKeyMappings());
+
         setOpaque (true);
         addAndMakeVisible (tabs);
 
@@ -6184,6 +6864,13 @@ struct AMidiControl final : public Component
     }
 
     MenuTabs tabs;
+
+private:
+    // Keyboard Command Manager
+    //ApplicationCommandManager& commandManager = getGlobalCommandManager();
+    ApplicationCommandManager commandManager;
+
+    KeyPressTarget keyTarget;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AMidiControl)
 };
@@ -6214,7 +6901,7 @@ void BubbleMessage(Component& targetComponent, const String& textToShow,
     text.setJustification(Justification::centred);
     text.setColour(targetComponent.findColour(TextButton::textColourOffId));
 
-    bmc->showAt(&targetComponent, text, 2000, true, false);
+    bmc->showAt(&targetComponent, text, 4000, true, false);
 }
 
 
