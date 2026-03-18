@@ -112,6 +112,15 @@ The following asset filenames are referenced by code through `BinaryData` symbol
 ### Bass Tab
 ![Bass Tab](docs/images/tab-bass.png)
 
+### Sounds Tab
+![Sounds Tab](docs/images/tab-sounds.png)
+
+### Effects Tab
+![Effects Tab](docs/images/tab-effects.png)
+
+### Config Tab
+![Config Tab](docs/images/tab-config.png)
+
 ## Functional Overview
 
 Supported MIDI hardware and software sound modules:
