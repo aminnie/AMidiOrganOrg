@@ -111,7 +111,6 @@ private:
     MidiPanels() {}
 
     ~MidiPanels() {
-        delete &jsonPanel;
     };
 
     juce::var jsonPanel;
@@ -137,7 +136,7 @@ public:
 
     bool createPreset(int presetid, int buttongroupid, int panelbuttonidx, bool mutestate, int rotarystate) {
 
-        if ((presetid < 0) || (presetid > 7)) {
+        if ((presetid < 0) || (presetid >= numberpresets)) {
             return false;
         }
 
@@ -230,7 +229,7 @@ private:
         }
 
         bool getPresetLoaded() {
-            presetloaded;
+            return presetloaded;
         }
 
         int getActiveButton(int buttongroupid) {
@@ -764,13 +763,13 @@ public:
     }
 
     // For direct access 
-    std::unique_ptr<PanelPresets> panelpresets;
+    PanelPresets* panelpresets = nullptr;
 
     juce_DeclareSingleton(InstrumentPanel, true)
 
 private:
-    std::unique_ptr<MidiDevices> mididevices;
-    std::unique_ptr<MidiInstruments> midiinstruments;
+    MidiDevices* mididevices = nullptr;
+    MidiInstruments* midiinstruments = nullptr;
 
     int panelbuttonidx = 0;
     bool bpanelupdated = false;
@@ -1428,9 +1427,9 @@ private:
 
     double startTime;
 
-    std::unique_ptr<MidiDevices> mididevices;
-    std::unique_ptr<InstrumentPanel> instrumentpanel;
-    std::unique_ptr<MidiInstruments> midiInstruments;
+    MidiDevices* mididevices = nullptr;
+    InstrumentPanel* instrumentpanel = nullptr;
+    MidiInstruments* midiInstruments = nullptr;
 
     GroupComponent* group;
 
@@ -1994,8 +1993,8 @@ private:
 
     double startTime;
 
-    std::unique_ptr<MidiDevices> mididevices;
-    std::unique_ptr<InstrumentPanel> instrumentpanel;
+    MidiDevices* mididevices = nullptr;
+    InstrumentPanel* instrumentpanel = nullptr;
 
     juce::GroupComponent* group;
 
@@ -4643,10 +4642,10 @@ private:
 
     double startTime;
 
-    std::unique_ptr<MidiInstruments> midiInstruments;
-    std::unique_ptr<MidiDevices> mididevices;
-    std::unique_ptr<InstrumentPanel> instrumentpanel;
-    std::unique_ptr<InstrumentModules> instrumentmodules;
+    MidiInstruments* midiInstruments = nullptr;
+    MidiDevices* mididevices = nullptr;
+    InstrumentPanel* instrumentpanel = nullptr;
+    InstrumentModules* instrumentmodules = nullptr;
 
     std::unique_ptr<FileChooser> filechooser;
 
@@ -5317,7 +5316,7 @@ private:
         bool isInput;
         SparseSet<int> lastSelectedItems;
 
-        std::unique_ptr<MidiDevices> lblmididevices;
+        MidiDevices* lblmididevices = nullptr;
 
     };
     //*** End of MidiDeviceListBox Class ***
@@ -5577,11 +5576,11 @@ private:
     ////ReferenceCountedArray<MidiDeviceListEntry> midiInputs, midiOutputs;
     std::unique_ptr<MidiDeviceListBox> midiInputSelector, midiOutputSelector;
 
-    std::unique_ptr<InstrumentModules> instrumentmodules;
+    InstrumentModules* instrumentmodules = nullptr;
 
-    std::unique_ptr<MidiDevices> mididevices;
-    std::unique_ptr<InstrumentPanel> instrumentpanel;
-    std::unique_ptr<MidiInstruments> midiInstruments;
+    MidiDevices* mididevices = nullptr;
+    InstrumentPanel* instrumentpanel = nullptr;
+    MidiInstruments* midiInstruments = nullptr;
 
     std::unique_ptr<FileChooser> filechooser;
 
@@ -6230,9 +6229,9 @@ public:
     }
 
 private:
-    std::unique_ptr<MidiDevices> mididevices;
-    std::unique_ptr<InstrumentPanel> instrumentpanel;
-    std::unique_ptr<InstrumentModules> instrumentmodules;
+    MidiDevices* mididevices = nullptr;
+    InstrumentPanel* instrumentpanel = nullptr;
+    InstrumentModules* instrumentmodules = nullptr;
 
     ValueTree vtconfigs;
 

@@ -1,0 +1,89 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="C:\Users\a_min\AMidiOrganOrg\tests\test_main.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\JUCE\modules\juce_audio_basics\juce_audio_basics.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\JUCE\modules\juce_core\juce_core.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\JUCE\modules\juce_core\juce_core_CompilationTime.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\JUCE\modules\juce_audio_devices\juce_audio_devices.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\JUCE\modules\juce_events\juce_events.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\JUCE\modules\juce_audio_utils\juce_audio_utils.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\JUCE\modules\juce_audio_processors\juce_audio_processors.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\JUCE\modules\juce_gui_extra\juce_gui_extra.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\JUCE\modules\juce_gui_basics\juce_gui_basics.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\JUCE\modules\juce_graphics\juce_graphics.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\JUCE\modules\juce_graphics\juce_graphics_Harfbuzz.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\JUCE\modules\juce_graphics\juce_graphics_Sheenbidi.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\JUCE\modules\juce_data_structures\juce_data_structures.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\JUCE\modules\juce_audio_processors_headless\juce_audio_processors_headless.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\JUCE\modules\juce_audio_processors_headless\juce_audio_processors_headless_ara.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\JUCE\modules\juce_audio_processors_headless\juce_audio_processors_headless_lv2_libs.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\JUCE\modules\juce_audio_formats\juce_audio_formats.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="C:\Users\a_min\AMidiOrganOrg\build\AMidiOrganTests_artefacts\JuceLibraryCode\JuceHeader.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\a_min\AMidiOrganOrg\build\CMakeFiles\7a21afb4af135e7c3d134175676e6689\JuceHeader.h.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="C:\Users\a_min\AMidiOrganOrg\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Object Include="C:\Users\a_min\AMidiOrganOrg\build\AMidiOrganTests_rc_lib.dir\$(Configuration)\AMidiOrganTests_resources.res">
+      <Filter>Object Libraries</Filter>
+    </Object>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="CMake Rules">
+      <UniqueIdentifier>{6915112A-A5C1-3375-826C-DBD8B0D10076}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{58567329-5687-35FF-A41B-0B73EF7B9597}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Object Libraries">
+      <UniqueIdentifier>{F8CABFCF-3221-3A9C-9396-D3F23A9AD08C}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{DFE6A5CF-3EBA-334B-ADF6-9E8C32A03DEB}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

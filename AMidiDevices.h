@@ -115,6 +115,53 @@ public:
         list[index]->stopAndReset();
     }
 
+    bool isValidMidiChannel(int channel) const noexcept
+    {
+        return channel >= 1 && channel <= 16;
+    }
+
+    int getTransposedNoteForOutput(int inputNote, int midioutchan) const noexcept
+    {
+        if (!isValidMidiChannel(midioutchan))
+            return juce::jlimit(0, 127, inputNote);
+
+        int octtranspose = octxpose[midioutchan];
+        if (octtranspose < -3 || octtranspose > 3)
+            octtranspose = 0;
+
+        return juce::jlimit(0, 127, inputNote + octtranspose * 12);
+    }
+
+    bool shouldRouteLayeredNote(int inchan, int note, int outchan) const noexcept
+    {
+        if (!isValidMidiChannel(inchan) || !isValidMidiChannel(outchan))
+            return false;
+
+        if (inchan == lowerchan && splitout[lowersolo] != 0)
+        {
+            // Above (or equal) split routes only to solo channel.
+            if (note >= splitout[lowersolo] && outchan != lowersolo)
+                return false;
+
+            // Below split excludes solo channel.
+            if (note < splitout[lowersolo] && outchan == lowersolo)
+                return false;
+        }
+
+        if (inchan == upperchan && splitout[uppersolo] != 0)
+        {
+            // Above (or equal) split routes only to solo channel.
+            if (note >= splitout[uppersolo] && outchan != uppersolo)
+                return false;
+
+            // Below split excludes solo channel.
+            if (note < splitout[uppersolo] && outchan == uppersolo)
+                return false;
+        }
+
+        return true;
+    }
+
     //-------------------------------------------------------------------------
     // Process Inbound Midi Messages and Send to Output
     //-------------------------------------------------------------------------
@@ -122,6 +169,13 @@ public:
     {
         //--- To do: Should we be adding messages to buffer rather than straight out to midiOutput
         int inchan = message.getChannel();
+
+        // Non-channel messages (e.g. SysEx) are forwarded unchanged.
+        if (!isValidMidiChannel(inchan))
+        {
+            sendToOutputs(message);
+            return;
+        }
 
         // Check to see if Midi passthrough is blocked for this channel and igore all messages if true
         if (passthroughin[inchan] == false)
@@ -143,35 +197,15 @@ public:
         while (i < 5) {     // Up to four layers supported in addition to original Midi in channel
             if (iomap[inchan][i] == 0) break;
 
-            int note = message.getNoteNumber();
+            const int note = message.getNoteNumber();
+            const int outchan = iomap[inchan][i];
 
-            if ((inchan == lowerchan) && (splitout[lowersolo] != 0)) {
-                // Only output notes above split point to solo channel
-                if ((note >= splitout[lowersolo]) && (iomap[inchan][i] != lowersolo)) {
-                    i++;
-                    continue;
-                }
-                // Do not output Solo channel below split point
-                if ((note < splitout[lowersolo]) && (iomap[inchan][i] == lowersolo)) {
-                    i++;
-                    continue;
-                }
+            if (!shouldRouteLayeredNote(inchan, note, outchan))
+            {
+                i++;
+                continue;
             }
 
-            if ((inchan == upperchan) && (splitout[uppersolo] != 0)) {
-                // Only output notes above split point to solo channel
-                if ((note >= splitout[uppersolo]) && (iomap[inchan][i] != uppersolo)) {
-                    i++;
-                    continue;
-                }
-                // Do not output Solo channel below split point
-                if ((note < splitout[uppersolo]) && (iomap[inchan][i] == uppersolo)) {
-                    i++;
-                    continue;
-                }
-            }
-
-            int outchan = iomap[inchan][i];
             rewriteSendNoteMessage(message, outchan);
 
             DBG("*** handleIncomingMidiMessage(): Layering midi message to " + std::to_string(outchan));
@@ -192,17 +226,16 @@ public:
             return false;
         }
 
+        if (!isValidMidiChannel(midioutchan))
+            return false;
+
         // Get the Input Note and Octave transpose if required for Output Channel
-        // Ignore transposes larger han -2 and +2. 
+        // Ignore transposes larger than -3 and +3.
         int outchan = midioutchan;
-        int octtranspose = octxpose[outchan];
-
-        if ((octtranspose < -3) || (octtranspose > 3))
-            octtranspose = 0;
-
-        // To do: Add note boundary checks when transpose is used - based on how it is handled by Midi
-        auto note = message.getNoteNumber() + octtranspose * 12;
-        juce::uint8 velocity = message.getControllerValue();
+        auto note = getTransposedNoteForOutput(message.getNoteNumber(), outchan);
+        juce::uint8 velocity = 0;
+        if (message.getRawDataSize() >= 3)
+            velocity = message.getRawData()[2];
 
         if (message.isNoteOn()) {
 
@@ -259,7 +292,8 @@ public:
 
         // If MidiView connected duplicate message for display in monitor
         if (midiviewidx < midiOutputs.size()) {
-            midiOutputs[midiviewidx]->outDevice->sendMessageNow(msg);
+            if (midiOutputs[midiviewidx]->outDevice.get() != nullptr)
+                midiOutputs[midiviewidx]->outDevice->sendMessageNow(msg);
         }
     }
 

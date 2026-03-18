@@ -95,7 +95,7 @@ private:
     int stepcount = 0;
 
     double startTime;
-    std::unique_ptr<MidiDevices> mididevices;
+    MidiDevices* mididevices = nullptr;
 
     int midichannel = 0;
 
@@ -161,7 +161,7 @@ private:
     int stepcount = 0;
 
     double startTime;
-    std::unique_ptr<MidiDevices> mididevices;
+    MidiDevices* mididevices = nullptr;
     int midichannel = 0;
 
     int rotaryfast[6] = { 0x63, 0x33, 0x62, 0x69, 0x06, 0x00 };

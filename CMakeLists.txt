@@ -71,3 +71,43 @@ target_link_libraries(AMidiOrgan
         juce::juce_recommended_lto_flags
         juce::juce_recommended_warning_flags
 )
+
+enable_testing()
+
+juce_add_console_app(AMidiOrganTests
+    PRODUCT_NAME "AMidiOrganTests"
+)
+
+juce_generate_juce_header(AMidiOrganTests)
+
+target_sources(AMidiOrganTests
+    PRIVATE
+        tests/test_main.cpp
+)
+
+target_include_directories(AMidiOrganTests
+    PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}"
+)
+
+target_link_libraries(AMidiOrganTests
+    PRIVATE
+        AMidiOrganBinaryData
+        juce::juce_audio_basics
+        juce::juce_audio_devices
+        juce::juce_audio_utils
+        juce::juce_core
+        juce::juce_data_structures
+        juce::juce_events
+        juce::juce_graphics
+        juce::juce_gui_basics
+        juce::juce_gui_extra
+)
+
+target_compile_definitions(AMidiOrganTests
+    PRIVATE
+        JUCE_WEB_BROWSER=0
+        JUCE_USE_CURL=0
+)
+
+add_test(NAME AMidiOrganTests COMMAND AMidiOrganTests)

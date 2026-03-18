@@ -35,6 +35,17 @@ cmake --build build --config Release --target AMidiOrgan
 Start-Process "build/AMidiOrgan_artefacts/Release/AMidiOrgan.exe"
 ```
 
+### Test (Windows)
+From the repository root:
+
+```powershell
+# Build the test executable
+cmake --build build --config Debug --target AMidiOrganTests
+
+# Run tests
+ctest --test-dir build -C Debug --output-on-failure
+```
+
 ### macOS (Xcode generator)
 From the repository root:
 

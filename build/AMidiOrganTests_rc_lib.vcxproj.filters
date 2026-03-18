@@ -1,0 +1,22 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\a_min\AMidiOrganOrg\build\CMakeFiles\7a21afb4af135e7c3d134175676e6689\AMidiOrganTests_resources.rc.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="C:\Users\a_min\AMidiOrganOrg\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="C:\Users\a_min\AMidiOrganOrg\build\AMidiOrganTests_artefacts\JuceLibraryCode\AMidiOrganTests_resources.rc">
+      <Filter>Source Files</Filter>
+    </ResourceCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="CMake Rules">
+      <UniqueIdentifier>{6915112A-A5C1-3375-826C-DBD8B0D10076}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{DFE6A5CF-3EBA-334B-ADF6-9E8C32A03DEB}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

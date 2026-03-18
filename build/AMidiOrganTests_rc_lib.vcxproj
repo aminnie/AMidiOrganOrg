@@ -3,9 +3,6 @@
   <PropertyGroup>
     <PreferredToolArchitecture>x64</PreferredToolArchitecture>
   </PropertyGroup>
-  <PropertyGroup>
-    <ResolveNugetPackages>false</ResolveNugetPackages>
-  </PropertyGroup>
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|x64">
       <Configuration>Debug</Configuration>
@@ -25,31 +22,31 @@
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{D9B24D53-0F03-3E5E-ACBF-FB9FE40F203B}</ProjectGuid>
+    <ProjectGuid>{1A177B25-189A-3234-AF31-BDAEE39297D1}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <WindowsTargetPlatformVersion>10.0.26100.0</WindowsTargetPlatformVersion>
     <Platform>x64</Platform>
-    <ProjectName>ALL_BUILD</ProjectName>
+    <ProjectName>AMidiOrganTests_rc_lib</ProjectName>
     <VCProjectUpgraderObjectName>NoUpgrade</VCProjectUpgraderObjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
-    <ConfigurationType>Utility</ConfigurationType>
+    <ConfigurationType>StaticLibrary</ConfigurationType>
     <CharacterSet>MultiByte</CharacterSet>
     <PlatformToolset>v143</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
-    <ConfigurationType>Utility</ConfigurationType>
+    <ConfigurationType>StaticLibrary</ConfigurationType>
     <CharacterSet>MultiByte</CharacterSet>
     <PlatformToolset>v143</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'" Label="Configuration">
-    <ConfigurationType>Utility</ConfigurationType>
+    <ConfigurationType>StaticLibrary</ConfigurationType>
     <CharacterSet>MultiByte</CharacterSet>
     <PlatformToolset>v143</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'" Label="Configuration">
-    <ConfigurationType>Utility</ConfigurationType>
+    <ConfigurationType>StaticLibrary</ConfigurationType>
     <CharacterSet>MultiByte</CharacterSet>
     <PlatformToolset>v143</PlatformToolset>
   </PropertyGroup>
@@ -62,12 +59,47 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup>
     <_ProjectFileVersion>10.0.20506.1</_ProjectFileVersion>
-    <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(Platform)\$(Configuration)\$(ProjectName)\</IntDir>
-    <IntDir Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(Platform)\$(Configuration)\$(ProjectName)\</IntDir>
-    <IntDir Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">$(Platform)\$(Configuration)\$(ProjectName)\</IntDir>
-    <IntDir Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">$(Platform)\$(Configuration)\$(ProjectName)\</IntDir>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">AMidiOrganTests_rc_lib.dir\Debug\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">AMidiOrganTests_rc_lib.dir\Debug\</IntDir>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">AMidiOrganTests_rc_lib</TargetName>
+    <TargetExt Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">.lib</TargetExt>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='Release|x64'">AMidiOrganTests_rc_lib.dir\Release\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Release|x64'">AMidiOrganTests_rc_lib.dir\Release\</IntDir>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='Release|x64'">AMidiOrganTests_rc_lib</TargetName>
+    <TargetExt Condition="'$(Configuration)|$(Platform)'=='Release|x64'">.lib</TargetExt>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">AMidiOrganTests_rc_lib.dir\MinSizeRel\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">AMidiOrganTests_rc_lib.dir\MinSizeRel\</IntDir>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">AMidiOrganTests_rc_lib</TargetName>
+    <TargetExt Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">.lib</TargetExt>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">AMidiOrganTests_rc_lib.dir\RelWithDebInfo\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">AMidiOrganTests_rc_lib.dir\RelWithDebInfo\</IntDir>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">AMidiOrganTests_rc_lib</TargetName>
+    <TargetExt Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">.lib</TargetExt>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
+      <BasicRuntimeChecks>Default</BasicRuntimeChecks>
+      <ExceptionHandling>
+      </ExceptionHandling>
+      <ForceConformanceInForLoopScope></ForceConformanceInForLoopScope>
+      <MinimalRebuild></MinimalRebuild>
+      <Optimization></Optimization>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <RemoveUnreferencedCodeData></RemoveUnreferencedCodeData>
+      <RuntimeLibrary></RuntimeLibrary>
+      <SupportJustMyCode></SupportJustMyCode>
+      <TreatWChar_tAsBuiltInType></TreatWChar_tAsBuiltInType>
+      <UseFullPaths>false</UseFullPaths>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);CMAKE_INTDIR="Debug"</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)</ObjectFileName>
+      <DebugInformationFormat>
+      </DebugInformationFormat>
+      <ScanSourceForModuleDependencies>false</ScanSourceForModuleDependencies>
+    </ClCompile>
+    <ResourceCompile>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_DEBUG;CMAKE_INTDIR=\"Debug\"</PreprocessorDefinitions>
+    </ResourceCompile>
     <Midl>
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
@@ -76,8 +108,34 @@
       <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
       <ProxyFileName>%(Filename)_p.c</ProxyFileName>
     </Midl>
+    <Lib>
+      <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
+    </Lib>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
+      <BasicRuntimeChecks>Default</BasicRuntimeChecks>
+      <ExceptionHandling>
+      </ExceptionHandling>
+      <ForceConformanceInForLoopScope></ForceConformanceInForLoopScope>
+      <MinimalRebuild></MinimalRebuild>
+      <Optimization></Optimization>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <RemoveUnreferencedCodeData></RemoveUnreferencedCodeData>
+      <RuntimeLibrary></RuntimeLibrary>
+      <SupportJustMyCode></SupportJustMyCode>
+      <TreatWChar_tAsBuiltInType></TreatWChar_tAsBuiltInType>
+      <UseFullPaths>false</UseFullPaths>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);CMAKE_INTDIR="Release"</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)</ObjectFileName>
+      <DebugInformationFormat>
+      </DebugInformationFormat>
+      <ScanSourceForModuleDependencies>false</ScanSourceForModuleDependencies>
+    </ClCompile>
+    <ResourceCompile>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;CMAKE_INTDIR=\"Release\"</PreprocessorDefinitions>
+    </ResourceCompile>
     <Midl>
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
@@ -86,8 +144,34 @@
       <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
       <ProxyFileName>%(Filename)_p.c</ProxyFileName>
     </Midl>
+    <Lib>
+      <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
+    </Lib>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">
+    <ClCompile>
+      <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
+      <BasicRuntimeChecks>Default</BasicRuntimeChecks>
+      <ExceptionHandling>
+      </ExceptionHandling>
+      <ForceConformanceInForLoopScope></ForceConformanceInForLoopScope>
+      <MinimalRebuild></MinimalRebuild>
+      <Optimization></Optimization>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <RemoveUnreferencedCodeData></RemoveUnreferencedCodeData>
+      <RuntimeLibrary></RuntimeLibrary>
+      <SupportJustMyCode></SupportJustMyCode>
+      <TreatWChar_tAsBuiltInType></TreatWChar_tAsBuiltInType>
+      <UseFullPaths>false</UseFullPaths>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);CMAKE_INTDIR="MinSizeRel"</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)</ObjectFileName>
+      <DebugInformationFormat>
+      </DebugInformationFormat>
+      <ScanSourceForModuleDependencies>false</ScanSourceForModuleDependencies>
+    </ClCompile>
+    <ResourceCompile>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;CMAKE_INTDIR=\"MinSizeRel\"</PreprocessorDefinitions>
+    </ResourceCompile>
     <Midl>
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
@@ -96,8 +180,34 @@
       <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
       <ProxyFileName>%(Filename)_p.c</ProxyFileName>
     </Midl>
+    <Lib>
+      <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
+    </Lib>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">
+    <ClCompile>
+      <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
+      <BasicRuntimeChecks>Default</BasicRuntimeChecks>
+      <ExceptionHandling>
+      </ExceptionHandling>
+      <ForceConformanceInForLoopScope></ForceConformanceInForLoopScope>
+      <MinimalRebuild></MinimalRebuild>
+      <Optimization></Optimization>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <RemoveUnreferencedCodeData></RemoveUnreferencedCodeData>
+      <RuntimeLibrary></RuntimeLibrary>
+      <SupportJustMyCode></SupportJustMyCode>
+      <TreatWChar_tAsBuiltInType></TreatWChar_tAsBuiltInType>
+      <UseFullPaths>false</UseFullPaths>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);CMAKE_INTDIR="RelWithDebInfo"</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)</ObjectFileName>
+      <DebugInformationFormat>
+      </DebugInformationFormat>
+      <ScanSourceForModuleDependencies>false</ScanSourceForModuleDependencies>
+    </ClCompile>
+    <ResourceCompile>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;CMAKE_INTDIR=\"RelWithDebInfo\"</PreprocessorDefinitions>
+    </ResourceCompile>
     <Midl>
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
@@ -106,7 +216,66 @@
       <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
       <ProxyFileName>%(Filename)_p.c</ProxyFileName>
     </Midl>
+    <Lib>
+      <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
+    </Lib>
   </ItemDefinitionGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\a_min\AMidiOrganOrg\build\CMakeFiles\7a21afb4af135e7c3d134175676e6689\AMidiOrganTests_resources.rc.rule">
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Generating AMidiOrganTests_artefacts/JuceLibraryCode/AMidiOrganTests_resources.rc</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">setlocal
+JUCE\tools\extras\Build\juceaide\juceaide_artefacts\Custom\juceaide.exe rcfile C:/Users/a_min/AMidiOrganOrg/build/AMidiOrganTests_artefacts/JuceLibraryCode/Info.txt C:/Users/a_min/AMidiOrganOrg/build/AMidiOrganTests_artefacts/JuceLibraryCode/AMidiOrganTests_resources.rc
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Users\a_min\AMidiOrganOrg\build\AMidiOrganTests_artefacts\JuceLibraryCode\AMidiOrganTests_resources.rc</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</LinkObjects>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Generating AMidiOrganTests_artefacts/JuceLibraryCode/AMidiOrganTests_resources.rc</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
+JUCE\tools\extras\Build\juceaide\juceaide_artefacts\Custom\juceaide.exe rcfile C:/Users/a_min/AMidiOrganOrg/build/AMidiOrganTests_artefacts/JuceLibraryCode/Info.txt C:/Users/a_min/AMidiOrganOrg/build/AMidiOrganTests_artefacts/JuceLibraryCode/AMidiOrganTests_resources.rc
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">C:\Users\a_min\AMidiOrganOrg\build\AMidiOrganTests_artefacts\JuceLibraryCode\AMidiOrganTests_resources.rc</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</LinkObjects>
+      <Message Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">Generating AMidiOrganTests_artefacts/JuceLibraryCode/AMidiOrganTests_resources.rc</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">setlocal
+JUCE\tools\extras\Build\juceaide\juceaide_artefacts\Custom\juceaide.exe rcfile C:/Users/a_min/AMidiOrganOrg/build/AMidiOrganTests_artefacts/JuceLibraryCode/Info.txt C:/Users/a_min/AMidiOrganOrg/build/AMidiOrganTests_artefacts/JuceLibraryCode/AMidiOrganTests_resources.rc
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">C:\Users\a_min\AMidiOrganOrg\build\AMidiOrganTests_artefacts\JuceLibraryCode\AMidiOrganTests_resources.rc</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">false</LinkObjects>
+      <Message Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">Generating AMidiOrganTests_artefacts/JuceLibraryCode/AMidiOrganTests_resources.rc</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">setlocal
+JUCE\tools\extras\Build\juceaide\juceaide_artefacts\Custom\juceaide.exe rcfile C:/Users/a_min/AMidiOrganOrg/build/AMidiOrganTests_artefacts/JuceLibraryCode/Info.txt C:/Users/a_min/AMidiOrganOrg/build/AMidiOrganTests_artefacts/JuceLibraryCode/AMidiOrganTests_resources.rc
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">C:\Users\a_min\AMidiOrganOrg\build\AMidiOrganTests_artefacts\JuceLibraryCode\AMidiOrganTests_resources.rc</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">false</LinkObjects>
+    </CustomBuild>
+  </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="C:\Users\a_min\AMidiOrganOrg\CMakeLists.txt">
       <UseUtf8Encoding>Always</UseUtf8Encoding>
@@ -165,36 +334,13 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
+    <ResourceCompile Include="C:\Users\a_min\AMidiOrganOrg\build\AMidiOrganTests_artefacts\JuceLibraryCode\AMidiOrganTests_resources.rc" />
   </ItemGroup>
   <ItemGroup />
   <ItemGroup>
     <ProjectReference Include="C:\Users\a_min\AMidiOrganOrg\build\ZERO_CHECK.vcxproj">
       <Project>{263D58A6-E2C9-3767-9285-6798EA54FAB1}</Project>
       <Name>ZERO_CHECK</Name>
-      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
-      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-    </ProjectReference>
-    <ProjectReference Include="C:\Users\a_min\AMidiOrganOrg\build\AMidiOrgan.vcxproj">
-      <Project>{8ECAA4B2-12FA-3BF8-B57C-2A645A11AFA8}</Project>
-      <Name>AMidiOrgan</Name>
-    </ProjectReference>
-    <ProjectReference Include="C:\Users\a_min\AMidiOrganOrg\build\AMidiOrganBinaryData.vcxproj">
-      <Project>{75DCC91C-7D6D-319F-87C9-DEFF37978A46}</Project>
-      <Name>AMidiOrganBinaryData</Name>
-    </ProjectReference>
-    <ProjectReference Include="C:\Users\a_min\AMidiOrganOrg\build\AMidiOrganTests.vcxproj">
-      <Project>{9B621942-DAC1-39B6-837D-1CA52A68A569}</Project>
-      <Name>AMidiOrganTests</Name>
-    </ProjectReference>
-    <ProjectReference Include="C:\Users\a_min\AMidiOrganOrg\build\AMidiOrganTests_rc_lib.vcxproj">
-      <Project>{1A177B25-189A-3234-AF31-BDAEE39297D1}</Project>
-      <Name>AMidiOrganTests_rc_lib</Name>
-      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
-      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-    </ProjectReference>
-    <ProjectReference Include="C:\Users\a_min\AMidiOrganOrg\build\AMidiOrgan_rc_lib.vcxproj">
-      <Project>{B919F265-4E1F-33DF-9FC6-AAA2FFF13E79}</Project>
-      <Name>AMidiOrgan_rc_lib</Name>
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
       <CopyToOutputDirectory>Never</CopyToOutputDirectory>
     </ProjectReference>

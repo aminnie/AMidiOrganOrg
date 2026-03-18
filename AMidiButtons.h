@@ -30,8 +30,6 @@ public:
 
     ~VoiceButton() {
         //DBG("=== VoiceButton(): Destructor " + std::to_string(--zinstcntvoicebutton));
-
-        delete& instrument;
     }
 
     bool setInstrument(Instrument instr)

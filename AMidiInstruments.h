@@ -338,8 +338,6 @@ public:
 
     ~MidiInstruments() {
         DBG("=S= MidiInstruments(): Destructor " + std::to_string(--zinstcntmidiinstruments));
-
-        delete& jsonInstrumentData;
     };
 
     juce_DeclareSingleton(MidiInstruments, true)
@@ -353,7 +351,7 @@ private:
 
     juce::var jsonInstrumentData;
 
-    std::unique_ptr<InstrumentModules> instrumentmodules;
+    InstrumentModules* instrumentmodules = nullptr;
 
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MidiInstruments)
