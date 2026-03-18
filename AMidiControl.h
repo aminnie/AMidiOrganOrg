@@ -4502,16 +4502,16 @@ struct KeyboardPanelPage final : public Component,
     // https://melatonin.dev/blog/juce-component-mouse-and-keyboard/
     void addMouseListener(const juce::MouseEvent& event);
 
-    void mouseEnter(const juce::MouseEvent& event) override {
+    void mouseEnter([[maybe_unused]] const juce::MouseEvent& event) override {
         DBG("*** KeyboardManualPage(): Mouse Event Enter " + event.eventComponent->getDescription());
     }
 
     // Trigger Button updates when voice updated or panel reloaded - not working!!!
-    void focusGained(const juce::MouseEvent& event) {
+    void focusGained([[maybe_unused]] const juce::MouseEvent& event) {
         DBG("*** KeyboardManualPage(): Focus Received " + event.eventComponent->getDescription());
     }
 
-    void tabSelected(const juce::MouseEvent& event) {
+    void tabSelected([[maybe_unused]] const juce::MouseEvent& event) {
         DBG("*** KeyboardManualPage(): Tab Selected " + event.eventComponent->getDescription());
     }
 
