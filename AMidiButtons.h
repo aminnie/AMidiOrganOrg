@@ -233,6 +233,87 @@ private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(CommandButton)
 };
 
+//==============================================================================
+// Class: ArrowCommandButton - Command-style button with thick white arrow
+//==============================================================================
+class ArrowCommandButton : public CommandButton
+{
+public:
+    enum class Direction
+    {
+        up,
+        down
+    };
+
+    explicit ArrowCommandButton(Direction dir) : direction(dir)
+    {
+        setButtonText("");
+        setClickingTogglesState(true);
+    }
+
+    ~ArrowCommandButton() override = default;
+
+    void paintButton(Graphics& g, bool shouldDrawButtonAsHighlighted, bool shouldDrawButtonAsDown) override
+    {
+        auto bounds = getLocalBounds().toFloat().reduced(0.5f);
+        const bool isPressedOrToggled = shouldDrawButtonAsDown || getToggleState();
+        const auto background = isPressedOrToggled ? findColour(TextButton::buttonOnColourId)
+                                                   : findColour(TextButton::buttonColourId);
+        const float corner = 4.4f;
+
+        const auto borderColour = isPressedOrToggled ? Colours::black.withAlpha(0.70f)
+                                                     : Colours::black.withAlpha(0.55f);
+        const auto highlightColour = isPressedOrToggled ? Colours::white.withAlpha(0.04f)
+                                                        : Colours::white.withAlpha(0.10f);
+
+        g.setColour(background);
+        g.fillRoundedRectangle(bounds, corner);
+
+        // Subtle top sheen to better match the look of neighboring organ-style controls.
+        auto topHalf = bounds;
+        topHalf.setHeight(bounds.getHeight() * 0.45f);
+        g.setColour(highlightColour);
+        g.fillRoundedRectangle(topHalf, corner);
+
+        if (shouldDrawButtonAsHighlighted && !isPressedOrToggled)
+        {
+            g.setColour(Colours::white.withAlpha(0.08f));
+            g.fillRoundedRectangle(bounds, corner);
+        }
+
+        g.setColour(borderColour);
+        g.drawRoundedRectangle(bounds, corner, 1.1f);
+
+        const float verticalNudge = isPressedOrToggled ? 0.8f : 0.0f;
+        const float cx = bounds.getCentreX();
+        const float cy = bounds.getCentreY() + verticalNudge;
+        const float halfWidth = jmin(bounds.getWidth(), bounds.getHeight()) * 0.23f;
+        const float halfHeight = jmin(bounds.getWidth(), bounds.getHeight()) * 0.20f;
+
+        Path arrowPath;
+        if (direction == Direction::up)
+        {
+            arrowPath.startNewSubPath(cx - halfWidth, cy + halfHeight);
+            arrowPath.lineTo(cx, cy - halfHeight);
+            arrowPath.lineTo(cx + halfWidth, cy + halfHeight);
+        }
+        else
+        {
+            arrowPath.startNewSubPath(cx - halfWidth, cy - halfHeight);
+            arrowPath.lineTo(cx, cy + halfHeight);
+            arrowPath.lineTo(cx + halfWidth, cy - halfHeight);
+        }
+
+        g.setColour(Colours::white);
+        g.strokePath(arrowPath, PathStrokeType(4.0f, PathStrokeType::curved, PathStrokeType::rounded));
+    }
+
+private:
+    Direction direction;
+
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ArrowCommandButton)
+};
+
 
 
 

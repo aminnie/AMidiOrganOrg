@@ -98,6 +98,20 @@ The following asset filenames are referenced by code through `BinaryData` symbol
 - `assets/icons8arrowdown32click.png`
 - `assets/icons8arrowup32click.png`
 
+## UI Screenshots
+
+### Start Tab
+![Start Tab](docs/images/tab-start.png)
+
+### Upper Tab
+![Upper Tab](docs/images/tab-upper.png)
+
+### Lower Tab
+![Lower Tab](docs/images/tab-lower.png)
+
+### Bass Tab
+![Bass Tab](docs/images/tab-bass.png)
+
 ## Functional Overview
 
 Supported MIDI hardware and software sound modules:

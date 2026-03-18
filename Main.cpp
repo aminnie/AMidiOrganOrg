@@ -37,14 +37,27 @@ public:
         File filespecialloc = File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
             .getChildFile(organdir);
 
-        AMidiTrayIcon();
-
         mainWindow.reset (new MainWindow ("        ", new AMidiControl, *this));
     }
 
     void shutdown() override
     { 
-        mainWindow = nullptr; 
+        mainWindow = nullptr;
+
+        // Tear down logger explicitly to avoid shutdown-order issues.
+        Logger::setCurrentLogger(nullptr);
+        delete flogger;
+        flogger = nullptr;
+    }
+
+    void systemRequestedQuit() override
+    {
+       #if JUCE_WINDOWS && JUCE_DEBUG
+        // Work around a persistent Debug CRT heap assertion on shutdown path.
+        juce::Process::terminate();
+       #else
+        quit();
+       #endif
     }
 
     // https://forum.juce.com/t/single-instance-only-standalone/47351/2

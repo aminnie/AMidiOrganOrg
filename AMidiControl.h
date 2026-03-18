@@ -1424,6 +1424,50 @@ public:
     }
 
 private:
+    // Volume bar with fixed stacked gradient (bottom stays green as level rises).
+    class VolumeGradientSlider final : public Slider
+    {
+    public:
+        void paint(juce::Graphics& g) override
+        {
+            auto bounds = getLocalBounds().toFloat();
+            auto inner = bounds.reduced(2.0f);
+
+            g.setColour(juce::Colours::black.withAlpha(0.25f));
+            g.fillRoundedRectangle(bounds, 2.5f);
+
+            const auto min = (float)getMinimum();
+            const auto max = (float)getMaximum();
+            const auto value = (float)getValue();
+            const float value01 = (max > min) ? juce::jlimit(0.0f, 1.0f, (value - min) / (max - min)) : 0.0f;
+
+            const float filledHeight = inner.getHeight() * value01;
+            auto fillArea = juce::Rectangle<float>(
+                inner.getX(),
+                inner.getBottom() - filledHeight,
+                inner.getWidth(),
+                filledHeight);
+
+            juce::ColourGradient gradient(
+                juce::Colours::green.darker(), inner.getCentreX(), inner.getBottom(),
+                juce::Colours::red.darker(), inner.getCentreX(), inner.getY(),
+                false);
+            gradient.addColour(0.65, juce::Colours::orange.darker());
+
+            g.setGradientFill(gradient);
+            g.fillRect(fillArea);
+
+            g.setColour(juce::Colours::black.withAlpha(0.55f));
+            g.drawRect(inner, 1.0f);
+
+            if (!isEnabled())
+            {
+                g.setColour(juce::Colours::black.withAlpha(0.35f));
+                g.fillRect(inner);
+            }
+        }
+    };
+
     OwnedArray<Component> components;
 
     double startTime;
@@ -2099,17 +2143,42 @@ struct KeyboardPanelPage final : public Component,
     {
         juce::Logger::writeToLog("== KeyboardManualPage(): Constructor " + std::to_string(zinstcntmanualpage++));
 
-        // Load Volume up ad down arrow image files
-        juce::Image arrowdownclickImage = juce::ImageFileFormat::loadFrom(BinaryData::icons8arrowdown32_png, BinaryData::icons8arrowdown32_pngSize);
-        juce::Image arrowdownImage = juce::ImageFileFormat::loadFrom(BinaryData::icons8arrowdown32click_png, BinaryData::icons8arrowdown32click_pngSize);
-        juce::Image arrowupclickImage = juce::ImageFileFormat::loadFrom(BinaryData::icons8arrowup32_png, BinaryData::icons8arrowup32_pngSize);
-        juce::Image arrowupImage = juce::ImageFileFormat::loadFrom(BinaryData::icons8arrowup32click_png, BinaryData::icons8arrowup32click_pngSize);
-
         int bwidth = 75, bheight = 50, swidth = 20;
         int sbwidth = (int)(bwidth / 1.2), sbheight = (int)(bheight / 1.5);
 
         int mgroup = 10;
         int xgroup = 10, ygroup = 10;
+
+        auto configureArrowButton = [](ArrowCommandButton* button)
+            {
+                button->setClickingTogglesState(true);
+                button->setColour(TextButton::textColourOffId, Colours::black);
+                button->setColour(TextButton::textColourOnId, Colours::black);
+                button->setColour(TextButton::buttonColourId, Colours::darkgrey.darker(0.25f));
+                button->setColour(TextButton::buttonOnColourId, Colours::darkgrey.brighter(0.20f));
+            };
+
+        auto getDefaultGroupOutlineColour = [tabidx]()
+            {
+                if (tabidx == PTLower)
+                    return Colours::palegreen.darker();
+                if (tabidx == PTBass)
+                    return Colours::antiquewhite.darker();
+                return Colours::palevioletred.darker();
+            };
+
+        auto applyMutedGroupVisualCue = [&](ButtonGroup* buttonGroup, bool isMuted)
+            {
+                if (buttonGroup == nullptr)
+                    return;
+
+                if (auto* groupComponent = buttonGroup->getGroupComponentPtr())
+                {
+                    groupComponent->setColour(GroupComponent::outlineColourId,
+                        isMuted ? Colours::darkred.brighter(0.35f)
+                                : getDefaultGroupOutlineColour());
+                }
+            };
 
         // Remember current Tab Index so we can redirect Voice and Effects pages back to it
         currenttabidx = tabidx;
@@ -2442,13 +2511,6 @@ struct KeyboardPanelPage final : public Component,
                 {
                     int svol = (int)g1svol->getValue();
 
-                    if (svol < 8)
-                        g1svol->setColour(juce::Slider::ColourIds::trackColourId, juce::Colours::green.darker());
-                    else if (svol < 10)
-                        g1svol->setColour(juce::Slider::ColourIds::trackColourId, juce::Colours::yellow.darker());
-                    else
-                        g1svol->setColour(juce::Slider::ColourIds::trackColourId, juce::Colours::red.darker());
-
                     g1uppernvol = (svol * 120 / 10);
                     auto ccMessage = juce::MidiMessage::controllerEvent(buttongroupmidiout, 7, g1uppernvol);
                     ccMessage.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
@@ -2463,27 +2525,29 @@ struct KeyboardPanelPage final : public Component,
                 };
 
             // Slider Volume up and down buttons
-            auto* g1bvup = addToList(new ImageButton());
-            g1bvup->setImages(true, true, true, arrowupImage, 1.0f, {}, arrowupclickImage, 1.0f, {}, arrowupclickImage, 1.0f, {}, 0.0f);
+            auto* g1bvup = addToList(new ArrowCommandButton(ArrowCommandButton::Direction::up));
+            configureArrowButton(g1bvup);
             g1bvup->setBounds(g1xoffset + mgroup + (bwidth - sbwidth) / 2 + (cbuttonsdisplayed / rbuttons - 2) * bwidth, mgroup * 4 + rbuttons * bheight, sbwidth, sbheight);
             g1bvup->onClick = [=]()
                 {
                     //juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::InfoIcon, "Status", strtest /*"The button was clicked!"*/);
 
                     vbuttonupClicked(g1svol);
+                    g1bvup->setToggleState(false, dontSendNotification);
 
                     //String strstatus = "Vol Up: " + juce::String(g1svol->getValue());
                     //statusLabel->setText(strstatus, juce::dontSendNotification);
                 };
 
-            auto* g1bvdwn = addToList(new ImageButton());
-            g1bvdwn->setImages(true, true, true, arrowdownImage, 1.0f, {}, arrowdownclickImage, 1.0f, {}, arrowdownclickImage, 1.0f, {}, 0.0f);
+            auto* g1bvdwn = addToList(new ArrowCommandButton(ArrowCommandButton::Direction::down));
+            configureArrowButton(g1bvdwn);
             g1bvdwn->setBounds(g1xoffset + mgroup + (bwidth - sbwidth) / 2 + (cbuttonsdisplayed / rbuttons - 1) * bwidth, mgroup * 4 + rbuttons * bheight, sbwidth, sbheight);
             g1bvdwn->onClick = [=]()
                 {
                     //juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::InfoIcon, "Status", strtest /*"The button was clicked!"*/);
 
                     vbuttondownClicked(g1svol);
+                    g1bvdwn->setToggleState(false, dontSendNotification);
 
                     //String strstatus = "Vol Down: " + juce::String(g1svol->getValue());
                     //statusLabel->setText(strstatus, juce::dontSendNotification);
@@ -2517,6 +2581,7 @@ struct KeyboardPanelPage final : public Component,
 
                         ButtonGroup* ptrbuttongroup = instrumentpanel->getButtonGroup(buttongroupidx);
                         ptrbuttongroup->setMuteButtonStatus(true);
+                        applyMutedGroupVisualCue(ptrbuttongroup, true);
                         g1uppermute = true;
                     }
                     else {
@@ -2533,6 +2598,7 @@ struct KeyboardPanelPage final : public Component,
 
                         ButtonGroup* ptrbuttongroup = instrumentpanel->getButtonGroup(buttongroupidx);
                         ptrbuttongroup->setMuteButtonStatus(false);
+                        applyMutedGroupVisualCue(ptrbuttongroup, false);
                         g1uppermute = false;
                     }
 
@@ -2858,13 +2924,6 @@ struct KeyboardPanelPage final : public Component,
                 {
                     int svol = (int)g2svol->getValue();
 
-                    if (svol < 8)
-                        g2svol->setColour(juce::Slider::ColourIds::trackColourId, juce::Colours::green.darker());
-                    else if (svol < 10)
-                        g2svol->setColour(juce::Slider::ColourIds::trackColourId, juce::Colours::yellow.darker());
-                    else
-                        g2svol->setColour(juce::Slider::ColourIds::trackColourId, juce::Colours::red.darker());
-
                     g2uppernvol = (svol * 120 / 10);
                     auto ccMessage = juce::MidiMessage::controllerEvent(buttongroupmidiout, 7, g2uppernvol);
                     ccMessage.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
@@ -2879,24 +2938,26 @@ struct KeyboardPanelPage final : public Component,
                 };
 
             // Slider Volume up and down buttons
-            auto* g2bvup = addToList(new ImageButton());
-            g2bvup->setImages(true, true, true, arrowupImage, 1.0f, {}, arrowupclickImage, 1.0f, {}, arrowupclickImage, 1.0f, {}, 0.0f);
+            auto* g2bvup = addToList(new ArrowCommandButton(ArrowCommandButton::Direction::up));
+            configureArrowButton(g2bvup);
             g2bvup->setBounds(g2xoffset + mgroup + (bwidth - sbwidth) / 2 + (cbuttons / rbuttons - 2) * bwidth, mgroup * 4 + rbuttons * bheight, sbwidth, sbheight);
             g2bvup->onClick = [=]()
                 {
                     //juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::InfoIcon, "Status", strtest /*"The button was clicked!"*/);
 
                     vbuttonupClicked(g2svol);
+                    g2bvup->setToggleState(false, dontSendNotification);
                 };
 
-            auto* g2bvdwn = addToList(new ImageButton());
-            g2bvdwn->setImages(true, true, true, arrowdownImage, 1.0f, {}, arrowdownclickImage, 1.0f, {}, arrowdownclickImage, 1.0f, {}, 0.0f);
+            auto* g2bvdwn = addToList(new ArrowCommandButton(ArrowCommandButton::Direction::down));
+            configureArrowButton(g2bvdwn);
             g2bvdwn->setBounds(g2xoffset + mgroup + (bwidth - sbwidth) / 2 + (cbuttons / rbuttons - 1) * bwidth, mgroup * 4 + rbuttons * bheight, sbwidth, sbheight);
             g2bvdwn->onClick = [=]()
                 {
                     //juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::InfoIcon, "Status", strtest /*"The button was clicked!"*/);
 
                     vbuttondownClicked(g2svol);
+                    g2bvdwn->setToggleState(false, dontSendNotification);
                 };
 
             // Add Sound Mute Button
@@ -2927,6 +2988,7 @@ struct KeyboardPanelPage final : public Component,
 
                         ButtonGroup* ptrbuttongroup = instrumentpanel->getButtonGroup(buttongroupidx);
                         ptrbuttongroup->setMuteButtonStatus(true);
+                        applyMutedGroupVisualCue(ptrbuttongroup, true);
                         g2uppermute = true;
                     }
                     else {
@@ -2943,6 +3005,7 @@ struct KeyboardPanelPage final : public Component,
 
                         ButtonGroup* ptrbuttongroup = instrumentpanel->getButtonGroup(buttongroupidx);
                         ptrbuttongroup->setMuteButtonStatus(false);
+                        applyMutedGroupVisualCue(ptrbuttongroup, false);
                         g2uppermute = false;
                     }
 
@@ -3266,13 +3329,6 @@ struct KeyboardPanelPage final : public Component,
                 {
                     int svol = (int)g3svol->getValue();
 
-                    if (svol < 8)
-                        g3svol->setColour(juce::Slider::ColourIds::trackColourId, juce::Colours::green.darker());
-                    else if (svol < 10)
-                        g3svol->setColour(juce::Slider::ColourIds::trackColourId, juce::Colours::yellow.darker());
-                    else
-                        g3svol->setColour(juce::Slider::ColourIds::trackColourId, juce::Colours::red.darker());
-
                     g3uppernvol = (svol * 120 / 10);
                     auto ccMessage = juce::MidiMessage::controllerEvent(buttongroupmidiout, 7, g3uppernvol);
                     ccMessage.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
@@ -3287,24 +3343,26 @@ struct KeyboardPanelPage final : public Component,
                 };
 
             // Slider Volume up and down buttons
-            auto* g3bvup = addToList(new ImageButton());
-            g3bvup->setImages(true, true, true, arrowupImage, 1.0f, {}, arrowupclickImage, 1.0f, {}, arrowupclickImage, 1.0f, {}, 0.0f);
+            auto* g3bvup = addToList(new ArrowCommandButton(ArrowCommandButton::Direction::up));
+            configureArrowButton(g3bvup);
             g3bvup->setBounds(g3xoffset + mgroup + (bwidth - sbwidth) / 2 + (cbuttons / rbuttons - 2) * bwidth, mgroup * 4 + rbuttons * bheight, sbwidth, sbheight);
             g3bvup->onClick = [=]()
                 {
                     //juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::InfoIcon, "Status", strtest /*"The button was clicked!"*/);
 
                     vbuttonupClicked(g3svol);
+                    g3bvup->setToggleState(false, dontSendNotification);
                 };
 
-            auto* g3bvdwn = addToList(new ImageButton());
-            g3bvdwn->setImages(true, true, true, arrowdownImage, 1.0f, {}, arrowdownclickImage, 1.0f, {}, arrowdownclickImage, 1.0f, {}, 0.0f);
+            auto* g3bvdwn = addToList(new ArrowCommandButton(ArrowCommandButton::Direction::down));
+            configureArrowButton(g3bvdwn);
             g3bvdwn->setBounds(g3xoffset + mgroup + (bwidth - sbwidth) / 2 + (cbuttons / rbuttons - 1) * bwidth, mgroup * 4 + rbuttons * bheight, sbwidth, sbheight);
             g3bvdwn->onClick = [=]()
                 {
                     //juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::InfoIcon, "Status", strtest /*"The button was clicked!"*/);
 
                     vbuttondownClicked(g3svol);
+                    g3bvdwn->setToggleState(false, dontSendNotification);
                 };
 
             // Add Sound Mute Button
@@ -3335,6 +3393,7 @@ struct KeyboardPanelPage final : public Component,
 
                         ButtonGroup* ptrbuttongroup = instrumentpanel->getButtonGroup(buttongroupidx);
                         ptrbuttongroup->setMuteButtonStatus(true);
+                        applyMutedGroupVisualCue(ptrbuttongroup, true);
                         g3uppermute = true;
                     }
                     else {
@@ -3351,6 +3410,7 @@ struct KeyboardPanelPage final : public Component,
 
                         ButtonGroup* ptrbuttongroup = instrumentpanel->getButtonGroup(buttongroupidx);
                         ptrbuttongroup->setMuteButtonStatus(false);
+                        applyMutedGroupVisualCue(ptrbuttongroup, false);
                         g3uppermute = false;
                     }
 
@@ -3684,13 +3744,6 @@ struct KeyboardPanelPage final : public Component,
                 {
                     int svol = (int)g4svol->getValue();
 
-                    if (svol < 8)
-                        g4svol->setColour(juce::Slider::ColourIds::trackColourId, juce::Colours::green.darker());
-                    else if (svol < 10)
-                        g4svol->setColour(juce::Slider::ColourIds::trackColourId, juce::Colours::yellow.darker());
-                    else
-                        g4svol->setColour(juce::Slider::ColourIds::trackColourId, juce::Colours::red.darker());
-
                     g4uppernvol = (svol * 120 / 10);
                     auto ccMessage = juce::MidiMessage::controllerEvent(buttongroupmidiout, 7, g4uppernvol);
                     ccMessage.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
@@ -3705,24 +3758,26 @@ struct KeyboardPanelPage final : public Component,
                 };
 
             // Slider Volume up and down buttons
-            auto* g4bvup = addToList(new ImageButton());
-            g4bvup->setImages(true, true, true, arrowupImage, 1.0f, {}, arrowupclickImage, 1.0f, {}, arrowupclickImage, 1.0f, {}, 0.0f);
+            auto* g4bvup = addToList(new ArrowCommandButton(ArrowCommandButton::Direction::up));
+            configureArrowButton(g4bvup);
             g4bvup->setBounds(g4xoffset + mgroup + (bwidth - sbwidth) / 2 + (cbuttons / rbuttons - 2) * bwidth, mgroup * 4 + rbuttons * bheight, sbwidth, sbheight);
             g4bvup->onClick = [=]()
                 {
                     //juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::InfoIcon, "Status", strtest /*"The button was clicked!"*/);
 
                     vbuttonupClicked(g4svol);
+                    g4bvup->setToggleState(false, dontSendNotification);
                 };
 
-            auto* g4bvdwn = addToList(new ImageButton());
-            g4bvdwn->setImages(true, true, true, arrowdownImage, 1.0f, {}, arrowdownclickImage, 1.0f, {}, arrowdownclickImage, 1.0f, {}, 0.0f);
+            auto* g4bvdwn = addToList(new ArrowCommandButton(ArrowCommandButton::Direction::down));
+            configureArrowButton(g4bvdwn);
             g4bvdwn->setBounds(g4xoffset + mgroup + (bwidth - sbwidth) / 2 + (cbuttons / rbuttons - 1) * bwidth, mgroup * 4 + rbuttons * bheight, sbwidth, sbheight);
             g4bvdwn->onClick = [=]()
                 {
                     //juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::InfoIcon, "Status", strtest /*"The button was clicked!"*/);
 
                     vbuttondownClicked(g4svol);
+                    g4bvdwn->setToggleState(false, dontSendNotification);
                 };
 
             // Add Sound Mute Button
@@ -3753,6 +3808,7 @@ struct KeyboardPanelPage final : public Component,
 
                         ButtonGroup* ptrbuttongroup = instrumentpanel->getButtonGroup(buttongroupidx);
                         ptrbuttongroup->setMuteButtonStatus(true);
+                        applyMutedGroupVisualCue(ptrbuttongroup, true);
                         g4uppermute = true;
                     }
                     else {
@@ -3769,6 +3825,7 @@ struct KeyboardPanelPage final : public Component,
 
                         ButtonGroup* ptrbuttongroup = instrumentpanel->getButtonGroup(buttongroupidx);
                         ptrbuttongroup->setMuteButtonStatus(false);
+                        applyMutedGroupVisualCue(ptrbuttongroup, false);
                         g4uppermute = false;
                     }
 
@@ -4232,6 +4289,34 @@ struct KeyboardPanelPage final : public Component,
         // Instrument Panel Save and Save As Buttons
         if ((tabidx != PTUpper) || (tabidx != PTLower) || (tabidx != PTBass))
         {
+            auto* tbExit = addToList(new CommandButton());
+            tbExit->setButtonText("Exit");
+            tbExit->setColour(TextButton::textColourOffId, Colours::white);
+            tbExit->setColour(TextButton::textColourOnId, Colours::white);
+            tbExit->setColour(TextButton::buttonColourId, Colours::black.darker());
+            tbExit->setColour(TextButton::buttonOnColourId, Colours::black.brighter());
+            tbExit->setBounds(1350, 235, 80, 30);
+            tbExit->setToggleState(false, dontSendNotification);
+            tbExit->onClick = [=]()
+                {
+                    if (auto* topLevel = getTopLevelComponent())
+                    {
+                        auto safeTop = juce::Component::SafePointer<juce::Component>(topLevel);
+                        juce::MessageManager::callAsync([safeTop]()
+                            {
+                                if (safeTop != nullptr)
+                                    safeTop->userTriedToCloseWindow();
+                            });
+                    }
+                    else if (auto* app = juce::JUCEApplication::getInstance())
+                    {
+                        juce::MessageManager::callAsync([app]()
+                            {
+                                app->systemRequestedQuit();
+                            });
+                    }
+                };
+
             auto* tbSave = addToList(new CommandButton());
             cbSave = tbSave;
             tbSave->setButtonText("Save");
@@ -4679,6 +4764,50 @@ private:
     OwnedArray<PresetButton> presetbuttons;
     bool bsetpreset = false;
 
+    // Volume bar with fixed stacked gradient (bottom stays green/orange).
+    class VolumeGradientSlider final : public Slider
+    {
+    public:
+        void paint(juce::Graphics& g) override
+        {
+            auto bounds = getLocalBounds().toFloat();
+            auto inner = bounds.reduced(2.0f);
+
+            g.setColour(juce::Colours::black.withAlpha(0.25f));
+            g.fillRoundedRectangle(bounds, 2.5f);
+
+            const auto min = (float)getMinimum();
+            const auto max = (float)getMaximum();
+            const auto value = (float)getValue();
+            const float value01 = (max > min) ? juce::jlimit(0.0f, 1.0f, (value - min) / (max - min)) : 0.0f;
+
+            const float filledHeight = inner.getHeight() * value01;
+            auto fillArea = juce::Rectangle<float>(
+                inner.getX(),
+                inner.getBottom() - filledHeight,
+                inner.getWidth(),
+                filledHeight);
+
+            juce::ColourGradient gradient(
+                juce::Colours::green.darker(), inner.getCentreX(), inner.getBottom(),
+                juce::Colours::red.darker(), inner.getCentreX(), inner.getY(),
+                false);
+            gradient.addColour(0.65, juce::Colours::orange.darker());
+
+            g.setGradientFill(gradient);
+            g.fillRect(fillArea);
+
+            g.setColour(juce::Colours::black.withAlpha(0.55f));
+            g.drawRect(inner, 1.0f);
+
+            if (!isEnabled())
+            {
+                g.setColour(juce::Colours::black.withAlpha(0.35f));
+                g.fillRect(inner);
+            }
+        }
+    };
+
     Slider* createSlider(bool isSnapping)
     {
         auto* s = isSnapping ? new SnappingSlider()
@@ -4694,10 +4823,9 @@ private:
     Slider* createVolSlider(bool isSnapping)
     {
         auto* s = isSnapping ? new SnappingSlider()
-            : new Slider();
+            : static_cast<Slider*>(new VolumeGradientSlider());
 
         s->setRange(0.0, 10.0, 1.0);
-        s->setColour(juce::Slider::ColourIds::trackColourId, juce::Colours::green.darker());
         s->setPopupMenuEnabled(true);
         s->setValue(Random::getSystemRandom().nextDouble() * 7.0, dontSendNotification);
         return s;
@@ -5135,6 +5263,14 @@ public:
         // Update with active devices and Channel Output based on Button Groups
         updateDeviceLists();
 
+        // Register for device-list changes after page initialization is complete.
+        auto safeThis = juce::Component::SafePointer<MidiStartPage>(this);
+        connection = MidiDeviceListConnection::make([safeThis]()
+            {
+                if (safeThis != nullptr)
+                    safeThis->updateDeviceLists();
+            });
+
         // Dsplay current Panel File and Config Files in use. 
         // Flag mismatch between panel file and incorrect config file in red
         configfileLabel.setText(appState.configfname, {});
@@ -5153,8 +5289,9 @@ public:
     {
         DBG("=== MidiStartPage(): Destructor " + std::to_string(--zinstcntMidiStartPage));
 
-        mididevices->midiInputs.clear();
-        mididevices->midiOutputs.clear();
+        // Disconnect device-change callback before tearing down controls/state.
+        connection.reset();
+
         keyboardState.removeListener(this);
 
         midiInputSelector.reset();
@@ -5473,11 +5610,7 @@ private:
     }
 
     //-----------------------------------------------------------------------------
-    MidiDeviceListConnection connection = MidiDeviceListConnection::make([this]
-        {
-            updateDeviceLists();
-        }
-    );
+    MidiDeviceListConnection connection;
 
     //-----------------------------------------------------------------------------
     // Map Static Supported Midi Mpdules assigned to Button Groups to Channels in order to
@@ -5542,8 +5675,38 @@ private:
     //-----------------------------------------------------------------------------
     // Quit the original WIndows Application.
     void ApplicationQuit() {
-        if (JUCEApplicationBase::isStandaloneApp())
-            JUCEApplicationBase::quit();
+        if (shutdownRequested)
+            return;
+
+        shutdownRequested = true;
+
+        // Stop live callbacks before scheduling app shutdown.
+        connection.reset();
+        filechooser.reset();
+        juce::PopupMenu::dismissAllActiveMenus();
+        if (midiInputSelector != nullptr)
+            midiInputSelector->setEnabled(false);
+        if (midiOutputSelector != nullptr)
+            midiOutputSelector->setEnabled(false);
+
+        if (auto* topLevel = getTopLevelComponent())
+        {
+            auto safeTop = juce::Component::SafePointer<juce::Component>(topLevel);
+            juce::MessageManager::callAsync([safeTop]()
+                {
+                    if (safeTop != nullptr)
+                        safeTop->userTriedToCloseWindow();
+                });
+            return;
+        }
+
+        if (auto* app = juce::JUCEApplication::getInstance())
+        {
+            juce::MessageManager::callAsync([app]()
+                {
+                    app->systemRequestedQuit();
+                });
+        }
     }
 
     //-----------------------------------------------------------------------------
@@ -5579,6 +5742,7 @@ private:
     InstrumentPanel* instrumentpanel = nullptr;
     MidiInstruments* midiInstruments = nullptr;
     AppState& appState;
+    bool shutdownRequested = false;
 
     std::unique_ptr<FileChooser> filechooser;
 
@@ -6738,8 +6902,27 @@ private:
 
         juce::Logger::writeToLog("*** ApplicationQuit(): Quiting application");
 
-        if (JUCEApplicationBase::isStandaloneApp())
-            JUCEApplicationBase::quit();
+        filechooser.reset();
+        juce::PopupMenu::dismissAllActiveMenus();
+
+        if (auto* topLevel = getTopLevelComponent())
+        {
+            auto safeTop = juce::Component::SafePointer<juce::Component>(topLevel);
+            juce::MessageManager::callAsync([safeTop]()
+                {
+                    if (safeTop != nullptr)
+                        safeTop->userTriedToCloseWindow();
+                });
+            return;
+        }
+
+        if (auto* app = juce::JUCEApplication::getInstance())
+        {
+            juce::MessageManager::callAsync([app]()
+                {
+                    app->systemRequestedQuit();
+                });
+        }
     }
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ConfigPage)
