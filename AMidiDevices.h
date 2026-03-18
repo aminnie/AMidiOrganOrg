@@ -433,52 +433,52 @@ public:
         DBG("=S= InstrumentModules(): Destructor " + std::to_string(--zinstcntInstrumentModules));
     };
 
-    bool createInstrumentModule(int moduleidx, String displayname,
+    bool createInstrumentModule(int moduleIndex, String displayname,
         String subdirectory, String modulename, String moduleidstring,
-        String voicename, int MSB, int LSB, int font, bool iszerobased,
-        bool isrotary, int rotortype, int rotorcc, int rotoroff, int rotorslow, int rotorfast) {
+        String voicename, int MSB, int LSB, int font, bool isZeroBased,
+        bool isRotary, int rotortype, int rotorcc, int rotoroff, int rotorslow, int rotorfast) {
 
-        if ((moduleidx < 0) || (moduleidx >= instrumentmodules.size())) {
+        if ((moduleIndex < 0) || (moduleIndex >= instrumentmodules.size())) {
             return false;
         }
 
-        instrumentmodules[moduleidx]->setDisplayName(displayname);
-        instrumentmodules[moduleidx]->setSubDirectory(subdirectory);
-        instrumentmodules[moduleidx]->setModuleFileName(modulename);
-        instrumentmodules[moduleidx]->setModuleIdString(moduleidstring);
+        instrumentmodules[moduleIndex]->setDisplayName(displayname);
+        instrumentmodules[moduleIndex]->setSubDirectory(subdirectory);
+        instrumentmodules[moduleIndex]->setModuleFileName(modulename);
+        instrumentmodules[moduleIndex]->setModuleIdString(moduleidstring);
 
-        instrumentmodules[moduleidx]->setDefVoiceName(voicename);
-        instrumentmodules[moduleidx]->setDefMSB(MSB);
-        instrumentmodules[moduleidx]->setDefLSB(LSB);
-        instrumentmodules[moduleidx]->setDefFont(font);
-        instrumentmodules[moduleidx]->setIsZeroBased(iszerobased);
+        instrumentmodules[moduleIndex]->setDefVoiceName(voicename);
+        instrumentmodules[moduleIndex]->setDefMSB(MSB);
+        instrumentmodules[moduleIndex]->setDefLSB(LSB);
+        instrumentmodules[moduleIndex]->setDefFont(font);
+        instrumentmodules[moduleIndex]->setIsZeroBased(isZeroBased);
 
-        instrumentmodules[moduleidx]->setIsRotary(isrotary);
-        instrumentmodules[moduleidx]->setRotorType(rotortype);
-        instrumentmodules[moduleidx]->setRotorCC(rotorcc);
-        instrumentmodules[moduleidx]->setRotorOff(rotoroff);
-        instrumentmodules[moduleidx]->setRotorSlow(rotorslow);
-        instrumentmodules[moduleidx]->setRotorFast(rotorfast);
+        instrumentmodules[moduleIndex]->setIsRotary(isRotary);
+        instrumentmodules[moduleIndex]->setRotorType(rotortype);
+        instrumentmodules[moduleIndex]->setRotorCC(rotorcc);
+        instrumentmodules[moduleIndex]->setRotorOff(rotoroff);
+        instrumentmodules[moduleIndex]->setRotorSlow(rotorslow);
+        instrumentmodules[moduleIndex]->setRotorFast(rotorfast);
 
         return true;
     };
 
     bool setInstrumentModule(int mmoduleidx) {
 
-        moduleidx = mmoduleidx;
+        appState.moduleidx = mmoduleidx;
 
-        // Set Instrument Module Static Vars
-        vendorname = instrumentmodules[mmoduleidx]->getDisplayName();           //"Deebach Blackbox";
-        instrumentdname = instrumentmodules[mmoduleidx]->getSubDirectory();     // "BlackBox";
-        instrumentfname = instrumentmodules[mmoduleidx]->getModuleFileName();   //"maxplus.json";
+        // Set Instrument module state.
+        appState.vendorname = instrumentmodules[mmoduleidx]->getDisplayName();
+        appState.instrumentdname = instrumentmodules[mmoduleidx]->getSubDirectory();
+        appState.instrumentfname = instrumentmodules[mmoduleidx]->getModuleFileName();
 
-        String sdefVoice = instrumentmodules[mmoduleidx]->getDefVoiceName();
-        int sdefMSB = instrumentmodules[mmoduleidx]->getDefMSB();
-        int sdefLSB = instrumentmodules[mmoduleidx]->getDefLSB();
-        int sdefFont = instrumentmodules[mmoduleidx]->getDefFont();
-        iszerobased = instrumentmodules[mmoduleidx]->getIsZeroBased();
+        appState.sdefVoice = instrumentmodules[mmoduleidx]->getDefVoiceName();
+        appState.sdefMSB = instrumentmodules[mmoduleidx]->getDefMSB();
+        appState.sdefLSB = instrumentmodules[mmoduleidx]->getDefLSB();
+        appState.sdefFont = instrumentmodules[mmoduleidx]->getDefFont();
+        appState.iszerobased = instrumentmodules[mmoduleidx]->getIsZeroBased();
 
-        isrotary = instrumentmodules[mmoduleidx]->getIsRotary();
+        appState.isrotary = instrumentmodules[mmoduleidx]->getIsRotary();
 
         return true;
     }
@@ -525,16 +525,16 @@ public:
 
     bool isZeroBased(String fname) {
 
-        bool iszerobased = true;
+        bool zeroBased = true;
 
         for (auto modulevar : instrumentmodules) {
             if (modulevar->getModuleFileName() == fname) {
-                iszerobased = modulevar->getIsZeroBased();
+                zeroBased = modulevar->getIsZeroBased();
                 break;
             }
         }
 
-        return iszerobased;
+        return zeroBased;
     }
 
     bool isRotary(int moduleid) {
@@ -570,17 +570,17 @@ public:
         static Identifier defaultmoduleType("defaultmodule");
 
         // Configs ValueTree
-        ValueTree vtmodules(devicemodulesType);
+        ValueTree modulesTree(devicemodulesType);
 
         // Preset the user selected default module
-        vtmodules.setProperty(defaultmoduleType, moduleidx, nullptr);
+        modulesTree.setProperty(defaultmoduleType, appState.moduleidx, nullptr);
 
-        if (!vtmodules.isValid()) {
+        if (!modulesTree.isValid()) {
             juce::Logger::writeToLog("*** createVTModules(): An error occurred while creating final Modules ValueTree...");
             // To do: Add more error handling
         }
 
-        return vtmodules;
+        return modulesTree;
     }
 
     //-------------------------------------------------------------------------
@@ -593,8 +593,8 @@ public:
         // Prepare to save Instrument odules to Disk
         File outputFile = File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
             .getChildFile(organdir)
-            .getChildFile(configdir)
-            .getChildFile(modulefname);
+            .getChildFile(appState.configdir)
+            .getChildFile(appState.modulefname);
         if (outputFile.existsAsFile())
         {
             DBG("*** saveModules(): Modules file exists! Deleting to store new copy");
@@ -612,11 +612,11 @@ public:
         output.flush();
         if (output.getStatus().failed())
         {
-            juce::Logger::writeToLog("*** saveModules(): Modules file save failed " + modulefname);
+            juce::Logger::writeToLog("*** saveModules(): Modules file save failed " + appState.modulefname);
             // To do: Add more error handling
             return false;
         }
-        juce::Logger::writeToLog("*** saveModules(): Modules file saved " + modulefname);
+        juce::Logger::writeToLog("*** saveModules(): Modules file saved " + appState.modulefname);
 
         // Roundtip Save/Reload and update vars
         //loadmodules();
@@ -643,7 +643,7 @@ public:
         // For testing
         //String vtxml = vtmodules.toXmlString();
 
-        moduleidx = vtmodules.getProperty(defaultmoduleType);
+        appState.moduleidx = (int) vtmodules.getProperty(defaultmoduleType);
 
         return true;
     }
@@ -652,17 +652,17 @@ public:
     // Load Value Tree Modules from Disk
     //-------------------------------------------------------------------------
     bool loadModules() {
-        juce::Logger::writeToLog("*** loadModules(): Loading Module file " + modulefname);
+        juce::Logger::writeToLog("*** loadModules(): Loading Module file " + appState.modulefname);
 
         // Reload Value tree to test
         // Prepare to read Configs Panel from Disk
         File inputFile = File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
             .getChildFile(organdir)
-            .getChildFile(configdir)
-            .getChildFile(modulefname);
+            .getChildFile(appState.configdir)
+            .getChildFile(appState.modulefname);
         if (!inputFile.existsAsFile())
         {
-            juce::Logger::writeToLog("*** loadModules(): No Module file " + modulefname + " to load!");
+            juce::Logger::writeToLog("*** loadModules(): No Module file " + appState.modulefname + " to load!");
 
             inputFile = File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
                 .getChildFile(organdir)
@@ -673,7 +673,7 @@ public:
         FileInputStream input(inputFile);
         if (input.failedToOpen())
         {
-            juce::Logger::writeToLog(" ***loadModuless(): Module file " + modulefname + " did not open! Need to recover from this...");
+            juce::Logger::writeToLog(" ***loadModuless(): Module file " + appState.modulefname + " did not open! Need to recover from this...");
 
             return false;
         }
@@ -855,8 +855,10 @@ private:
         int rotorfast;
     };
 
+    AppState& appState;
+
     // Singleton Constructor
-    InstrumentModules() {
+    InstrumentModules() : appState(getAppState()) {
         juce::Logger::writeToLog("=S= InstrumentModules(): Constructor " + std::to_string(zinstcntInstrumentModules++));
 
         // Create and default Instruments. To be loaded from file in future

@@ -459,9 +459,9 @@ public:
     }
 
     //-------------------------------------------------------------------------
-    bool initInstrumentPanel(String instrumentdname, const String& panelfname, bool fromdisk) 
+    bool initInstrumentPanel(String instrumentDirectoryName, const String& panelFileName, bool fromdisk) 
     {
-        juce::Logger::writeToLog("*** initInstrumentPanel(): Loading " + panelfname + " instrument panel file");
+        juce::Logger::writeToLog("*** initInstrumentPanel(): Loading " + panelFileName + " instrument panel file");
 
         //-------------------------------------------------------------------------
         // Create the Master Panel from scratch with default voices and make it 
@@ -575,10 +575,10 @@ public:
         // Next we proceed to load an instument panel file from disk
         if (fromdisk) {
 
-            if (!loadInstrumentPanel(instrumentdname, panelfname, false)) //instrumentdir
+            if (!loadInstrumentPanel(instrumentDirectoryName, panelFileName, false))
             {
                 DBG("*** initInstrumentPanel(): Load InstrumentPanel from disk failed");
-                juce::Logger::writeToLog("*** initInstrumentPanel(): Failed to load " + panelfname + " instrument panel file");
+                juce::Logger::writeToLog("*** initInstrumentPanel(): Failed to load " + panelFileName + " instrument panel file");
 
                 // To do: Add some other error handling
 
@@ -588,7 +588,7 @@ public:
         else {
             // When not loading from disk, we recreate the masterpanel file - for now
             // and until custom panels supported.
-            saveInstrumentPanel(instrumentdname, panelfname);
+            saveInstrumentPanel(instrumentDirectoryName, panelFileName);
         }
 
         return true;
@@ -605,7 +605,7 @@ public:
     //  File::getSpecialLocation (File::SpecialLocationType::currentExecutableFile).getSiblingFile ("MyData")
     //        .getChildFile ("MySpecialFile").getFullPathName();
     //-------------------------------------------------------------------------
-    bool loadInstrumentPanel(String instrumentdir, const String& panelfname, bool bfullpath) {
+    bool loadInstrumentPanel(String instrumentDirectoryName, const String& panelFileName, bool bfullpath) {
 
         DBG("*** loadInstrumentPanel(): Loading Instrument Panel from disk");
 
@@ -620,30 +620,30 @@ public:
                 // Compile Panel File name from components and remember as full path for future saves
                 inputFile = File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
                     .getChildFile(organdir)
-                    .getChildFile(instrumentdir)
-                    .getChildFile(panelfname);
+                    .getChildFile(instrumentDirectoryName)
+                    .getChildFile(panelFileName);
 
-                panelfullpathname = inputFile.getFullPathName();
+                appState.panelfullpathname = inputFile.getFullPathName();
             }
             else {
-                inputFile = File(panelfname);
+                inputFile = File(panelFileName);
             }
 
             if (!inputFile.existsAsFile())
             {
-                juce::Logger::writeToLog("loadInstrumentPanel(): Panel file " + panelfname + " does not exists! We will revert to the Master Panel File");
+                juce::Logger::writeToLog("loadInstrumentPanel(): Panel file " + panelFileName + " does not exists! We will revert to the Master Panel File");
 
                 // To do: Add some other error handling
                 ///return false;
                 inputFile = File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
                     .getChildFile(organdir)
-                    .getChildFile(panelfname);
+                    .getChildFile(panelFileName);
             }
 
             FileInputStream input(inputFile);
             if (input.failedToOpen())
             {
-                juce::Logger::writeToLog("loadInstrumentPanel(): Panel file " + panelfname + " did not open! Need to recover from this...");
+                juce::Logger::writeToLog("loadInstrumentPanel(): Panel file " + panelFileName + " did not open! Need to recover from this...");
 
                 // To do: Add some other error handling
                 return false;
@@ -683,16 +683,16 @@ public:
     // https://forum.juce.com/t/example-for-creating-a-file-and-doing-something-with-it/31998
     // Save current Instrument Panel to Disk
     //-------------------------------------------------------------------------
-    bool saveInstrumentPanel(String instrumentdir, const String& panelfname) {
+    bool saveInstrumentPanel(String instrumentDirectoryName, const String& panelFileName) {
 
-        juce::Logger::writeToLog("*** saveInstrumentPanel(): Saving Instrument Panel " + panelfname);
+        juce::Logger::writeToLog("*** saveInstrumentPanel(): Saving Instrument Panel " + panelFileName);
 
         {   // Scoping
             // Prepare to save Instrument Panel to Disk
             File outputFile = File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
                 .getChildFile(organdir)
-                .getChildFile(instrumentdir)
-                .getChildFile(panelfname);
+                .getChildFile(instrumentDirectoryName)
+                .getChildFile(panelFileName);
 
             if (outputFile.existsAsFile())
             {
@@ -709,7 +709,7 @@ public:
             output.flush();
             if (output.getStatus().failed())
             {
-                juce::Logger::writeToLog("saveInstrumentPanel(): An error occurred in FileOutputStream " + panelfname);
+                juce::Logger::writeToLog("saveInstrumentPanel(): An error occurred in FileOutputStream " + panelFileName);
 
                 // To do: Add more error handling
                 return false;
@@ -770,6 +770,7 @@ public:
 private:
     MidiDevices* mididevices = nullptr;
     MidiInstruments* midiinstruments = nullptr;
+    AppState& appState;
 
     int panelbuttonidx = 0;
     bool bpanelupdated = false;
@@ -808,13 +809,14 @@ private:
     InstrumentPanel() :
         mididevices(MidiDevices::getInstance()), // Creates the singleton if there isn't already one
         midiinstruments(MidiInstruments::getInstance()),
-        panelpresets(PanelPresets::getInstance())
+        panelpresets(PanelPresets::getInstance()),
+        appState(getAppState())
     {
         juce::Logger::writeToLog("=S= InstrumentPanel(): Constructor " + std::to_string(zinstcntInstrumentPanel++));
 
         // Instrument ValueTree
         static Identifier instrumentpanelType("InstrumentPanel");   // Pre-create an Identifier
-        ValueTree vtinstrumentpanel(instrumentpanelType);
+        vtinstrumentpanel = ValueTree(instrumentpanelType);
     }
 
     //-------------------------------------------------------------------------
@@ -852,11 +854,11 @@ private:
         static Identifier buttonidxType("buttonidx");
 
         // Instrument ValueTree
-        ValueTree vtinstrumentpanel(instrumentpanelType);
+        ValueTree panelTree(instrumentpanelType);
 
-        vtinstrumentpanel.setProperty(filenameType, panelfname, nullptr);
-        vtinstrumentpanel.setProperty(vendorType, vendorname, nullptr);
-        vtinstrumentpanel.setProperty(configfilenameType, configfname, nullptr);
+        panelTree.setProperty(filenameType, appState.panelfname, nullptr);
+        panelTree.setProperty(vendorType, vendorname, nullptr);
+        panelTree.setProperty(configfilenameType, appState.configfname, nullptr);
 
         // Add VoiceButton Instruments from Panel to ValueTree
         for (int i = 0; i < numbervoicebuttons; i++)
@@ -891,7 +893,7 @@ private:
             ins.setProperty(dirtyType, instrument.getDirty(), nullptr);
 
             if (ins.isValid()) {
-                vtinstrumentpanel.appendChild(ins, nullptr);
+                panelTree.appendChild(ins, nullptr);
             }
             else {
                 DBG("createVTInstrumentPanel(): An error occurred while creating Instrument Panel ValueTree item: " + std::to_string(i));
@@ -951,7 +953,7 @@ private:
         }
 
         if (vtpresets.isValid()) {
-            vtinstrumentpanel.appendChild(vtpresets, nullptr);
+            panelTree.appendChild(vtpresets, nullptr);
         }
         else {
             DBG("createVTInstrumentPanel(): An error occurred while creating Instrument Panel ValueTree item: Presets");
@@ -959,7 +961,7 @@ private:
         }
 
         DBG("*** createVTInstrumentPanel(): Instrument Panel ValueTree created!");
-        return vtinstrumentpanel;
+        return panelTree;
     }
 
     //-------------------------------------------------------------------------
@@ -999,10 +1001,9 @@ private:
 
         String filename = vtinstrumentpanel.getProperty(filenameType);
         String vendor = vtinstrumentpanel.getProperty(vendorType);
-        pnlconfigfname = vtinstrumentpanel.getProperty(configfilenameType);
+        appState.pnlconfigfname = vtinstrumentpanel.getProperty(configfilenameType);
         // Flag a Config reload needed based on config paramter in Panel File
-        if ((configfname.compare(pnlconfigfname) == 0) ?
-            configreload = false : configreload = true);
+        appState.configreload = (appState.configfname.compare(appState.pnlconfigfname) != 0);
 
         panelbuttonidx = 0;
 
@@ -1080,25 +1081,25 @@ private:
 
         if ((vtpresets.isValid()) && (vtpresets.getType() == presetsType)) {
 
-            for (int i = 0; i < numberpresets; i++) {
+            for (int presetIdx = 0; presetIdx < numberpresets; presetIdx++) {
 
                 static Identifier presetType("Preset");
-                ValueTree vtpreset = vtpresets.getChild(i);
+                ValueTree vtpreset = vtpresets.getChild(presetIdx);
                 if (!(vtpreset.isValid()) || !(vtpreset.getType() == presetType)) {
-                    DBG("loadVTInstrumentPanel(): Failed to load Preset " + std::to_string(i));
+                    DBG("loadVTInstrumentPanel(): Failed to load Preset " + std::to_string(presetIdx));
                     continue;
                 }
 
-                String presetno = "preset" + std::to_string(i);
+                String presetno = "preset" + std::to_string(presetIdx);
                 String preset = vtpreset.getProperty(presetno);
-                //DBG("loadVTInstrumentPanel(): Preset " + std::to_string(i));
+                //DBG("loadVTInstrumentPanel(): Preset " + std::to_string(presetIdx));
 
                 for (int j = 0; j < numberbuttongroups; j++) {
 
                     static Identifier buttongroupType("ButtonGroup");
                     ValueTree vtbuttongroup = vtpreset.getChild(j);
                     if (!(vtbuttongroup.isValid()) || !(vtbuttongroup.getType() == buttongroupType)) {
-                        DBG("loadVTInstrumentPanel(): Failed to load Preset Button " + std::to_string(i) + ", "  + std::to_string(j));
+                        DBG("loadVTInstrumentPanel(): Failed to load Preset Button " + std::to_string(presetIdx) + ", "  + std::to_string(j));
                         continue;
                     }
 
@@ -1107,15 +1108,15 @@ private:
                     //DBG("loadVTInstrumentPanel(): ButtonGroup " + buttongroup);
 
                     int pbtnidx = vtbuttongroup.getProperty("button");
-                    DBG("loadVTInstrumentPanel(): Preset: " + std::to_string(i) + " ButtonGroup: " 
+                    DBG("loadVTInstrumentPanel(): Preset: " + std::to_string(presetIdx) + " ButtonGroup: "
                         + std::to_string(j) + " Button: " + std::to_string(pbtnidx));
-                    panelpresets->setPanelButtonIdx(i, j, pbtnidx);
+                    panelpresets->setPanelButtonIdx(presetIdx, j, pbtnidx);
 
                     bool bmute = vtbuttongroup.getProperty("mute");
-                    panelpresets->setMuteStatus(i, j, bmute);
+                    panelpresets->setMuteStatus(presetIdx, j, bmute);
 
                     int irotary = vtbuttongroup.getProperty("rotary");
-                    panelpresets->setRotaryStatus(i, j, irotary);
+                    panelpresets->setRotaryStatus(presetIdx, j, irotary);
                 }
             }
 
@@ -1398,7 +1399,7 @@ public:
         }
         tbroute->setButtonText(totabtext);
 
-        VoiceButton* ptrvoicebutton = instrumentpanel->getVoiceButton(panelbuttonidx);
+        ptrvoicebutton = instrumentpanel->getVoiceButton(panelbuttonidx);
         String svoice1 = ptrvoicebutton->getInstrument().getVoice();
         lblsvoicetxt.setText(svoice1, {});
 
@@ -1461,9 +1462,9 @@ private:
     void addLabelAndSetStyle(Label& label, bool heading)
     {
         if (heading == false)
-            label.setFont(Font(16.00f, Font::plain));
+            label.setFont(Font(FontOptions(16.00f, Font::plain)));
         else
-            label.setFont(Font(16.00f, Font::bold));
+            label.setFont(Font(FontOptions(16.00f, Font::bold)));
 
         label.setJustificationType(Justification::centredLeft);
         label.setEditable(false, false, false);
@@ -1976,7 +1977,7 @@ public:
         }
         tbroute->setButtonText(totabtext);
 
-        VoiceButton* ptrvoicebutton = instrumentpanel->getVoiceButton(panelbtnidx);
+        ptrvoicebutton = instrumentpanel->getVoiceButton(panelbtnidx);
         String svoice1 = ptrvoicebutton->getInstrument().getVoice();
         lblsvoicetxt.setText(svoice1, {});
 
@@ -2051,9 +2052,9 @@ private:
     void addLabelAndSetStyle(Label& label, bool heading)
     {
         if (heading == false)
-            label.setFont(Font(16.00f, Font::plain));
+            label.setFont(Font(FontOptions(16.00f, Font::plain)));
         else
-            label.setFont(Font(16.00f, Font::bold));
+            label.setFont(Font(FontOptions(16.00f, Font::bold)));
 
         label.setJustificationType(Justification::centredLeft);
         label.setEditable(false, false, false);
@@ -2093,7 +2094,8 @@ struct KeyboardPanelPage final : public Component,
         instrumentmodules(InstrumentModules::getInstance()),
         midiInstruments(MidiInstruments::getInstance()), // Singletons if there isn't already one
         mididevices(MidiDevices::getInstance()),
-        instrumentpanel(InstrumentPanel::getInstance())
+        instrumentpanel(InstrumentPanel::getInstance()),
+        appState(getAppState())
     {
         juce::Logger::writeToLog("== KeyboardManualPage(): Constructor " + std::to_string(zinstcntmanualpage++));
 
@@ -2120,7 +2122,7 @@ struct KeyboardPanelPage final : public Component,
         statusLabel->setBounds(1250, 210, 200, 20);
 
         int g1width, g2width, g3width, g4width;
-        int g1widthfull, g2widthfull, g3widthfull, g4widthfull;
+        int g1widthfull;
         int g1xoffset, g2xoffset, g3xoffset, g4xoffset;
         // --------------------------------------------------------------------
         // Upper Organ Button Group 1
@@ -2242,7 +2244,6 @@ struct KeyboardPanelPage final : public Component,
                         Instrument instrument = instrumentpanel->getVoiceButton(panelbuttonidx)->getInstrument();
 
                         sb->setButtonText(instrument.getVoice());
-                        int isdirty = instrument.getDirty();
 
                         // Reverse lookup Button Group ID for the selected Panel Button to preset Effects Midi Channel
                         int panelgroup = lookupPanelGroup(panelbuttonidx);
@@ -2657,7 +2658,6 @@ struct KeyboardPanelPage final : public Component,
                         Instrument instrument = instrumentpanel->getVoiceButton(panelbuttonidx)->getInstrument();
 
                         sb->setButtonText(instrument.getVoice());
-                        int isdirty = instrument.getDirty();
 
                         int panelgroup = lookupPanelGroup(panelbuttonidx);
                         ButtonGroup* ptrbuttongroup = instrumentpanel->getButtonGroup(panelgroup);
@@ -3070,7 +3070,6 @@ struct KeyboardPanelPage final : public Component,
                         Instrument instrument = instrumentpanel->getVoiceButton(panelbuttonidx)->getInstrument();
 
                         sb->setButtonText(instrument.getVoice());
-                        int isdirty = instrument.getDirty();
 
                         int panelgroup = lookupPanelGroup(panelbuttonidx);
                         ButtonGroup* ptrbuttongroup = instrumentpanel->getButtonGroup(panelgroup);
@@ -3484,20 +3483,19 @@ struct KeyboardPanelPage final : public Component,
                         // Remember last button we pressed in case we need to edit sound or effects
                         panelbuttonidx = sb->getPanelButtonIdx();
 
-                        // Remember active Voice Button in Group
-                        ptrbuttongroup->setActiveVoiceButton(panelbuttonidx);
-
                         // Reload the instrument since the Voice may have been updated since original load
                         // and update the Button text if not done yet
                         Instrument instrument = instrumentpanel->getVoiceButton(panelbuttonidx)->getInstrument();
 
                         int panelgroup = lookupPanelGroup(panelbuttonidx);
-                        ButtonGroup* ptrbuttongroup = instrumentpanel->getButtonGroup(panelgroup);
-                        int buttongroupmidiout = ptrbuttongroup->midiout;
-                        int buttongroupismuted = ptrbuttongroup->muted;
+                        ButtonGroup* selectedButtonGroup = instrumentpanel->getButtonGroup(panelgroup);
+                        int buttongroupmidiout = selectedButtonGroup->midiout;
+                        int buttongroupismuted = selectedButtonGroup->muted;
+
+                        // Remember active Voice Button in Group
+                        selectedButtonGroup->setActiveVoiceButton(panelbuttonidx);
 
                         sb->setButtonText(instrument.getVoice());
-                        int isdirty = instrument.getDirty();
 
                         int controllerNumber = CCMSB;    // MSB
                         juce::MidiMessage ccMessage = juce::MidiMessage::controllerEvent(
@@ -3533,7 +3531,7 @@ struct KeyboardPanelPage final : public Component,
                         g4svol->setValue(((int)instrument.getVol() / 12.8));
 
                         // Send Vol, or send 0 if Button Group is muted
-                        if (ptrbuttongroup->isEffectDirty(0, instrument.getVol()) == true) {
+                        if (selectedButtonGroup->isEffectDirty(0, instrument.getVol()) == true) {
                             //if ((isdirty & MAPVOL) || (buttongroupismuted)) {
                             int channelvolume = instrument.getVol();
                             if (buttongroupismuted) channelvolume = 0;
@@ -3549,7 +3547,7 @@ struct KeyboardPanelPage final : public Component,
                         }
 
                         // Send Exp
-                        if (ptrbuttongroup->isEffectDirty(1, instrument.getExp()) == true) {
+                        if (selectedButtonGroup->isEffectDirty(1, instrument.getExp()) == true) {
                             //if (isdirty & MAPEXP) {
                             controllerNumber = CCExp;
                             ccMessage = juce::MidiMessage::controllerEvent(
@@ -3562,7 +3560,7 @@ struct KeyboardPanelPage final : public Component,
                         }
 
                         // Send Rev
-                        if (ptrbuttongroup->isEffectDirty(2, instrument.getRev()) == true) {
+                        if (selectedButtonGroup->isEffectDirty(2, instrument.getRev()) == true) {
                             //if (isdirty & MAPREV) {
                             controllerNumber = CCRev;
                             ccMessage = juce::MidiMessage::controllerEvent(
@@ -3575,7 +3573,7 @@ struct KeyboardPanelPage final : public Component,
                         }
 
                         // Send Cho
-                        if (ptrbuttongroup->isEffectDirty(3, instrument.getCho()) == true) {
+                        if (selectedButtonGroup->isEffectDirty(3, instrument.getCho()) == true) {
                             //if (isdirty & MAPCHO) {
                             controllerNumber = CCMod;
                             ccMessage = juce::MidiMessage::controllerEvent(
@@ -3588,7 +3586,7 @@ struct KeyboardPanelPage final : public Component,
                         }
 
                         // Send Mod
-                        if (ptrbuttongroup->isEffectDirty(4, instrument.getMod()) == true) {
+                        if (selectedButtonGroup->isEffectDirty(4, instrument.getMod()) == true) {
                             //if (isdirty & MAPMOD) {
                             controllerNumber = CCMod;
                             ccMessage = juce::MidiMessage::controllerEvent(
@@ -3601,7 +3599,7 @@ struct KeyboardPanelPage final : public Component,
                         }
 
                         // Send Tim
-                        if (ptrbuttongroup->isEffectDirty(5, instrument.getTim()) == true) {
+                        if (selectedButtonGroup->isEffectDirty(5, instrument.getTim()) == true) {
                             //if (isdirty & MAPTIM) {
                             controllerNumber = CCTim;
                             ccMessage = juce::MidiMessage::controllerEvent(
@@ -3614,7 +3612,7 @@ struct KeyboardPanelPage final : public Component,
                         }
 
                         // Send Atk
-                        if (ptrbuttongroup->isEffectDirty(6, instrument.getMod()) == true) {
+                        if (selectedButtonGroup->isEffectDirty(6, instrument.getMod()) == true) {
                             //if (isdirty & MAPATK) {
                             controllerNumber = CCAtk;
                             ccMessage = juce::MidiMessage::controllerEvent(
@@ -3627,7 +3625,7 @@ struct KeyboardPanelPage final : public Component,
                         }
 
                         // Send Rel
-                        if (ptrbuttongroup->isEffectDirty(7, instrument.getRel()) == true) {
+                        if (selectedButtonGroup->isEffectDirty(7, instrument.getRel()) == true) {
                             //if (isdirty & MAPREL) {
                             controllerNumber = CCRel;
                             ccMessage = juce::MidiMessage::controllerEvent(
@@ -3640,7 +3638,7 @@ struct KeyboardPanelPage final : public Component,
                         }
 
                         // Send Bri
-                        if (ptrbuttongroup->isEffectDirty(8, instrument.getBri()) == true) {
+                        if (selectedButtonGroup->isEffectDirty(8, instrument.getBri()) == true) {
                             //if (isdirty & MAPBRI) {
                             controllerNumber = CCBri;
                             ccMessage = juce::MidiMessage::controllerEvent(
@@ -3653,7 +3651,7 @@ struct KeyboardPanelPage final : public Component,
                         }
 
                         // Send Pan
-                        if (ptrbuttongroup->isEffectDirty(9, instrument.getPan()) == true) {
+                        if (selectedButtonGroup->isEffectDirty(9, instrument.getPan()) == true) {
                             //if (isdirty & MAPPAN) {
                             controllerNumber = CCPan;
                             ccMessage = juce::MidiMessage::controllerEvent(
@@ -4247,17 +4245,17 @@ struct KeyboardPanelPage final : public Component,
                 {
                     DBG("*** KeyboardManualPage(): Saving Panel");
 
-                    //bool bsaved = instrumentpanel->saveInstrumentPanel(instrumentdname, panelfname);
-                    bool bsaved = instrumentpanel->saveInstrumentPanel(panelfullpathname);
+                    //bool bsaved = instrumentpanel->saveInstrumentPanel(appState.instrumentdname, appState.panelfname);
+                    bool bsaved = instrumentpanel->saveInstrumentPanel(appState.panelfullpathname);
 
                     String msgloaded;
                     if (!bsaved) {
-                        msgloaded = "Saved failed: " + panelfname;
-                        juce::Logger::writeToLog("*** KeyboardManualPage(): Save failed! " + panelfname);
+                        msgloaded = "Saved failed: " + appState.panelfname;
+                        juce::Logger::writeToLog("*** KeyboardManualPage(): Save failed! " + appState.panelfname);
                     }
                     else {
-                        msgloaded = "Saved: " + panelfname;
-                        juce::Logger::writeToLog("*** KeyboardManualPage(): Saved " + panelfname);
+                        msgloaded = "Saved: " + appState.panelfname;
+                        juce::Logger::writeToLog("*** KeyboardManualPage(): Saved " + appState.panelfname);
                     }
 
                     if (TextButton* focused = tbSave)
@@ -4279,17 +4277,17 @@ struct KeyboardPanelPage final : public Component,
                 {
                     File fileToSave = File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
                         .getChildFile(organdir)
-                        .getChildFile(instrumentdname);
+                        .getChildFile(appState.instrumentdname);
 
                     bool useNativeVersion = false;
                     //filechooser.reset(new FileChooser("Save Panel As: Select existing or create new *.pnl",
                     //    File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
                     //    .getChildFile(organdir)
-                    //    .getChildFile(instrumentdname),
+                    //    .getChildFile(appState.instrumentdname),
                     //    "*.pnl", useNativeVersion));
 
                     filechooser.reset(new FileChooser("Save Panel As: Select existing or create new *.pnl",
-                        File(panelfullpathname),
+                        File(appState.panelfullpathname),
                         "*.pnl", useNativeVersion));
 
                     filechooser->launchAsync(
@@ -4315,7 +4313,7 @@ struct KeyboardPanelPage final : public Component,
                                     selectedfname = selectedfname + ".pnl";
                                 }
 
-                                bsaved = instrumentpanel->saveInstrumentPanel(instrumentdname, selectedfname);
+                                bsaved = instrumentpanel->saveInstrumentPanel(appState.instrumentdname, selectedfname);
 
                                 String msgloaded;
                                 if (!bsaved) {
@@ -4339,7 +4337,7 @@ struct KeyboardPanelPage final : public Component,
                 };
         }   // End - Save and Save As Buttons
 
-        lblpanelfile = addToList(new Label("Panel File", panelfname));
+        lblpanelfile = addToList(new Label("Panel File", appState.panelfname));
         lblpanelfile->setColour(juce::Label::textColourId, juce::Colours::grey);
         lblpanelfile->setJustificationType(juce::Justification::left);
         lblpanelfile->setBounds(mgroup + 1240, 205, 200, 30);
@@ -4597,7 +4595,7 @@ struct KeyboardPanelPage final : public Component,
         }
 
         // Update every Voice Button Group Title if Config changes
-        else if (configchanged) {
+        else if (appState.configchanged) {
 
             for (int bgidx = 0; bgidx < numberbuttongroups; bgidx++) {
                 ButtonGroup* ptrbuttongroup = instrumentpanel->getButtonGroup(bgidx);
@@ -4625,10 +4623,10 @@ struct KeyboardPanelPage final : public Component,
                 ptrgroupcomponent->setText(buttongrouptitle);
             }
 
-            configchanged = false;
+            appState.configchanged = false;
         }
 
-        lblpanelfile->setText(panelfname, {});
+        lblpanelfile->setText(appState.panelfname, {});
     }
 
     //-----------------------------------------------------------------------------
@@ -4646,6 +4644,7 @@ private:
     MidiDevices* mididevices = nullptr;
     InstrumentPanel* instrumentpanel = nullptr;
     InstrumentModules* instrumentmodules = nullptr;
+    AppState& appState;
 
     std::unique_ptr<FileChooser> filechooser;
 
@@ -4785,7 +4784,8 @@ public:
         instrumentmodules(InstrumentModules::getInstance()),
         midiInstruments(MidiInstruments::getInstance()),
         mididevices(MidiDevices::getInstance()),
-        instrumentpanel(InstrumentPanel::getInstance())
+        instrumentpanel(InstrumentPanel::getInstance()),
+        appState(getAppState())
     {
         juce::Logger::writeToLog("== MidiStartPage(): Constructor " + std::to_string(zinstcntMidiStartPage++));
 
@@ -4822,13 +4822,13 @@ public:
             {
                 File fileToSave = File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
                     .getChildFile(organdir)
-                    .getChildFile(configdir);
+                    .getChildFile(appState.configdir);
 
                 bool useNativeVersion = false;
                 filechooser.reset(new FileChooser("Select Config file to load", 
                     File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
                     .getChildFile(organdir)
-                    .getChildFile(configdir),
+                    .getChildFile(appState.configdir),
                     "*.cfg", useNativeVersion));
 
                 filechooser->launchAsync(
@@ -4863,14 +4863,14 @@ public:
                         //bool bloaded = instrumentpanel->loadInstrumentPanel(instrumentdname, selectedfullpathfname, true);
                         bool bloaded = true;
 
-                        configfname = selectedfname; // Save Config File globally
+                        appState.configfname = selectedfname;
 
                         String msgloaded;
                         if (bloaded == true) {
-                            msgloaded = "Loaded: " + configfname;
+                            msgloaded = "Loaded: " + appState.configfname;
                         }
                         else {
-                            msgloaded = "Load failed: " + configfname;
+                            msgloaded = "Load failed: " + appState.configfname;
                         }
 
                         if (TextButton* focused = &loadConfigButton)
@@ -4889,13 +4889,13 @@ public:
             {
                 File fileToSave = File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
                     .getChildFile(organdir)
-                    .getChildFile(instrumentdname);
+                    .getChildFile(appState.instrumentdname);
 
                 bool useNativeVersion = false;
                 filechooser.reset(new FileChooser("Select Button Panel file to load",
                     File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
                     .getChildFile(organdir)
-                    .getChildFile(instrumentdname),
+                    .getChildFile(appState.instrumentdname),
                     "*.pnl", useNativeVersion));
 
                 filechooser->launchAsync(
@@ -4926,30 +4926,29 @@ public:
 
                         juce::Logger::writeToLog("*** MidiStartPage(): Loading Instrument Panel: " + selectedfname);
 
-                        bool bloaded = instrumentpanel->loadInstrumentPanel(instrumentdname, selectedfullpathfname, true);
+                        bool bloaded = instrumentpanel->loadInstrumentPanel(appState.instrumentdname, selectedfullpathfname, true);
 
                         // Save Panel File globally
-                        panelfname = selectedfname;
-                        panelfullpathname = selectedfullpathfname; 
+                        appState.panelfname = selectedfname;
+                        appState.panelfullpathname = selectedfullpathfname; 
 
                         String msgloaded;
                         if (bloaded == true) {
-                            msgloaded = "Loading\n Panel: " + panelfname + "\n Config: " + pnlconfigfname;
+                            msgloaded = "Loading\n Panel: " + appState.panelfname + "\n Config: " + appState.pnlconfigfname;
                         }
                         else {
-                            msgloaded = "Panel load failed: " + panelfname;
+                            msgloaded = "Panel load failed: " + appState.panelfname;
                         }
 
                         if (TextButton* focused = &loadPanelButton)
                             BubbleMessage(*focused, msgloaded, this->bubbleMessage);
 
-                        panelfileLabel.setText(panelfname, {});
+                        panelfileLabel.setText(appState.panelfname, {});
 
                         // Flag mismatch between panel file and incorrect config file in red
-                        if ((configfname.compare(pnlconfigfname) == 0) ?
-                            configreload = false : configreload = true);
+                        appState.configreload = (appState.configfname.compare(appState.pnlconfigfname) != 0);
 
-                        if (configreload == true)
+                        if (appState.configreload == true)
                             configfileLabel.setColour(juce::Label::textColourId, juce::Colours::red.darker());
                         else
                             configfileLabel.setColour(juce::Label::textColourId, juce::Colours::grey);
@@ -4969,7 +4968,7 @@ public:
 
         int mgroup = 10;
         addAndMakeVisible(toModule);
-        toModule.setButtonText(vendorname);
+        toModule.setButtonText(appState.vendorname);
         toModule.setClickingTogglesState(false);
         toModule.setColour(TextButton::textColourOffId, Colours::white);
         toModule.setColour(TextButton::textColourOnId, Colours::white);
@@ -4994,27 +4993,27 @@ public:
                             if (result == 0) return;
 
                             // Default Midi Instrument Module to Deebach until selected otherwise
-                            moduleidx = result - 1;
-                            instrumentmodules->setInstrumentModule(moduleidx);
+                            appState.moduleidx = result - 1;
+                            instrumentmodules->setInstrumentModule(appState.moduleidx);
 
                             // Save Device Modules includig index so we start with the same
                             instrumentmodules->saveModules();
 
                             // Instantiate Midi Instruments and load sound file into JSON object
                             // and Update Vendor Button text with new name
-                            midiInstruments->loadMidiInstruments(instrumentfname);
-                            String vendorname = midiInstruments->getVendor();
-                            toModule.setButtonText(vendorname);
+                            midiInstruments->loadMidiInstruments(appState.instrumentfname);
+                            String currentVendorName = midiInstruments->getVendor();
+                            toModule.setButtonText(currentVendorName);
 
                             // Instantiate Instrument Panel from Master Panel on Disk when true
-                            bool bloaded = instrumentpanel->loadInstrumentPanel(instrumentdname, defpanelfname, false);
+                            bool bloaded = instrumentpanel->loadInstrumentPanel(appState.instrumentdname, defpanelfname, false);
 
                             String msgloaded;
                             if (bloaded == true) {
-                                msgloaded = "Loading module:\n " + vendorname;
+                                msgloaded = "Loading module:\n " + currentVendorName;
                             }
                             else {
-                                msgloaded = "Module load failed!\n " + vendorname;
+                                msgloaded = "Module load failed!\n " + currentVendorName;
                             }
 
                             if (TextButton* focused = &toModule)
@@ -5038,7 +5037,7 @@ public:
 
         // Quick Access Keyboard Buttons
         {
-            int mgroup = 10;
+            int quickAccessMargin = 10;
             int xaccess = 720;
 
             addAndMakeVisible(toHelp);
@@ -5048,7 +5047,7 @@ public:
             toHelp.setColour(TextButton::textColourOnId, Colours::white);
             toHelp.setColour(TextButton::buttonColourId, Colours::white);
             toHelp.setColour(TextButton::buttonOnColourId, Colours::black.brighter());
-            toHelp.setBounds(mgroup + xaccess, mgroup + 200, 80, 50);
+            toHelp.setBounds(quickAccessMargin + xaccess, quickAccessMargin + 200, 80, 50);
             toHelp.setToggleState(true, dontSendNotification);
             toHelp.onClick = [=, &tabs]()
                 {
@@ -5063,7 +5062,7 @@ public:
             toConfig.setColour(TextButton::textColourOnId, Colours::white);
             toConfig.setColour(TextButton::buttonColourId, Colours::white);
             toConfig.setColour(TextButton::buttonOnColourId, Colours::black.brighter());
-            toConfig.setBounds(mgroup + xaccess, mgroup + 200, 80, 50);
+            toConfig.setBounds(quickAccessMargin + xaccess, quickAccessMargin + 200, 80, 50);
             toConfig.setToggleState(true, dontSendNotification);
             toConfig.onClick = [=, &tabs]()
                 {
@@ -5078,7 +5077,7 @@ public:
             toUpperKBD.setColour(TextButton::textColourOnId, Colours::white);
             toUpperKBD.setColour(TextButton::buttonColourId, Colours::white);
             toUpperKBD.setColour(TextButton::buttonOnColourId, Colours::black.brighter());
-            toUpperKBD.setBounds(mgroup + xaccess, mgroup + 200, 80, 50);
+            toUpperKBD.setBounds(quickAccessMargin + xaccess, quickAccessMargin + 200, 80, 50);
             toUpperKBD.setToggleState(true, dontSendNotification);
             toUpperKBD.onClick = [=, &tabs]()
                 {
@@ -5093,7 +5092,7 @@ public:
             toLowerKBD.setColour(TextButton::textColourOnId, Colours::white);
             toLowerKBD.setColour(TextButton::buttonColourId, Colours::white);
             toLowerKBD.setColour(TextButton::buttonOnColourId, Colours::black.brighter());
-            toLowerKBD.setBounds(mgroup + xaccess, mgroup + 200, 80, 50);
+            toLowerKBD.setBounds(quickAccessMargin + xaccess, quickAccessMargin + 200, 80, 50);
             toLowerKBD.setToggleState(true, dontSendNotification);
             toLowerKBD.onClick = [=, &tabs]()
                 {
@@ -5108,26 +5107,26 @@ public:
 
         // Preset Device Modules includig index so we start with the same one as last saved
         instrumentmodules->loadModules();
-        instrumentmodules->setInstrumentModule(moduleidx);
+        instrumentmodules->setInstrumentModule(appState.moduleidx);
         ////vendorname = instrumentmodules->getDisplayName(moduleidx);
 
         // Instantiate Midi Instruments and load sound file into JSON object
         // and Update Vendor Button text with new name
-        midiInstruments->loadMidiInstruments(instrumentfname);
-        String vendorname = midiInstruments->getVendor();
-        toModule.setButtonText(vendorname);
+        midiInstruments->loadMidiInstruments(appState.instrumentfname);
+        String currentVendorName = midiInstruments->getVendor();
+        toModule.setButtonText(currentVendorName);
 
         // Instantiate Instrument Panel from Master Panel on Disk when true
-        bool bloaded = instrumentpanel->initInstrumentPanel(instrumentdname, panelfname, true);
+        bool bloaded = instrumentpanel->initInstrumentPanel(appState.instrumentdname, appState.panelfname, true);
 
         String msgloaded;
         if (bloaded == true) {
             //statusLabel.setText("Loaded: " + panelfname, {});
-            msgloaded = "Loaded: " + panelfname;
+            msgloaded = "Loaded: " + appState.panelfname;
         }
         else {
             //statusLabel.setText("Load failed: " + panelfname, {});
-            msgloaded = "Load failed: " + panelfname;
+            msgloaded = "Load failed: " + appState.panelfname;
         }
 
         if (Label* focused = &statusLabel)
@@ -5138,13 +5137,12 @@ public:
 
         // Dsplay current Panel File and Config Files in use. 
         // Flag mismatch between panel file and incorrect config file in red
-        configfileLabel.setText(configfname, {});
-        panelfileLabel.setText(panelfname, {});
+        configfileLabel.setText(appState.configfname, {});
+        panelfileLabel.setText(appState.panelfname, {});
 
-        if ((configfname.compare(pnlconfigfname) == 0) ?
-            configreload = false : configreload = true);
+        appState.configreload = (appState.configfname.compare(appState.pnlconfigfname) != 0);
 
-        if  (configreload == true)
+        if  (appState.configreload == true)
             configfileLabel.setColour(juce::Label::textColourId, juce::Colours::red.darker());
         else
             configfileLabel.setColour(juce::Label::textColourId, juce::Colours::grey);
@@ -5206,13 +5204,12 @@ public:
 
         // Dsplay current Panel File and Config Files in use. 
         // Flag mismatch between panel file and incorrect config file in red
-        configfileLabel.setText(configfname, {});
-        panelfileLabel.setText(panelfname, {});
+        configfileLabel.setText(appState.configfname, {});
+        panelfileLabel.setText(appState.panelfname, {});
 
-        if ((configfname.compare(pnlconfigfname) == 0) ?
-            configreload = false : configreload = true);
+        appState.configreload = (appState.configfname.compare(appState.pnlconfigfname) != 0);
 
-        if (configreload == true)
+        if (appState.configreload == true)
             configfileLabel.setColour(juce::Label::textColourId, juce::Colours::red.darker());
         else
             configfileLabel.setColour(juce::Label::textColourId, juce::Colours::grey);
@@ -5324,7 +5321,7 @@ private:
     //-----------------------------------------------------------------------------
     void addLabelAndSetStyle(Label& label)
     {
-        label.setFont(Font(15.00f, Font::plain));
+        label.setFont(Font(FontOptions(15.00f, Font::plain)));
         label.setJustificationType(Justification::centredLeft);
         label.setEditable(false, false, false);
         label.setColour(TextEditor::textColourId, Colours::black);
@@ -5581,6 +5578,7 @@ private:
     MidiDevices* mididevices = nullptr;
     InstrumentPanel* instrumentpanel = nullptr;
     MidiInstruments* midiInstruments = nullptr;
+    AppState& appState;
 
     std::unique_ptr<FileChooser> filechooser;
 
@@ -5650,17 +5648,14 @@ public:
     ConfigPage(TabbedComponent& tabs) :
         instrumentmodules(InstrumentModules::getInstance()),
         mididevices(MidiDevices::getInstance()), // Singleton if there isn't already one
-        instrumentpanel(InstrumentPanel::getInstance()) // Singleton if there isn't already one
+        instrumentpanel(InstrumentPanel::getInstance()), // Singleton if there isn't already one
+        appState(getAppState())
     {
         juce::Logger::writeToLog("== ConfigPage(): Constructor " + std::to_string(zinstcntvoicespage++));
 
-        // Initiate Configs ValueTree used to saving and loading configurations
-        static Identifier ConfigsType("Configs");   // Pre-create an Identifier
-        ValueTree vtconfigs(ConfigsType);
-
         // 1. Load the system Confg from disk - mostly Button Group IO mappings 
-        loadConfigs(configfname);
-        lblconfigfile.setText(configfname, {});
+        loadConfigs(appState.configfname);
+        lblconfigfile.setText(appState.configfname, {});
 
         // 2. Prepare Midi IO Map router Map by reading initial Confg into IOMap array
         //    for quick access during Midi IO routing (sendToOutputs())
@@ -5745,7 +5740,7 @@ public:
         comboConfig.setSelectedId(1);
 
         addAndMakeVisible(SoundModule);
-        SoundModule.setButtonText(instrumentmodules->getDisplayName(moduleidx));
+        SoundModule.setButtonText(instrumentmodules->getDisplayName(appState.moduleidx));
         SoundModule.setClickingTogglesState(false);
         SoundModule.setColour(TextButton::textColourOffId, Colours::white);
         SoundModule.setColour(TextButton::textColourOnId, Colours::white);
@@ -5950,13 +5945,13 @@ public:
             {
                 File fileToSave = File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
                     .getChildFile(organdir)
-                    .getChildFile(configdir);
+                    .getChildFile(appState.configdir);
 
                 bool useNativeVersion = false;
                 filechooser.reset(new FileChooser("Select Config file to load",
                     File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
                     .getChildFile(organdir)
-                    .getChildFile(configdir),
+                    .getChildFile(appState.configdir),
                     "*.cfg", useNativeVersion));
 
                 filechooser->launchAsync(
@@ -5990,21 +5985,21 @@ public:
                         // Replace with Load Config functionality
                         bool bloaded = loadConfigs(selectedfname);
 
-                        configfname = selectedfname; // Save Config File globally
+                        appState.configfname = selectedfname;
 
-                        lblconfigfile.setText(configfname, {});
+                        lblconfigfile.setText(appState.configfname, {});
 
-                        configchanged = true;
+                        appState.configchanged = true;
 
                         // Select first itemin dropdown on creation
                         comboConfig.setSelectedId(1);
 
                         String msgloaded;
                         if (bloaded == true) {
-                            msgloaded = "Loading:\n " + configfname;
+                            msgloaded = "Loading:\n " + appState.configfname;
                         }
                         else {
-                            msgloaded = "Load failed:\n " + configfname;
+                            msgloaded = "Load failed:\n " + appState.configfname;
                         }
 
                         if (TextButton* focused = &loadConfigButton)
@@ -6023,9 +6018,9 @@ public:
         saveButton.setBounds(120, 225, 80, 30);
         saveButton.setEnabled(false);
         saveButton.onClick = [=]() {
-            bool bsaved = saveConfigs(configfname);
+            bool bsaved = saveConfigs(appState.configfname);
 
-            configchanged = true;
+            appState.configchanged = true;
 
             String msgloaded;
             if (!bsaved) {
@@ -6054,13 +6049,13 @@ public:
         saveAsButton.onClick = [=]() {
             File fileToSave = File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
                 .getChildFile(organdir)
-                .getChildFile(configdir);
+                .getChildFile(appState.configdir);
 
             bool useNativeVersion = false;
             filechooser.reset(new FileChooser("Save Config As: Select existing or create new *.cfg",
                 File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
                 .getChildFile(organdir)
-                .getChildFile(configdir),
+                .getChildFile(appState.configdir),
                 "*.cfg", useNativeVersion));
 
             filechooser->launchAsync(
@@ -6087,19 +6082,19 @@ public:
                         }
 
                         // Update static/global config file name and save to this file
-                        configfname = selconfigfname;
-                        bool bsaved = saveConfigs(configfname);
+                        appState.configfname = selconfigfname;
+                        bsaved = saveConfigs(appState.configfname);
 
-                        configchanged = true;
+                        appState.configchanged = true;
 
                         String msgloaded;
                         if (!bsaved) {
-                            msgloaded = "Save as failed: " + configfname;
-                            juce::Logger::writeToLog("*** ConfigPage(): Save As failed! " + configfname);
+                            msgloaded = "Save as failed: " + appState.configfname;
+                            juce::Logger::writeToLog("*** ConfigPage(): Save As failed! " + appState.configfname);
                         }
                         else {
-                            msgloaded = "Saved as: " + configfname;
-                            juce::Logger::writeToLog("*** ConfigPage(): Saved As " + configfname);
+                            msgloaded = "Saved as: " + appState.configfname;
+                            juce::Logger::writeToLog("*** ConfigPage(): Saved As " + appState.configfname);
                         }
 
                         if (TextButton* focused = &saveAsButton)
@@ -6112,7 +6107,7 @@ public:
 
                 saveAsButton.setEnabled(false);
 
-                lblconfigfile.setText(configfname, {});
+                lblconfigfile.setText(appState.configfname, {});
             };
 
         addAndMakeVisible(lblconfigfile);
@@ -6232,6 +6227,7 @@ private:
     MidiDevices* mididevices = nullptr;
     InstrumentPanel* instrumentpanel = nullptr;
     InstrumentModules* instrumentmodules = nullptr;
+    AppState& appState;
 
     ValueTree vtconfigs;
 
@@ -6419,7 +6415,7 @@ private:
         static Identifier moduleidxType("moduleidx");
 
         // Configs ValueTree
-        ValueTree vtconfigs(configsType);
+        ValueTree configsTree(configsType);
 
         for (int i = 0; i < numberbuttongroups; i++) {
             ValueTree vtcfg(buttongroupType);
@@ -6456,7 +6452,7 @@ private:
 
             // Added new config to parent
             if (vtcfg.isValid()) {
-                vtconfigs.appendChild(vtcfg, nullptr);
+                configsTree.appendChild(vtcfg, nullptr);
             }
             else
             {
@@ -6465,12 +6461,12 @@ private:
             }
         }
 
-        if (!vtconfigs.isValid()) {
+        if (!configsTree.isValid()) {
             juce::Logger::writeToLog("*** createVTConfigs(): An error occurred while creating final Configs ValueTree...");
             // To do: Add more error handling
         }
 
-        return vtconfigs;
+        return configsTree;
     }
 
     //-------------------------------------------------------------------------
@@ -6756,7 +6752,7 @@ private:
 class MenuTabs final : public TabbedComponent
 {
 public:
-    MenuTabs (bool isRunningComponenTransforms)
+    MenuTabs ([[maybe_unused]] bool isRunningComponenTransforms)
         : TabbedComponent (TabbedButtonBar::TabsAtTop)
     {
         juce::Logger::writeToLog("== MenuTabs(): Constructor ");

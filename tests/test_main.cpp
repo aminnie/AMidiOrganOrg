@@ -80,6 +80,38 @@ namespace
         return true;
     }
 
+    bool runInstrumentModuleWritesAppState(std::string& details)
+    {
+        auto* modules = InstrumentModules::getInstance();
+        if (modules == nullptr)
+        {
+            details = "InstrumentModules::getInstance() returned nullptr";
+            return false;
+        }
+
+        auto& state = getAppState();
+        const int previousModule = state.moduleidx;
+
+        // Pick a known module id from constructor defaults.
+        const int targetModule = 2;
+        modules->setInstrumentModule(targetModule);
+
+        if (!expectEqual(state.moduleidx, targetModule, "setInstrumentModule updates appState.moduleidx", details))
+            return false;
+
+        const bool hasVendor = state.vendorname.isNotEmpty();
+        const bool hasFile = state.instrumentfname.isNotEmpty();
+        if (!hasVendor || !hasFile)
+        {
+            details = "setInstrumentModule did not populate vendor/instrument file in AppState";
+            return false;
+        }
+
+        // Restore previous module selection to minimize side effects.
+        modules->setInstrumentModule(previousModule);
+        return true;
+    }
+
     bool runLookupPanelGroup(std::string& details)
     {
         return expectEqual(lookupPanelGroup(0), 0, "lookupPanelGroup(0)", details)
@@ -377,6 +409,11 @@ int main()
     {
         std::string details;
         results.push_back({ "AppState aliases remain compatible", runAppStateAliasBackcompat(details), details });
+    }
+
+    {
+        std::string details;
+        results.push_back({ "InstrumentModules writes AppState", runInstrumentModuleWritesAppState(details), details });
     }
 
     {

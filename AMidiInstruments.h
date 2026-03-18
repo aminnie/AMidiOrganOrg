@@ -229,9 +229,9 @@ class MidiInstruments final : public Component
 {
 public:
 
-    bool loadMidiInstruments(const String& instrumentfname)
+    bool loadMidiInstruments(const String& instrumentFileName)
     {
-        String fname = instrumentfname;
+        String fname = instrumentFileName;
 
         // Sample JSON Instrument File
             //std::string jsonText = R"(
@@ -240,17 +240,17 @@ public:
             // Parse the JSON string into a var object.
             //juce::var jsonData = juce::JSON::parse(jsonText);
 
-        juce::Logger::writeToLog("*** loadMidiInstruments(): Loading " + instrumentfname + " instrument file");
+        juce::Logger::writeToLog("*** loadMidiInstruments(): Loading " + instrumentFileName + " instrument file");
 
         // Read the instruments JSON file from disk into a string
         juce::File instrumentFile = File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
             .getChildFile(organdir)
-            .getChildFile(instrumentdir)
-            .getChildFile(instrumentfname);
+            .getChildFile(appState.instrumentdir)
+            .getChildFile(instrumentFileName);
         if (!instrumentFile.existsAsFile()) {
-            juce::Logger::writeToLog("*** loadMidiInstruments(): Failed to load " + instrumentfname + " instrument file");
+            juce::Logger::writeToLog("*** loadMidiInstruments(): Failed to load " + instrumentFileName + " instrument file");
 
-            juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::InfoIcon, "Instrument file not found!", instrumentfname);
+            juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::InfoIcon, "Instrument file not found!", instrumentFileName);
             return false;
         }
 
@@ -264,9 +264,9 @@ public:
         // Track this value while the file is loaded for any new Voice selects
         // and Voice Button assignments. Not used during realtime voice selects 
         if (instrumentmodules->isZeroBased(fname))
-            iszerobased = true;
+            appState.iszerobased = true;
         else
-            iszerobased = false;
+            appState.iszerobased = false;
 
         return true;
     }
@@ -324,7 +324,7 @@ public:
 
         int insfont = jsonInstrumentData["Instruments"][cat][inst][1];
 
-        if ((!iszerobased) && (inst > 0)) insfont = insfont - 1;
+        if ((!appState.iszerobased) && (inst > 0)) insfont = insfont - 1;
 
         return insfont;
     }
@@ -344,7 +344,8 @@ public:
 
 private:
     // Private constructor so only one object instance can be created.
-    MidiInstruments() : instrumentmodules(InstrumentModules::getInstance())
+    MidiInstruments() : instrumentmodules(InstrumentModules::getInstance()),
+        appState(getAppState())
     {
         juce::Logger::writeToLog("=S= MidiInstruments(): Constructor " + std::to_string(zinstcntmidiinstruments++));
     }
@@ -352,6 +353,7 @@ private:
     juce::var jsonInstrumentData;
 
     InstrumentModules* instrumentmodules = nullptr;
+    AppState& appState;
 
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MidiInstruments)
