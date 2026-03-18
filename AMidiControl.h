@@ -2158,6 +2158,33 @@ struct KeyboardPanelPage final : public Component,
                 button->setColour(TextButton::buttonOnColourId, Colours::darkgrey.brighter(0.20f));
             };
 
+        auto setArrowButtonsMutedState = [configureArrowButton](ArrowCommandButton* upButton, ArrowCommandButton* downButton, bool isMuted)
+            {
+                auto applyState = [&](ArrowCommandButton* button)
+                    {
+                        if (button == nullptr)
+                            return;
+
+                        if (isMuted)
+                        {
+                            button->setColour(TextButton::textColourOffId, Colours::grey);
+                            button->setColour(TextButton::textColourOnId, Colours::grey);
+                            button->setColour(TextButton::buttonColourId, Colours::darkred.darker(0.45f));
+                            button->setColour(TextButton::buttonOnColourId, Colours::darkred.darker(0.30f));
+                        }
+                        else
+                        {
+                            configureArrowButton(button);
+                        }
+
+                        button->setEnabled(!isMuted);
+                        button->repaint();
+                    };
+
+                applyState(upButton);
+                applyState(downButton);
+            };
+
         auto getDefaultGroupOutlineColour = [tabidx]()
             {
                 if (tabidx == PTLower)
@@ -2167,16 +2194,47 @@ struct KeyboardPanelPage final : public Component,
                 return Colours::palevioletred.darker();
             };
 
-        auto applyMutedGroupVisualCue = [&](ButtonGroup* buttonGroup, bool isMuted)
+        auto getGroupOutlineColour = [getDefaultGroupOutlineColour](ButtonGroup* buttonGroup)
+            {
+                if (buttonGroup != nullptr)
+                {
+                    const auto name = buttonGroup->groupname.toLowerCase();
+                    const bool isDrumByName =
+                        name.contains("drum 1")
+                        || name.contains("drum1")
+                        || name.contains("drums 1")
+                        || name.contains("drums1")
+                        || name.contains("drum 2")
+                        || name.contains("drum2")
+                        || name.contains("drums 2")
+                        || name.contains("drums2");
+
+                    // Safety fallback for Bass drum groups if names are edited in config.
+                    const bool isDrumByBassMidiOut =
+                        (buttonGroup->midikeyboard == KBDBASS)
+                        && (buttonGroup->midiout == 10 || buttonGroup->midiout == 11);
+
+                    if (isDrumByName || isDrumByBassMidiOut)
+                    {
+                        return Colours::cornflowerblue;
+                    }
+                }
+                return getDefaultGroupOutlineColour();
+            };
+
+        auto applyMutedGroupVisualCue = [tabidx, getDefaultGroupOutlineColour, getGroupOutlineColour](ButtonGroup* buttonGroup, bool isMuted)
             {
                 if (buttonGroup == nullptr)
                     return;
 
                 if (auto* groupComponent = buttonGroup->getGroupComponentPtr())
                 {
+                    // Keep Lower/Bass group outlines consistent with their tab palette.
+                    // Use muted-outline tint only on Upper where contrast remains clear.
+                    const bool useMutedOutlineTint = isMuted && (tabidx == PTUpper);
                     groupComponent->setColour(GroupComponent::outlineColourId,
-                        isMuted ? Colours::darkred.brighter(0.35f)
-                                : getDefaultGroupOutlineColour());
+                        useMutedOutlineTint ? Colours::darkred.brighter(0.35f)
+                                            : getGroupOutlineColour(buttonGroup));
                 }
             };
 
@@ -2245,12 +2303,7 @@ struct KeyboardPanelPage final : public Component,
             {
                 auto* group = addToList(new GroupComponent("group", buttongrouptitle));
 
-                if (tabidx == PTLower)
-                    group->setColour(GroupComponent::outlineColourId, Colours::palegreen.darker());
-                else if (tabidx == PTBass)
-                    group->setColour(GroupComponent::outlineColourId, Colours::antiquewhite.darker());
-                else
-                    group->setColour(GroupComponent::outlineColourId, Colours::palevioletred.darker());
+                group->setColour(GroupComponent::outlineColourId, getGroupOutlineColour(ptrbuttongroup));
 
                 group->setBounds(g1xoffset, ygroup, g1width, g1height);
 
@@ -2576,8 +2629,7 @@ struct KeyboardPanelPage final : public Component,
                         mididevices->sendToOutputs(ccMessage);
 
                         g1svol->setEnabled(false);
-                        g1bvup->setEnabled(false);
-                        g1bvdwn->setEnabled(false);
+                        setArrowButtonsMutedState(g1bvup, g1bvdwn, true);
 
                         ButtonGroup* ptrbuttongroup = instrumentpanel->getButtonGroup(buttongroupidx);
                         ptrbuttongroup->setMuteButtonStatus(true);
@@ -2593,8 +2645,7 @@ struct KeyboardPanelPage final : public Component,
                         mididevices->sendToOutputs(ccMessage);
 
                         g1svol->setEnabled(true);
-                        g1bvup->setEnabled(true);
-                        g1bvdwn->setEnabled(true);
+                        setArrowButtonsMutedState(g1bvup, g1bvdwn, false);
 
                         ButtonGroup* ptrbuttongroup = instrumentpanel->getButtonGroup(buttongroupidx);
                         ptrbuttongroup->setMuteButtonStatus(false);
@@ -2660,12 +2711,7 @@ struct KeyboardPanelPage final : public Component,
             {
                 auto* group = addToList(new GroupComponent("group", buttongrouptitle));
 
-                if (tabidx == PTLower)
-                    group->setColour(GroupComponent::outlineColourId, Colours::palegreen.darker());
-                else if (tabidx == PTBass)
-                    group->setColour(GroupComponent::outlineColourId, Colours::antiquewhite.darker());
-                else
-                    group->setColour(GroupComponent::outlineColourId, Colours::palevioletred.darker());
+                group->setColour(GroupComponent::outlineColourId, getGroupOutlineColour(ptrbuttongroup));
 
                 group->setBounds(g2xoffset, ygroup, g2width, g2height);
 
@@ -2983,8 +3029,7 @@ struct KeyboardPanelPage final : public Component,
                         mididevices->sendToOutputs(ccMessage);
 
                         g2svol->setEnabled(false);
-                        g2bvup->setEnabled(false);
-                        g2bvdwn->setEnabled(false);
+                        setArrowButtonsMutedState(g2bvup, g2bvdwn, true);
 
                         ButtonGroup* ptrbuttongroup = instrumentpanel->getButtonGroup(buttongroupidx);
                         ptrbuttongroup->setMuteButtonStatus(true);
@@ -3000,8 +3045,7 @@ struct KeyboardPanelPage final : public Component,
                         mididevices->sendToOutputs(ccMessage);
 
                         g2svol->setEnabled(true);
-                        g2bvup->setEnabled(true);
-                        g2bvdwn->setEnabled(true);
+                        setArrowButtonsMutedState(g2bvup, g2bvdwn, false);
 
                         ButtonGroup* ptrbuttongroup = instrumentpanel->getButtonGroup(buttongroupidx);
                         ptrbuttongroup->setMuteButtonStatus(false);
@@ -3067,12 +3111,7 @@ struct KeyboardPanelPage final : public Component,
             {
                 auto* group = addToList(new GroupComponent("group", buttongrouptitle));
 
-                if (tabidx == PTLower)
-                    group->setColour(GroupComponent::outlineColourId, Colours::palegreen.darker());
-                else if (tabidx == PTBass)
-                    group->setColour(GroupComponent::outlineColourId, Colours::antiquewhite.darker());
-                else
-                    group->setColour(GroupComponent::outlineColourId, Colours::palevioletred.darker());
+                group->setColour(GroupComponent::outlineColourId, getGroupOutlineColour(ptrbuttongroup));
 
                 group->setBounds(g3xoffset, ygroup, g3width, g3height);
 
@@ -3388,8 +3427,7 @@ struct KeyboardPanelPage final : public Component,
                         mididevices->sendToOutputs(ccMessage);
 
                         g3svol->setEnabled(false);
-                        g3bvup->setEnabled(false);
-                        g3bvdwn->setEnabled(false);
+                        setArrowButtonsMutedState(g3bvup, g3bvdwn, true);
 
                         ButtonGroup* ptrbuttongroup = instrumentpanel->getButtonGroup(buttongroupidx);
                         ptrbuttongroup->setMuteButtonStatus(true);
@@ -3405,8 +3443,7 @@ struct KeyboardPanelPage final : public Component,
                         mididevices->sendToOutputs(ccMessage);
 
                         g3svol->setEnabled(true);
-                        g3bvup->setEnabled(true);
-                        g3bvdwn->setEnabled(true);
+                        setArrowButtonsMutedState(g3bvup, g3bvdwn, false);
 
                         ButtonGroup* ptrbuttongroup = instrumentpanel->getButtonGroup(buttongroupidx);
                         ptrbuttongroup->setMuteButtonStatus(false);
@@ -3484,12 +3521,7 @@ struct KeyboardPanelPage final : public Component,
             {
                 auto* group = addToList(new GroupComponent("group", buttongrouptitle));
 
-                if (tabidx == PTLower)
-                    group->setColour(GroupComponent::outlineColourId, Colours::palegreen.darker());
-                else if (tabidx == PTBass)
-                    group->setColour(GroupComponent::outlineColourId, Colours::antiquewhite.darker());
-                else
-                    group->setColour(GroupComponent::outlineColourId, Colours::palevioletred.darker());
+                group->setColour(GroupComponent::outlineColourId, getGroupOutlineColour(ptrbuttongroup));
 
                 group->setBounds(g4xoffset, ygroup, g4width, g4height);
 
@@ -3803,8 +3835,7 @@ struct KeyboardPanelPage final : public Component,
                         mididevices->sendToOutputs(ccMessage);
 
                         g4svol->setEnabled(false);
-                        g4bvup->setEnabled(false);
-                        g4bvdwn->setEnabled(false);
+                        setArrowButtonsMutedState(g4bvup, g4bvdwn, true);
 
                         ButtonGroup* ptrbuttongroup = instrumentpanel->getButtonGroup(buttongroupidx);
                         ptrbuttongroup->setMuteButtonStatus(true);
@@ -3820,8 +3851,7 @@ struct KeyboardPanelPage final : public Component,
                         mididevices->sendToOutputs(ccMessage);
 
                         g4svol->setEnabled(true);
-                        g4bvup->setEnabled(true);
-                        g4bvdwn->setEnabled(true);
+                        setArrowButtonsMutedState(g4bvup, g4bvdwn, false);
 
                         ButtonGroup* ptrbuttongroup = instrumentpanel->getButtonGroup(buttongroupidx);
                         ptrbuttongroup->setMuteButtonStatus(false);
@@ -3874,6 +3904,11 @@ struct KeyboardPanelPage final : public Component,
             gxtbchange->setToggleState(false, dontSendNotification);
             gxtbchange->onClick = [=, &tabs, &voicespage]()
                 {
+                    bpendingSoundEdit = true;
+                    if (cbSave != nullptr)
+                        cbSave->setEnabled(true);
+                    updatePanelSaveButtonsPendingStyle();
+
                     //String strstatus = "Change Sound Button";
                     //statusLabel->setText(strstatus, juce::dontSendNotification);
 
@@ -3906,6 +3941,11 @@ struct KeyboardPanelPage final : public Component,
             gxtbedit->setToggleState(false, dontSendNotification);
             gxtbedit->onClick = [=, &tabs, &effectspage]()
                 {
+                    bpendingEffectsEdit = true;
+                    if (cbSave != nullptr)
+                        cbSave->setEnabled(true);
+                    updatePanelSaveButtonsPendingStyle();
+
                     //String strstatus = "Edit Sound Button";
                     //statusLabel->setText(strstatus, juce::dontSendNotification);
 
@@ -3977,6 +4017,10 @@ struct KeyboardPanelPage final : public Component,
                 {
                     if (tbsetpreset->getToggleState()) {
                         bsetpreset = true;
+                        bpendingPresetSet = true;
+                        if (cbSave != nullptr)
+                            cbSave->setEnabled(true);
+                        updatePanelSaveButtonsPendingStyle();
 
                         DBG("PresetButton.onClick(): Set");
                     }
@@ -4346,11 +4390,16 @@ struct KeyboardPanelPage final : public Component,
                     if (TextButton* focused = tbSave)
                         BubbleMessage(*focused, msgloaded, this->bubbleMessage);
 
+                    if (bsaved)
+                        clearPendingExitSavePrompt();
+                    updatePanelSaveButtonsPendingStyle();
+
                     tbSave->setEnabled(false);
                 };
             tbSave->setEnabled(false);
 
             auto* tbSaveAs = addToList(new CommandButton());
+            cbSaveAs = tbSaveAs;
             tbSaveAs->setButtonText("Save As");
             tbSaveAs->setColour(TextButton::textColourOffId, Colours::white);
             tbSaveAs->setColour(TextButton::textColourOnId, Colours::white);
@@ -4412,6 +4461,10 @@ struct KeyboardPanelPage final : public Component,
 
                                 if (TextButton* focused = tbSaveAs)
                                     BubbleMessage(*focused, msgloaded, this->bubbleMessage);
+
+                                if (bsaved)
+                                    clearPendingExitSavePrompt();
+                                updatePanelSaveButtonsPendingStyle();
                             }
                             else {
                                 statusLabel->setText("Empty file name save! " + selectedfname, juce::dontSendNotification);
@@ -4420,6 +4473,7 @@ struct KeyboardPanelPage final : public Component,
 
                     tbSave->setEnabled(false);
                 };
+            updatePanelSaveButtonsPendingStyle();
         }   // End - Save and Save As Buttons
 
         lblpanelfile = addToList(new Label("Panel File", appState.panelfname));
@@ -4432,8 +4486,6 @@ struct KeyboardPanelPage final : public Component,
     // Button Group Voice Volume Up or Down Button clicked
     void vbuttonupClicked(Slider* svol)
     {
-        //juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::InfoIcon, "Vol Up", "The button was clicked!");
-
         if (svol->getValue() >= 9.0)
             svol->setValue(10.0);
         else
@@ -4442,8 +4494,6 @@ struct KeyboardPanelPage final : public Component,
 
     void vbuttondownClicked(Slider* svol)
     {
-        //juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::InfoIcon, "Vol Down", "The button was clicked!");
-
         if (svol->getValue() <= 1.0)
             svol->setValue(0.0);
         else
@@ -4472,6 +4522,7 @@ struct KeyboardPanelPage final : public Component,
         }
 
         cbSave->setEnabled(true);
+        updatePanelSaveButtonsPendingStyle();
 
         // Read Rotary Status for every Button Group
     }
@@ -4631,6 +4682,7 @@ struct KeyboardPanelPage final : public Component,
             bvoiceupdated = false;
 
             cbSave->setEnabled(true);
+            updatePanelSaveButtonsPendingStyle();
 
             return;
         }
@@ -4640,6 +4692,7 @@ struct KeyboardPanelPage final : public Component,
             beffectsupdated = false;
 
             cbSave->setEnabled(true);
+            updatePanelSaveButtonsPendingStyle();
 
             return;
         }
@@ -4741,7 +4794,8 @@ private:
     TextButton* tbrotbrake;
 
     Label* lblpanelfile;
-    CommandButton* cbSave;
+    CommandButton* cbSave = nullptr;
+    CommandButton* cbSaveAs = nullptr;
 
     bool isFastUpper = false;
     bool rotarybrake = false;
@@ -4763,6 +4817,37 @@ private:
 
     OwnedArray<PresetButton> presetbuttons;
     bool bsetpreset = false;
+
+    bool isPanelSavePending() const
+    {
+        return hasPendingExitSavePrompt();
+    }
+
+    void updatePanelSaveButtonsPendingStyle()
+    {
+        auto applyStyle = [&](CommandButton* button)
+            {
+                if (button == nullptr)
+                    return;
+
+                button->setColour(TextButton::textColourOffId, Colours::white);
+                button->setColour(TextButton::textColourOnId, Colours::white);
+
+                if (isPanelSavePending())
+                {
+                    button->setColour(TextButton::buttonColourId, Colours::darkred);
+                    button->setColour(TextButton::buttonOnColourId, Colours::darkred.brighter());
+                }
+                else
+                {
+                    button->setColour(TextButton::buttonColourId, Colours::black.darker());
+                    button->setColour(TextButton::buttonOnColourId, Colours::black.brighter());
+                }
+            };
+
+        applyStyle(cbSave);
+        applyStyle(cbSaveAs);
+    }
 
     // Volume bar with fixed stacked gradient (bottom stays green/orange).
     class VolumeGradientSlider final : public Slider
@@ -5093,6 +5178,8 @@ public:
 
             ApplicationQuit();
             };
+        // Header-level Exit button is provided globally in AMidiControl.
+        exitButton.setVisible(false);
 
         int mgroup = 10;
         addAndMakeVisible(toModule);
@@ -5324,7 +5411,8 @@ public:
 
         loadPanelButton.setBounds(1250, 235, 80, 30);
 
-        exitButton.setBounds(1350, 235, 80, 30);
+        // Place Exit in the top-right header area for faster access.
+        exitButton.setBounds(getWidth() - 90, 4, 80, 24);
 
         panelfileLabel.setBounds(200, margin + 210, 160, 20);
 
@@ -5760,6 +5848,129 @@ private:
 //==============================================================================
 // Class: HelpPage
 //==============================================================================
+class MarkdownHelpContent final : public Component
+{
+public:
+    void setMarkdownText(const String& markdownText)
+    {
+        markdown = markdownText;
+    }
+
+    void refreshLayoutForWidth(int targetWidth)
+    {
+        const int safeWidth = jmax(260, targetWidth);
+        const float textWidth = (float)jmax(220, safeWidth - 16);
+        const int textHeight = buildLayout(textWidth);
+        const int targetHeight = jmax(260, textHeight + 16);
+
+        setSize(safeWidth, targetHeight);
+        repaint();
+    }
+
+    void paint(juce::Graphics& g) override
+    {
+        g.fillAll(juce::Colour(0xff141414));
+
+        g.setColour(juce::Colours::grey.withAlpha(0.45f));
+        g.drawRect(getLocalBounds(), 1);
+
+        layout.draw(g, juce::Rectangle<float>(8.0f, 8.0f, (float)getWidth() - 16.0f, (float)getHeight() - 16.0f));
+    }
+
+private:
+    int buildLayout(float textWidth)
+    {
+        auto parseLine = [](const String& rawLine, String& outText, Font& outFont, Colour& outColour)
+            {
+                const String line = rawLine.trimEnd();
+                const String trimmed = line.trimStart();
+
+                outText = line;
+                outFont = Font(FontOptions(15.0f, Font::plain));
+                outColour = Colours::whitesmoke;
+
+                if (trimmed.startsWith("### "))
+                {
+                    outText = trimmed.fromFirstOccurrenceOf("### ", false, false);
+                    outFont = Font(FontOptions(17.0f, Font::bold));
+                    outColour = Colours::lightgoldenrodyellow;
+                    return;
+                }
+
+                if (trimmed.startsWith("## "))
+                {
+                    outText = trimmed.fromFirstOccurrenceOf("## ", false, false);
+                    outFont = Font(FontOptions(20.0f, Font::bold));
+                    outColour = Colours::antiquewhite;
+                    return;
+                }
+
+                if (trimmed.startsWith("# "))
+                {
+                    outText = trimmed.fromFirstOccurrenceOf("# ", false, false);
+                    outFont = Font(FontOptions(24.0f, Font::bold));
+                    outColour = Colours::white;
+                    return;
+                }
+
+                if (trimmed.startsWith("- "))
+                {
+                    outText = String(CharPointer_UTF8("\xE2\x80\xA2 ")) + trimmed.substring(2);
+                    outFont = Font(FontOptions(15.0f, Font::plain));
+                    outColour = Colours::whitesmoke;
+                    return;
+                }
+
+                int digitCount = 0;
+                while (digitCount < trimmed.length() && CharacterFunctions::isDigit(trimmed[digitCount]))
+                    ++digitCount;
+                if (digitCount > 0
+                    && digitCount + 1 < trimmed.length()
+                    && trimmed[digitCount] == '.'
+                    && trimmed[digitCount + 1] == ' ')
+                {
+                    outText = trimmed;
+                    outFont = Font(FontOptions(15.0f, Font::plain));
+                    outColour = Colours::whitesmoke;
+                    return;
+                }
+
+                if (trimmed.isEmpty())
+                {
+                    outText = "";
+                    outFont = Font(FontOptions(8.0f, Font::plain));
+                    outColour = Colours::transparentWhite;
+                    return;
+                }
+            };
+
+        AttributedString attributed;
+        attributed.setJustification(Justification::topLeft);
+
+        StringArray lines;
+        lines.addLines(markdown);
+        if (lines.isEmpty())
+            lines.add(markdown);
+
+        for (auto& line : lines)
+        {
+            String parsed;
+            Font font(FontOptions(15.0f, Font::plain));
+            Colour colour;
+            parseLine(line, parsed, font, colour);
+
+            attributed.append(parsed, font, colour);
+            attributed.append("\n", Font(FontOptions(6.0f, Font::plain)), Colours::transparentWhite);
+        }
+
+        layout.createLayout(attributed, textWidth);
+        return juce::roundToInt(layout.getHeight() + 0.5f);
+    }
+
+    String markdown;
+    TextLayout layout;
+};
+
 class HelpPage final : public Component
 {
 public:
@@ -5767,35 +5978,43 @@ public:
     {
         DBG("*** HelpPage(): Constructing HelpPage");
 
-        textContent.reset(new juce::TextEditor());
-        addAndMakeVisible(textContent.get());
-        textContent->setMultiLine(true);
-        textContent->setReadOnly(true);
-        textContent->setCaretVisible(false);
-        textContent->setBounds(10, 10, 1220, 250);
+        viewport.reset(new juce::Viewport());
+        addAndMakeVisible(viewport.get());
+        viewport->setScrollBarsShown(true, true);
 
-        // Prepare to read Help Panel from Disk
-        String helpfname = "help.txt";
-        File inputFile = File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
-            .getChildFile(organdir)
-            .getChildFile(helpfname);
-        if (!inputFile.existsAsFile())
+        markdownContent.reset(new MarkdownHelpContent());
+        viewport->setViewedComponent(markdownContent.get(), false);
+
+        // Load embedded markdown so Help is portable across machines.
+        const auto* helpData = reinterpret_cast<const char*>(BinaryData::help_md);
+        const auto helpSize = BinaryData::help_mdSize;
+        if (helpData != nullptr && helpSize > 0)
         {
-            juce::Logger::writeToLog("=== HelpPage(): Failed to load help file " + helpfname + " from disk");
+            markdownContent->setMarkdownText(juce::String::fromUTF8(helpData, helpSize));
+        }
+        else
+        {
+            markdownContent->setMarkdownText("# AMidiOrgan Help\n\nEmbedded help content is not available.");
+            juce::Logger::writeToLog("=== HelpPage(): Embedded help.md content was not found in BinaryData");
         }
 
-        if (!inputFile.existsAsFile()) return;
-
-        auto fileText = inputFile.loadFileAsString();
-        textContent->setText(fileText);
+        resized();
     }
 
-    void resized() override {}
+    void resized() override
+    {
+        const int margin = 10;
+        viewport->setBounds(margin, margin, getWidth() - margin * 2, getHeight() - margin * 2);
+
+        const int contentWidth = jmax(260, viewport->getWidth() - viewport->getScrollBarThickness());
+        markdownContent->refreshLayoutForWidth(contentWidth);
+    }
 
     void paint(juce::Graphics&) override {}
 
 private:
-    std::unique_ptr<juce::TextEditor> textContent;
+    std::unique_ptr<juce::Viewport> viewport;
+    std::unique_ptr<MarkdownHelpContent> markdownContent;
 
     //-----------------------------------------------------------------------------
     //JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(HelpPage)
@@ -6365,6 +6584,8 @@ public:
         exitButton.setColour(TextButton::buttonColourId, Colours::black.darker());
         exitButton.setColour(TextButton::buttonOnColourId, Colours::black.brighter());
         exitButton.setBounds(1350, 235, 80, 30);
+        // Header-level Exit button is provided globally in AMidiControl.
+        exitButton.setVisible(false);
 
         exitButton.onClick = [=]() {
             ApplicationQuit();
@@ -6964,6 +7185,7 @@ public:
         // Create Config and Help Pages
         addTab("Config",       colour, configspage, true);
         addTab("Help",         colour, new HelpPage(), true);
+        addTab("Exit",         colour, new Component(), true);
 
         this->setTabBarDepth(30);
 
@@ -6972,6 +7194,121 @@ public:
         String sname = this->getCurrentTabName();
 
         //this->grabKeyboardFocus();
+    }
+
+    void mouseDown(const MouseEvent& e) override
+    {
+        draggingFromTabBarBackground = false;
+
+        // Enable window drag from empty tab-bar strip space only.
+        if (e.originalComponent == this && e.y <= getTabBarDepth())
+        {
+            if (auto* topLevel = getTopLevelComponent())
+            {
+                windowDragger.startDraggingComponent(topLevel, e);
+                draggingFromTabBarBackground = true;
+            }
+        }
+
+        TabbedComponent::mouseDown(e);
+    }
+
+    void mouseDrag(const MouseEvent& e) override
+    {
+        if (draggingFromTabBarBackground)
+        {
+            if (auto* topLevel = getTopLevelComponent())
+                windowDragger.dragComponent(topLevel, e, nullptr);
+        }
+
+        TabbedComponent::mouseDrag(e);
+    }
+
+    void mouseUp(const MouseEvent& e) override
+    {
+        draggingFromTabBarBackground = false;
+        TabbedComponent::mouseUp(e);
+    }
+
+    void currentTabChanged(int newCurrentTabIndex, const String& newCurrentTabName) override
+    {
+        if (newCurrentTabName == "Exit")
+        {
+            const auto previousTab = lastNonExitTabIndex;
+            setCurrentTabIndex(previousTab, false);
+
+            auto closeApplication = [safeTop = juce::Component::SafePointer<juce::Component>(getTopLevelComponent())]()
+            {
+                if (safeTop != nullptr)
+                    {
+                    juce::MessageManager::callAsync([safeTop]()
+                    {
+                            if (safeTop != nullptr)
+                                safeTop->userTriedToCloseWindow();
+                    });
+                }
+                else if (auto* app = juce::JUCEApplication::getInstance())
+                {
+                    juce::MessageManager::callAsync([app]()
+                        {
+                            app->systemRequestedQuit();
+                        });
+                }
+            };
+
+            if (hasPendingExitSavePrompt())
+            {
+                auto safeThis = juce::Component::SafePointer<MenuTabs>(this);
+                AlertWindow::showYesNoCancelBox(
+                    AlertWindow::WarningIcon,
+                    "Unsaved Panel Changes",
+                    "Sounds/Effects/Preset Set actions were used since the last panel save.\n\n"
+                    "Do you want to save before exiting?",
+                    "Save and Exit",
+                    "Exit Without Saving",
+                    "Cancel",
+                    this,
+                    ModalCallbackFunction::create([safeThis, closeApplication](int result)
+                        {
+                            if (safeThis == nullptr)
+                                return;
+
+                            if (result == 1)
+                            {
+                                auto* panel = InstrumentPanel::getInstance();
+                                auto& appState = getAppState();
+                                bool saved = false;
+                                if (panel != nullptr)
+                                    saved = panel->saveInstrumentPanel(appState.panelfullpathname);
+
+                                if (!saved)
+                                {
+                                    AlertWindow::showMessageBoxAsync(
+                                        AlertWindow::WarningIcon,
+                                        "Save Failed",
+                                        "Panel save failed. Please save manually before exiting.");
+                                    return;
+                                }
+
+                                clearPendingExitSavePrompt();
+                                closeApplication();
+                            }
+                            else if (result == 2)
+                            {
+                                clearPendingExitSavePrompt();
+                                closeApplication();
+                            }
+                        }));
+            }
+            else
+            {
+                closeApplication();
+            }
+            return;
+        }
+
+        lastNonExitTabIndex = newCurrentTabIndex;
+        TabbedComponent::currentTabChanged(newCurrentTabIndex, newCurrentTabName);
     }
 
     // Small star button that is put inside one of the tabs
@@ -7004,6 +7341,9 @@ public:
     };
 
 private:
+    ComponentDragger windowDragger;
+    bool draggingFromTabBarBackground = false;
+    int lastNonExitTabIndex = PTStart;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MenuTabs)
 };
@@ -7059,21 +7399,15 @@ void BubbleMessage(Component& targetComponent, const String& textToShow,
 {
     bmc.reset(new BubbleMessageComponent());
 
-    bool isRunningComponentTransform = true;
-
-    if (isRunningComponentTransform)
-    {
-        targetComponent.findParentComponentOfClass<AMidiControl>()->addChildComponent(bmc.get());
-    }
-    else if (Desktop::canUseSemiTransparentWindows())
-    {
-        bmc->setAlwaysOnTop(true);
-        bmc->addToDesktop(0);
-    }
+    // Attach to the most reliable host component so the bubble is always visible.
+    if (auto* host = targetComponent.findParentComponentOfClass<AMidiControl>())
+        host->addAndMakeVisible(bmc.get());
+    else if (auto* topLevel = targetComponent.getTopLevelComponent())
+        topLevel->addAndMakeVisible(bmc.get());
     else
-    {
-        targetComponent.getTopLevelComponent()->addChildComponent(bmc.get());
-    }
+        targetComponent.addAndMakeVisible(bmc.get());
+
+    bmc->toFront(false);
 
     AttributedString text(textToShow);
     text.setJustification(Justification::centred);

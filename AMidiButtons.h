@@ -256,6 +256,7 @@ public:
     void paintButton(Graphics& g, bool shouldDrawButtonAsHighlighted, bool shouldDrawButtonAsDown) override
     {
         auto bounds = getLocalBounds().toFloat().reduced(0.5f);
+        const bool isEnabledNow = isEnabled();
         const bool isPressedOrToggled = shouldDrawButtonAsDown || getToggleState();
         const auto background = isPressedOrToggled ? findColour(TextButton::buttonOnColourId)
                                                    : findColour(TextButton::buttonColourId);
@@ -266,7 +267,7 @@ public:
         const auto highlightColour = isPressedOrToggled ? Colours::white.withAlpha(0.04f)
                                                         : Colours::white.withAlpha(0.10f);
 
-        g.setColour(background);
+        g.setColour(isEnabledNow ? background : background.withAlpha(0.80f));
         g.fillRoundedRectangle(bounds, corner);
 
         // Subtle top sheen to better match the look of neighboring organ-style controls.
@@ -275,7 +276,7 @@ public:
         g.setColour(highlightColour);
         g.fillRoundedRectangle(topHalf, corner);
 
-        if (shouldDrawButtonAsHighlighted && !isPressedOrToggled)
+        if (isEnabledNow && shouldDrawButtonAsHighlighted && !isPressedOrToggled)
         {
             g.setColour(Colours::white.withAlpha(0.08f));
             g.fillRoundedRectangle(bounds, corner);
@@ -304,7 +305,9 @@ public:
             arrowPath.lineTo(cx + halfWidth, cy - halfHeight);
         }
 
-        g.setColour(Colours::white);
+        const auto arrowColour = isEnabledNow ? Colours::white
+                                              : Colours::lightgrey.withAlpha(0.55f);
+        g.setColour(arrowColour);
         g.strokePath(arrowPath, PathStrokeType(4.0f, PathStrokeType::curved, PathStrokeType::rounded));
     }
 
