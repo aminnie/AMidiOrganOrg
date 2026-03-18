@@ -1,4 +1,4 @@
-AMidiOrgan Features
+# AMidiOrgan Features
 
 ## Build
 
@@ -98,140 +98,152 @@ The following asset filenames are referenced by code through `BinaryData` symbol
 - `assets/icons8arrowdown32click.png`
 - `assets/icons8arrowup32click.png`
 
-New:
-- MIDI Hardeware and Software Sound Mdules: 
-	Deebach BlackBox, Roland Integra7, Ketron SD2, Midi GM. 
-	Please conact developer for more to be added.
+## Functional Overview
 
-1. Voice Buttons
-1.1 MIDI Instrument Sound from loaded Device (MSB, LSB, Soundfont).
-1.2 Ten MIDI Effects (VOL, EXP, REV, CHO, MOD, TIM, ATK, REL, BRI, PAN) applied to Button Group MIDI Out channel.
-1.3. MIDI Sound settings are unique per Voice Button and any/all effects may be changed from one Button to another.
+Supported MIDI hardware and software sound modules:
+- Deebach BlackBox
+- Roland Integra7
+- Ketron SD2
+- MIDI GM
+- Contact developer for additional module support.
 
-2. Voice Button Groups
-2.1 A number of Voice Buttons in a logical grouping.
-2.2.1 Logical groupings can be changed by the user in the Config page.
-2.2 Voice Button Groups also stores:
-2.2.1 The MIDI IN and OUT settings for this group, configurable by the user via Config Page
-2.2.2 Octave shift settings for this group.
-2.2.3 Solo Keyboard Split:
-2.2.3.1 Solo Button Group can be used to host typical Solo instruments. However the Solo split section remains polyphonic.
-2.2.3.2 One Solo Split for the Upper and Lower Keyboards.
-2.3 Every Voice Button Group has a Volume slider with level Up and Down Buttons.
-2.3.1 Voice Button value is preset by the value on the active Voice Button enabling adjutments equalization in realtime.
-2.3.2 Changes to the Button Group volume is not stored back on the active Voice Button Instrument Volume effect.
-2.4. Voice Button Groups Mute and Unmute:
-2.4.1 Muting is used to enable Voice Layering by turning the sound volume off for the associated Button Group.
-2.4.2 Muting a Voice Button Group disables the Volume Slider and Up/Down Buttons and sets Volume for the MIDI Out channel to zero.
-2.4.2.1 MIDI Notes from the Button Group MIDI Input channel are always transmited to the MIDI Output channel for a Button Group.
-2.4.2.2 This enables dynamic layering of Input Keyboard notes to Voice Button Group MIDI output channels.
-2.5 Output Note layering:
-2.5.1 All MIDI messages in the first Buttton Group MIDI IN channel is forwarded directly to its MIDI Out Channel. Default same MIDI IN as OUT.
-2.5.2. Layering to Button Group 2, 3, and 4 forwards MIDI Note On/Off Messages only using the active Voice Button, its sound and effects.
-2.6 To do: Need to adjust Bass and Drums Keyboard Panel to allow all messages on first Drum Button Group as well.
+### 1. Voice Buttons
+- MIDI instrument sound from loaded device (MSB, LSB, soundfont).
+- Ten MIDI effects (VOL, EXP, REV, CHO, MOD, TIM, ATK, REL, BRI, PAN) applied to the button group MIDI output channel.
+- MIDI sound settings are unique per voice button; effects may differ per button.
 
-3. Instrument Panel
-3.1 System supports one Instrument Panel that contains:
-3.1.1 Three Keyboard Panels: Upper, Lower and Bass&Drums.
-3.2 Instrument Panel is named and saved to and loaded from disk in the application working directory.
-3.3 User is able to create instrument panels for specific organ types/styles or by song.
-3.4. Instrument Panel contains up to 96 Voice Buttons organized in 12 Buttons Groups over 3 Keyboard Panels.
-3.5 Instrument Panel saves all 96 Voice Button values, 12 Button Group details, as well as 7 x Preset configurations to .pnl file for reload.
-3.6 Instrument Panel Button Groups are color coded to assist identifying the Keyboard Panel you are working with.
-3.7 To do: Make the Voice Button Group sizing/nmbers configurable. This was done for the first Voice Group to support default Organ Bass.
+### 2. Voice Button Groups
+- A voice button group is a logical grouping of voice buttons.
+- Logical groupings can be changed by the user in the Config page.
+- Each voice button group stores:
+  - MIDI In and Out settings (Config page).
+  - Octave shift settings.
+  - Solo keyboard split settings:
+    - Solo group can host typical solo instruments, while solo split remains polyphonic.
+    - One solo split for Upper and one for Lower keyboards.
+- Every group has a volume slider with level Up/Down buttons.
+  - Voice button value is initialized from the active voice button to support real-time balancing.
+  - Group volume changes are not written back to the active voice button instrument volume effect.
+- Mute/unmute behavior:
+  - Muting enables layering by setting group output volume to zero.
+  - Muting disables the group volume slider and Up/Down buttons.
+  - MIDI notes from group MIDI input are still transmitted to group MIDI output.
+  - This enables dynamic layering of input keyboard notes to multiple output channels.
+- Output note layering:
+  - First button group In channel forwards all MIDI messages directly to its Out channel (default same In/Out).
+  - Layering to groups 2, 3, and 4 forwards Note On/Off using active voice button sound/effects.
+- To do: adjust Bass/Drums panel to allow all messages on first Drum button group.
 
-4. Presets
-4.1. Total for 7 Presets supported:
-4.1.1 Manual Preset as the default when the system starts up.
-4.1.2 Six programmable Presets.
-4.2. Every Preset stores the active/selected Voice Button in every Button Voice Button Group for all 3 Keyboard Panels.
-4.3. A reference to the Voice Button is stored and reflecs the currently selected Sound and Effects.
-4.4 The Preset SET button is used to program (update) a selected Preset, including Manual.
-4.4.1 To update a Preset, ensure you select the preferred Preset to preset active Buttons, and update active Buttons as needed. 
-4.4.2 All Voices on all Panels reflect your preference. 
-4.4.3 Click Preset Set button and proceed to click Preset Button to update.
-4.5. The Preset button group is shared by all three Keyboard Panels. 
-4.5.1 Selections on any one of the three Keyboard Panels saves all three Panels into the Preset.
-4.6. To save the Preset selections, save the Instrument Panel.
+### 3. Instrument Panel
+- System supports one instrument panel containing:
+  - Upper keyboard panel
+  - Lower keyboard panel
+  - Bass&Drums keyboard panel
+- Instrument panel is named, saved, and loaded from disk in the application's working directory.
+- User can create panels by organ style/type or by song.
+- Panel contains up to 96 voice buttons across 12 button groups over 3 keyboard panels.
+- Panel save (`.pnl`) stores:
+  - all 96 voice button values,
+  - 12 button group details,
+  - 7 preset configurations.
+- Button groups are color-coded by keyboard panel.
+- To do: make voice button group sizing/count configurable.
 
-5. Rotary Button Group
-5.2 Available on the Upper and Lower Keyboard Panels.
-5.3 Controls Rotor Speed (Fast/Slow) and Brake On/Off.
-5.3.1 Ramp up and down speed based on an internal list played at 100ms intervals
-5.4 To do: Needs more work limited syncronizing voice startup fast/slow speed.
+### 4. Presets
+- Total presets: 7
+  - 1 Manual preset (default on startup)
+  - 6 programmable presets
+- Each preset stores active/selected voice button in each button group for all 3 keyboard panels.
+- Preset references reflect currently selected sound and effects.
+- Preset programming flow:
+  - Select target preset.
+  - Adjust active buttons as needed across panels.
+  - Click `Preset Set`, then click preset button to update.
+- Preset button group is shared by all keyboard panels.
+  - Selection on any panel captures all three panels into the preset.
+- Save instrument panel to persist preset selections to disk.
 
-6. Keyboard Panel
-6.1. Every Keyboard Panel contains four Voice Button Groups.
-6.2. Seven Presets are supported by a Keyboard Panel.
-6.3. Upper and Lower Panel Rotary function is associated with Button Group 1 (Organ by default).
+### 5. Rotary Button Group
+- Available on Upper and Lower keyboard panels.
+- Controls rotor speed (Fast/Slow) and Brake On/Off.
+- Uses internal ramp list at 100 ms intervals for speed transitions.
+- To do: improve synchronization of voice startup fast/slow state.
 
-7. Sounds Edit Page
-7.1 Any support Instrument Midi Sound can be selected and programmed into a Voice Button on any Keyboard Panel.
-7.2 Ensure intended Voice Button selected before clicking on Sounds button in Keyboard Panel. Page displays Voice Button details.
-7.3 Once picked from pop-up menu, this voice sound is MIDI sent on the Button Group MIDI Out channel for demo play.
-7.4 Click on the To Upper/To Lower/To Bass button to save new Sound to the Voice Button and return to the Keyboard Panel.
-7.5. To do: Assess whether we continue to use JUCE popup menu for this function. Works better with a mouse than touch.
+### 6. Keyboard Panel
+- Each keyboard panel contains four voice button groups.
+- Seven presets are supported per panel (shared preset set across panels).
+- Upper/Lower rotary function is associated with button group 1 (Organ by default).
 
-8. Effects Edit Page
-8.1 Any of the supported MIDI Effects can be selected and programmed into a Voice Button on any Keyboard Panel
-8.2 Ensure intended Voice Button is selected before clicking on Effects button in Keyboard Panel. Page displays Voice Buttons details.
-8.3 Changes to any of the 10 MIDI Effects are applied in realtime to the Button Group MIDI Out channel.
-8.4 Click on the To Upper/To Lower/To Bass button to save changed Effects values on Voice Button and return to the Keyboard Panel.
-8.5 MIDI Effects applies to the Button Group MIDI channel:
-8.5.1 Every Voice Button and associated sound has its own Effects that is supplied to the Button Group MIDI Out channel when Voice selected.
-8.5.2 Establish if we need global Effect settings in addition to Button specific similar an organ - e.g. Volume or Brilliance.
-8.6 To do: Consider reading current MIDI Device Effects values directly and use as defaults for Effect values.
+### 7. Sounds Edit Page
+- Any supported instrument MIDI sound can be selected and programmed into any voice button.
+- Select intended voice button before opening Sounds page.
+- Selected sound is sent on button group MIDI Out channel for demo play.
+- Use `To Upper` / `To Lower` / `To Bass` to save and return.
+- To do: assess long-term use of JUCE popup menu (mouse-first UX).
 
-9. Config Page
-9.1 Configure Button Group parameters:
-9.1.2 Button Group Name (1 of 12).
-9.1.3 Button Group MIDI IN and Out Channel.
-9.1.4 Button Group Octave Shift (+3 to -3).
-9.1.5 Solo Keyboard Split for Upper and Lower Keyboard Panels. 
-9.2 MIDI Reset Button resets all MIDI Controller on each of 16 channels using standard MIDI command. 
-9.3 MIDI Pass Through check: If off, any channel that is not configured as input in a Button Group is blocked and not forwarded to output.
-9.3.1. Useful where Organ Solo channel is output on seperate channel from Uppper/Lower and interferes with kKeyboard Split in this application.
-9.3.2. If check is off, list to block is recalculated and applied on startup or Config save.
-9.4 Config Page applies to Organ application and is independent of the Instrument Panel loaded.
-9.5 To do: Consider if configs should be moved into Panel save and by Instrument Panel file, rather than global.
-9.6 To do: Add feature to load different instrument JSON file.
+### 8. Effects Edit Page
+- Any supported MIDI effect can be programmed into a voice button.
+- Select intended voice button before opening Effects page.
+- Effect changes are applied in real time to the button group MIDI output channel.
+- Use `To Upper` / `To Lower` / `To Bass` to save and return.
+- Effect behavior:
+  - Each voice button has independent effect values.
+  - Effects are emitted when that voice button is selected.
+- To do:
+  - evaluate global effect settings in addition to per-button settings,
+  - consider reading current device effect values as defaults.
 
-10. MIDI Start Page
-10.1 MIDI Input and Output Devices are dynamially loaded and made available for selected upon connect or disconnect.
-10.2 Multiple MIDI Input Keyboards and Output Devices are supported.
-10.2.1 Only one MIDI Sound Device (e.g. Deebach MaxPlus) is support.
-10.3 Button Group MIDI In/Out Channels should be configured to listen and output to the preferred devices by MIDI channel.
-10.4 In addition to output note layering by Button Group, MIDI input is also layered onto each selected MIDI OUT device.
-10.5 Instrument HW/SW Sound Module Button: Displaus the currently selected Midi Sound Module name 
-10.5.1 Click button produces to list of Sound Modules currently supported:
-10.5.1.1 Deebach BlackBox, Roland Integra7, Ketron SD2, MIDIGM, Custom MIDI
-10.5.2 A new module can be added be replace the .JSON sound file in the aaplication Custom directory. 
-10.5.3 Check JSON validity using to ensure instrument loads. E.g.: https://jsonlint.com/
-10.6 To do: Test Bluetooth connectivity (standard JUCE framework support).
+### 9. Config Page
+- Configure button group parameters:
+  - group name (1..12),
+  - MIDI In/Out channel,
+  - octave shift (-3..+3),
+  - solo keyboard split (Upper/Lower).
+- MIDI Reset sends standard controller reset on all 16 channels.
+- MIDI pass-through option:
+  - Off: channels not configured as group inputs are blocked.
+  - Useful when solo channel output conflicts with keyboard split behavior.
+  - Block list recalculated on startup or Config save.
+- Config applies globally to the application, independent of loaded instrument panel.
+- To do:
+  - evaluate moving config scope into panel saves (per instrument panel),
+  - add feature to load different instrument JSON files.
 
-11 General
-11.1 Built using the JUCE C++ framework.
-11.1.1 Application can be compiled for different operating systems and devices as it is using JUCE and C++.
-12.1.2 Initial executable for Windows based systems
-11.3 System supports a touch panel and using mouse or keyboard to navigate is optional.
+### 10. MIDI Start Page
+- MIDI input/output devices are dynamically listed on connect/disconnect.
+- Supports multiple MIDI input keyboards and output devices.
+- Current design assumes one active MIDI sound device at a time.
+- Button group MIDI In/Out should be configured by channel for preferred routing.
+- Input is layered both by button-group routing and by selected MIDI output devices.
+- Instrument module button shows selected module name.
+  - Supported module list includes Deebach BlackBox, Roland Integra7, Ketron SD2, MIDIGM, and Custom MIDI.
+  - A new module can be added by replacing the JSON sound file in the Custom directory.
+  - Validate JSON before use, e.g. [jsonlint.com](https://jsonlint.com/).
+- To do: test Bluetooth connectivity support through JUCE.
 
-12. Device Support
-12.1 MIDI Keyboards
-12.1.1 Every Button Group supports a MIDI keyboard, and/or inputs using common MIDI IN
-12.1.2 For Solo input from dedicated MIDI keyboard, set split value to 0 for MIDI OUT 
-12.2 Sound Modules
-12.2.1 Uses custom Sound Module Device file with a simple JSON based structure converted from the original device instrument file.
-12.2.2 Supports output to any Hardeware or Software Module that presents itself as a MIDI device after Sound Module file has been added.
-12.3 Displays
-12.3.1 Current display optimized for a Waveshare 11.9 Capacitive Touch Screen (1480 by 320 pixles)
-12.3.1.1 https://www.waveshare.com/11.9inch-hdmi-lcd.htm
-12.3.2 Applcation autocenters on systems with a typical HD 15.6" display.
-12.3.3 Please contact developer for other display suggestions/requests.
+### 11. General
+- Built using JUCE and C++.
+- Application can be compiled for multiple operating systems and devices.
+- Initial executable targets Windows systems.
+- Touch panel is supported; mouse/keyboard navigation is optional.
 
-13. Up Next:
-13.1 Use JUCE to compile and test controller with Raspberry PI or Latte Panda SBC
-13.1.1  Intention is to be able to build a cost effective and standalone controller and display that does not need PC or similar
-13.2 Add optional HW support for selected buttons and sliders
+### 12. Device Support
+- MIDI keyboards:
+  - Every button group supports MIDI keyboard input and/or shared MIDI In.
+  - For dedicated solo keyboard input, set split value to `0` for MIDI Out.
+- Sound modules:
+  - Uses custom JSON sound-module device files.
+  - Supports hardware/software modules that present as MIDI devices after module file is added.
+- Displays:
+  - Optimized for Waveshare 11.9" capacitive touch screen (1480x320):
+    - [Waveshare 11.9" HDMI LCD](https://www.waveshare.com/11.9inch-hdmi-lcd.htm)
+  - Application auto-centers on typical HD 15.6" displays.
+  - Contact the developer for additional display requests.
 
- Contact Detaails:
- - Anton Minnie @ a_minnie@hotmail.com.
+### 13. Up Next
+- Use JUCE to compile/test controller with Raspberry Pi or LattePanda SBC.
+  - Goal: cost-effective standalone controller + display without requiring a PC.
+- Add optional hardware support for selected buttons and sliders.
+
+## Contact Details
+- Anton Minnie: `a_minnie@hotmail.com`
