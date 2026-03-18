@@ -30,6 +30,83 @@ namespace
         return true;
     }
 
+    bool expectEqualStr(const String& actual, const String& expected, const std::string& label, std::string& details)
+    {
+        if (actual != expected)
+        {
+            details = label + " expected '" + expected.toStdString() + "' but got '" + actual.toStdString() + "'";
+            return false;
+        }
+        return true;
+    }
+
+    struct AppStateSnapshot
+    {
+        String instrumentdir;
+        String instrumentfname;
+        String panelfname;
+        String configfname;
+        String pnlconfigfname;
+        bool configreload = false;
+    };
+
+    AppStateSnapshot takeAppStateSnapshot()
+    {
+        auto& state = getAppState();
+        AppStateSnapshot snapshot;
+        snapshot.instrumentdir = state.instrumentdir;
+        snapshot.instrumentfname = state.instrumentfname;
+        snapshot.panelfname = state.panelfname;
+        snapshot.configfname = state.configfname;
+        snapshot.pnlconfigfname = state.pnlconfigfname;
+        snapshot.configreload = state.configreload;
+        return snapshot;
+    }
+
+    void restoreAppState(const AppStateSnapshot& snapshot)
+    {
+        auto& state = getAppState();
+        state.instrumentdir = snapshot.instrumentdir;
+        state.instrumentfname = snapshot.instrumentfname;
+        state.panelfname = snapshot.panelfname;
+        state.configfname = snapshot.configfname;
+        state.pnlconfigfname = snapshot.pnlconfigfname;
+        state.configreload = snapshot.configreload;
+    }
+
+    bool prepareTestInstrumentJson(const String& testDirName, const String& fileName, std::string& details)
+    {
+        auto& state = getAppState();
+
+        const File baseDir = File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
+            .getChildFile(organdir)
+            .getChildFile(testDirName);
+
+        if (!baseDir.exists() && !baseDir.createDirectory())
+        {
+            details = "Failed to create test directory: " + baseDir.getFullPathName().toStdString();
+            return false;
+        }
+
+        const File instrumentJson = baseDir.getChildFile(fileName);
+        const String jsonText = R"({
+  "Vendor": "TestVendor",
+  "Instruments": [
+    []
+  ]
+})";
+
+        if (!instrumentJson.replaceWithText(jsonText))
+        {
+            details = "Failed to write test JSON: " + instrumentJson.getFullPathName().toStdString();
+            return false;
+        }
+
+        state.instrumentdir = testDirName;
+        state.instrumentfname = fileName;
+        return true;
+    }
+
     bool runCheck0to127(std::string& details)
     {
         return expectEqual(check0to127(-5), 0, "check0to127(-5)", details)
@@ -390,6 +467,229 @@ namespace
                            "createPreset rejects out-of-range panel button index", details);
     }
 
+    bool runInstrumentPanelConfigRoundtrip(std::string& details)
+    {
+        auto* midiInstruments = MidiInstruments::getInstance();
+        auto* instrumentPanel = InstrumentPanel::getInstance();
+
+        if (midiInstruments == nullptr || instrumentPanel == nullptr)
+        {
+            details = "MidiInstruments/InstrumentPanel singleton not available";
+            return false;
+        }
+
+        const auto snapshot = takeAppStateSnapshot();
+        auto& state = getAppState();
+
+        const String testDir = "AMidiOrganTestData";
+        const String testInstrumentFile = "integration_test_instruments.json";
+        const String testPanelFile = "integration_roundtrip.pnl";
+
+        if (!prepareTestInstrumentJson(testDir, testInstrumentFile, details))
+            return false;
+
+        if (!midiInstruments->loadMidiInstruments(state.instrumentfname))
+        {
+            details = "Failed to load test instrument JSON";
+            restoreAppState(snapshot);
+            return false;
+        }
+
+        state.panelfname = testPanelFile;
+        state.configfname = "integration_config_A.cfg";
+        state.pnlconfigfname = "";
+        state.configreload = false;
+
+        if (!instrumentPanel->initInstrumentPanel(testDir, testPanelFile, false))
+        {
+            details = "initInstrumentPanel(fromdisk=false) failed";
+            restoreAppState(snapshot);
+            return false;
+        }
+
+        if (!instrumentPanel->loadInstrumentPanel(testDir, testPanelFile, false))
+        {
+            details = "First loadInstrumentPanel failed";
+            restoreAppState(snapshot);
+            return false;
+        }
+
+        if (!expectEqualStr(state.pnlconfigfname, "integration_config_A.cfg",
+                            "panel stores config file name", details))
+        {
+            restoreAppState(snapshot);
+            return false;
+        }
+
+        if (!expectEqual(state.configreload ? 1 : 0, 0,
+                         "matching config does not require reload", details))
+        {
+            restoreAppState(snapshot);
+            return false;
+        }
+
+        state.configfname = "integration_config_B.cfg";
+        if (!instrumentPanel->loadInstrumentPanel(testDir, testPanelFile, false))
+        {
+            details = "Second loadInstrumentPanel failed";
+            restoreAppState(snapshot);
+            return false;
+        }
+
+        const bool reloadExpected = state.configreload;
+        restoreAppState(snapshot);
+        return expectEqual(reloadExpected ? 1 : 0, 1,
+                           "config mismatch sets configreload", details);
+    }
+
+    bool runPresetRecallPersistenceAcrossGroups(std::string& details)
+    {
+        auto* midiInstruments = MidiInstruments::getInstance();
+        auto* instrumentPanel = InstrumentPanel::getInstance();
+        auto* presets = PanelPresets::getInstance();
+
+        if (midiInstruments == nullptr || instrumentPanel == nullptr || presets == nullptr)
+        {
+            details = "Required singleton unavailable";
+            return false;
+        }
+
+        const auto snapshot = takeAppStateSnapshot();
+        auto& state = getAppState();
+
+        const String testDir = "AMidiOrganTestData";
+        const String testInstrumentFile = "integration_test_instruments.json";
+        const String panelFile = "integration_presets.pnl";
+        const int presetIdx = 3;
+
+        if (!prepareTestInstrumentJson(testDir, testInstrumentFile, details))
+            return false;
+
+        if (!midiInstruments->loadMidiInstruments(state.instrumentfname))
+        {
+            details = "Failed to load test instrument JSON";
+            restoreAppState(snapshot);
+            return false;
+        }
+
+        state.panelfname = panelFile;
+        state.configfname = "preset_test.cfg";
+
+        if (!instrumentPanel->initInstrumentPanel(testDir, panelFile, false))
+        {
+            details = "initInstrumentPanel for preset persistence failed";
+            restoreAppState(snapshot);
+            return false;
+        }
+
+        // Persist a representative spread of button groups/buttons and flags.
+        presets->setPanelButtonIdx(presetIdx, 0, 0);
+        presets->setPanelButtonIdx(presetIdx, 5, 40);
+        presets->setPanelButtonIdx(presetIdx, 11, 90);
+        presets->setMuteStatus(presetIdx, 0, true);
+        presets->setMuteStatus(presetIdx, 5, false);
+        presets->setMuteStatus(presetIdx, 11, true);
+        presets->setRotaryStatus(presetIdx, 0, 2);
+        presets->setRotaryStatus(presetIdx, 5, 1);
+        presets->setRotaryStatus(presetIdx, 11, 0);
+
+        if (!instrumentPanel->saveInstrumentPanel(testDir, panelFile))
+        {
+            details = "saveInstrumentPanel for preset persistence failed";
+            restoreAppState(snapshot);
+            return false;
+        }
+
+        // Overwrite with different values to ensure load restores saved data.
+        presets->setPanelButtonIdx(presetIdx, 0, 2);
+        presets->setPanelButtonIdx(presetIdx, 5, 44);
+        presets->setPanelButtonIdx(presetIdx, 11, 84);
+        presets->setMuteStatus(presetIdx, 0, false);
+        presets->setMuteStatus(presetIdx, 5, true);
+        presets->setMuteStatus(presetIdx, 11, false);
+        presets->setRotaryStatus(presetIdx, 0, 0);
+        presets->setRotaryStatus(presetIdx, 5, 0);
+        presets->setRotaryStatus(presetIdx, 11, 0);
+
+        if (!instrumentPanel->loadInstrumentPanel(testDir, panelFile, false))
+        {
+            details = "loadInstrumentPanel for preset persistence failed";
+            restoreAppState(snapshot);
+            return false;
+        }
+
+        if (!expectEqual(presets->getPanelButtonIdx(presetIdx, 0), 0, "preset button idx group 0", details) ||
+            !expectEqual(presets->getPanelButtonIdx(presetIdx, 5), 40, "preset button idx group 5", details) ||
+            !expectEqual(presets->getPanelButtonIdx(presetIdx, 11), 90, "preset button idx group 11", details) ||
+            !expectEqual(presets->getMuteStatus(presetIdx, 0) ? 1 : 0, 1, "preset mute group 0", details) ||
+            !expectEqual(presets->getMuteStatus(presetIdx, 5) ? 1 : 0, 0, "preset mute group 5", details) ||
+            !expectEqual(presets->getMuteStatus(presetIdx, 11) ? 1 : 0, 1, "preset mute group 11", details) ||
+            !expectEqual(presets->getRotaryStatus(presetIdx, 0), 2, "preset rotary group 0", details) ||
+            !expectEqual(presets->getRotaryStatus(presetIdx, 5), 1, "preset rotary group 5", details) ||
+            !expectEqual(presets->getRotaryStatus(presetIdx, 11), 0, "preset rotary group 11", details))
+        {
+            restoreAppState(snapshot);
+            return false;
+        }
+
+        restoreAppState(snapshot);
+        return true;
+    }
+
+    bool runMidiRoutingSplitLayerEdgeCases(std::string& details)
+    {
+        auto* devices = MidiDevices::getInstance();
+        if (devices == nullptr)
+        {
+            details = "MidiDevices::getInstance() returned nullptr";
+            return false;
+        }
+
+        devices->clearMidiIOMap();
+
+        // Configure lower manual split with a layered output and solo output.
+        lowerchan = 3;
+        lowersolo = 15;
+        devices->splitout[lowersolo] = 60;
+        devices->iomap[3][0] = 3;
+        devices->iomap[3][1] = 4;
+        devices->iomap[3][2] = 15;
+        devices->octxpose[4] = 1;
+        devices->octxpose[15] = -1;
+        devices->velocityout[4] = true;
+        devices->velocityout[15] = false;
+
+        // Below split: layer output routes, solo output blocked.
+        if (!expectEqual(devices->shouldRouteLayeredNote(3, 59, 4) ? 1 : 0, 1,
+                         "below split routes non-solo layer", details) ||
+            !expectEqual(devices->shouldRouteLayeredNote(3, 59, 15) ? 1 : 0, 0,
+                         "below split blocks solo output", details))
+            return false;
+
+        // At split: layer output blocked, solo output routes.
+        if (!expectEqual(devices->shouldRouteLayeredNote(3, 60, 4) ? 1 : 0, 0,
+                         "at split blocks non-solo layer", details) ||
+            !expectEqual(devices->shouldRouteLayeredNote(3, 60, 15) ? 1 : 0, 1,
+                         "at split routes solo output", details))
+            return false;
+
+        // Verify transpose edge behavior for the layered channels used above.
+        if (!expectEqual(devices->getTransposedNoteForOutput(59, 4), 71,
+                         "layered non-solo transpose +1 octave", details) ||
+            !expectEqual(devices->getTransposedNoteForOutput(60, 15), 48,
+                         "solo transpose -1 octave", details))
+            return false;
+
+        // End-to-end rewrite/send should safely process both target channels.
+        const auto noteOn = MidiMessage::noteOn(3, 60, (juce::uint8) 100);
+        if (!expectEqual(devices->rewriteSendNoteMessage(noteOn, 4) ? 1 : 0, 1,
+                         "rewrite/send accepts layered non-solo output", details))
+            return false;
+
+        return expectEqual(devices->rewriteSendNoteMessage(noteOn, 15) ? 1 : 0, 1,
+                           "rewrite/send accepts solo output", details);
+    }
+
 }
 
 int main()
@@ -459,6 +759,21 @@ int main()
     {
         std::string details;
         results.push_back({ "PanelPresets validates group/button bounds", runPanelPresetGroupAndButtonBounds(details), details });
+    }
+
+    {
+        std::string details;
+        results.push_back({ "InstrumentPanel panel/config roundtrip load-save-load", runInstrumentPanelConfigRoundtrip(details), details });
+    }
+
+    {
+        std::string details;
+        results.push_back({ "Preset recall persists across groups/buttons", runPresetRecallPersistenceAcrossGroups(details), details });
+    }
+
+    {
+        std::string details;
+        results.push_back({ "MIDI routing split/layer edge cases", runMidiRoutingSplitLayerEdgeCases(details), details });
     }
 
 
