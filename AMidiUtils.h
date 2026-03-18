@@ -39,36 +39,69 @@ static bool beffectsupdated = false;
 static const String organdir = "AMidiOrgan";
 
 static const String defpanelfname = "masterinstrument.pnl";
-static String panelfname = "masterinstrument.pnl";
-static String panelfullpathname = "";
+static const String defmodulefname = "mastermodules.mod";
 
-static String configfname = "amidiconfigs.cfg";
-static String pnlconfigfname = "amidiconfigs.cfg";
-static String configdir = "configs";
-static bool configchanged = false;
-static bool configreload = false;
+// Centralized runtime state for filenames/module selection.
+struct AppState final
+{
+    String panelfname = defpanelfname;
+    String panelfullpathname = "";
 
-static String modulefname = "amidimodules.mod";
-static String defmodulefname = "mastermodules.mod";
+    String configfname = "amidiconfigs.cfg";
+    String pnlconfigfname = "amidiconfigs.cfg";
+    String configdir = "configs";
+    bool configchanged = false;
+    bool configreload = false;
 
-static String userdata = "";
+    String modulefname = "amidimodules.mod";
+    String defmodulefname = ::defmodulefname;
 
-// Static Instrument module variable defaults. Changed when new module selected
-// To do: Consider moving to Singleton
-static int moduleidx = 1;
-static String instrumentdir = "instruments";
-static String instrumentfname = "maxplus.json";
-static String vendorname = "Deebach Blackbox";
-static String instrumentdname = "BlackBox";
+    String userdata = "";
 
-static bool isrotary = true;
-static bool iszerobased = true;
+    // Instrument module defaults. Changed when new module selected.
+    int moduleidx = 1;
+    String instrumentdir = "instruments";
+    String instrumentfname = "maxplus.json";
+    String vendorname = "Deebach Blackbox";
+    String instrumentdname = "BlackBox";
 
-// Static voice from the 1st voice in selected Midi module. Used to create new panel file.
-static String sdefVoice;
-static int sdefMSB;
-static int sdefLSB;
-static int sdefFont;
+    bool isrotary = true;
+    bool iszerobased = true;
+
+    // Static voice from the 1st voice in selected Midi module. Used to create new panel file.
+    String sdefVoice;
+    int sdefMSB = 0;
+    int sdefLSB = 0;
+    int sdefFont = 0;
+};
+
+inline AppState& getAppState()
+{
+    static AppState state;
+    return state;
+}
+
+// Backward-compatible aliases while code is gradually migrated to getAppState().
+inline String& panelfname = getAppState().panelfname;
+inline String& panelfullpathname = getAppState().panelfullpathname;
+inline String& configfname = getAppState().configfname;
+inline String& pnlconfigfname = getAppState().pnlconfigfname;
+inline String& configdir = getAppState().configdir;
+inline bool& configchanged = getAppState().configchanged;
+inline bool& configreload = getAppState().configreload;
+inline String& modulefname = getAppState().modulefname;
+inline String& userdata = getAppState().userdata;
+inline int& moduleidx = getAppState().moduleidx;
+inline String& instrumentdir = getAppState().instrumentdir;
+inline String& instrumentfname = getAppState().instrumentfname;
+inline String& vendorname = getAppState().vendorname;
+inline String& instrumentdname = getAppState().instrumentdname;
+inline bool& isrotary = getAppState().isrotary;
+inline bool& iszerobased = getAppState().iszerobased;
+inline String& sdefVoice = getAppState().sdefVoice;
+inline int& sdefMSB = getAppState().sdefMSB;
+inline int& sdefLSB = getAppState().sdefLSB;
+inline int& sdefFont = getAppState().sdefFont;
 
 // To do: Consider moving quick access static Midi in keyboard handler vars below directly 
 // from config classes. Updated during Config save or loads.

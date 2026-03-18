@@ -1,2 +1,2 @@
-AMidiOrganTests 7 0.0159631
+AMidiOrganTests 8 0.0117137
 ---

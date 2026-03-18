@@ -48,6 +48,38 @@ namespace
             && expectEqual(check1to16(99), 16, "check1to16(99)", details);
     }
 
+    bool runAppStateAliasBackcompat(std::string& details)
+    {
+        auto& state = getAppState();
+
+        const auto oldPanelName = panelfname;
+        const auto oldModuleIdx = moduleidx;
+
+        panelfname = "testpanel.pnl";
+        moduleidx = 4;
+
+        const bool panelOk = (state.panelfname == "testpanel.pnl");
+        const bool moduleOk = (state.moduleidx == 4);
+
+        // Restore prior values to avoid side effects between tests.
+        panelfname = oldPanelName;
+        moduleidx = oldModuleIdx;
+
+        if (!panelOk)
+        {
+            details = "panelfname alias not synchronized with AppState";
+            return false;
+        }
+
+        if (!moduleOk)
+        {
+            details = "moduleidx alias not synchronized with AppState";
+            return false;
+        }
+
+        return true;
+    }
+
     bool runLookupPanelGroup(std::string& details)
     {
         return expectEqual(lookupPanelGroup(0), 0, "lookupPanelGroup(0)", details)
@@ -340,6 +372,11 @@ int main()
     {
         std::string details;
         results.push_back({ "check1to16 clamps values", runCheck1to16(details), details });
+    }
+
+    {
+        std::string details;
+        results.push_back({ "AppState aliases remain compatible", runAppStateAliasBackcompat(details), details });
     }
 
     {
