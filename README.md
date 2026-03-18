@@ -46,6 +46,36 @@ cmake --build build --config Debug --target AMidiOrganTests
 ctest --test-dir build -C Debug --output-on-failure
 ```
 
+### Continuous Integration (GitHub Actions)
+- Workflow file: `.github/workflows/ci.yml`
+- Triggers: push to `main`, pull requests targeting `main`, and manual dispatch.
+- Platforms: `windows-latest` and `macos-latest`.
+- Pipeline steps:
+  - Configure CMake using a checked-out JUCE source tree.
+  - Build `AMidiOrganTests`.
+  - Run `ctest`.
+  - Build `AMidiOrgan` (Debug build on both platforms).
+
+### Recommended Manual UI Smoke Test
+After a successful build, run this quick checklist (5-10 minutes):
+
+1. Launch the app and open each tab once:
+   - `Start`, `Upper`, `Lower`, `Bass&Drums`, `Sounds`, `Effects`, `Config`, `Help`.
+2. On `Start`:
+   - Load a config file.
+   - Load a panel file.
+   - Confirm panel/config labels update and mismatch coloring behaves as expected.
+3. On `Upper`, `Lower`, and `Bass&Drums`:
+   - Click several voice buttons and confirm active-state behavior.
+   - Use panel `Save` and `Save As`, then reload the saved panel.
+4. On `Sounds` and `Effects`:
+   - Change a voice and a few effect values.
+   - Return to a keyboard tab and confirm state is preserved.
+5. On `Config`:
+   - Change one mapping value, save, reload, and confirm it persists.
+6. If MIDI hardware is connected:
+   - Open/close MIDI input and output devices and confirm no crash/hang.
+
 ### macOS (Xcode generator)
 From the repository root:
 

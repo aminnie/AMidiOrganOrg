@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    name: Build and test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Checkout JUCE
+        uses: actions/checkout@v4
+        with:
+          repository: juce-framework/JUCE
+          path: juce
+          fetch-depth: 1
+
+      - name: Configure (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          cmake -S . -B build -DJUCE_ROOT="${{ github.workspace }}/juce"
+
+      - name: Configure (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          cmake -S . -B build -DJUCE_ROOT="${{ github.workspace }}/juce" -DCMAKE_BUILD_TYPE=Debug
+
+      - name: Build tests (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          cmake --build build --config Debug --target AMidiOrganTests
+
+      - name: Build tests (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          cmake --build build --target AMidiOrganTests
+
+      - name: Run tests (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          ctest --test-dir build -C Debug --output-on-failure
+
+      - name: Run tests (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          ctest --test-dir build --output-on-failure
+
+      - name: Build app (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          cmake --build build --config Debug --target AMidiOrgan
+
+      - name: Build app (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          cmake --build build --target AMidiOrgan
