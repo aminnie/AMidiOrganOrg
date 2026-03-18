@@ -45,6 +45,13 @@ For canonical build/run commands, use the `Build` section in `README.md`.
 - Button groups map input channels to one or more output layers.
 - Presets capture active voice button selection + mute/rotary state by button group.
 
+## State Migration Progress
+- Completed slices: `Slice 1`, `Slice 2`, `Slice 3A`, `Slice 3B`, `Slice 3C`, `Slice 3D`.
+- Current migration posture: most UI and instrument/panel flows use explicit `appState`; legacy alias globals remain only in a small number of persistence helpers.
+- Next recommended slice (`3E`):
+  - finish `ConfigPage` persistence helper conversion in `AMidiControl.h` (`saveConfigs` / `loadConfigs` internals) where alias globals are still referenced for path/log values.
+  - preserve existing on-disk file formats and paths while replacing alias reads/writes with explicit `appState` fields.
+
 ## Validation Checklist After Changes
 - Build succeeds for the active JUCE target.
 - App launches and tab navigation works.
