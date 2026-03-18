@@ -1,0 +1,11 @@
+C:/Users/a_min/AMidiOrganOrg/build/CMakeFiles/AMidiOrgan.dir
+C:/Users/a_min/AMidiOrganOrg/build/CMakeFiles/AMidiOrgan_rc_lib.dir
+C:/Users/a_min/AMidiOrganOrg/build/CMakeFiles/AMidiOrganBinaryData.dir
+C:/Users/a_min/AMidiOrganOrg/build/CMakeFiles/INSTALL.dir
+C:/Users/a_min/AMidiOrganOrg/build/CMakeFiles/ALL_BUILD.dir
+C:/Users/a_min/AMidiOrganOrg/build/CMakeFiles/ZERO_CHECK.dir
+C:/Users/a_min/AMidiOrganOrg/build/JUCE/CMakeFiles/INSTALL.dir
+C:/Users/a_min/AMidiOrganOrg/build/JUCE/CMakeFiles/ALL_BUILD.dir
+C:/Users/a_min/AMidiOrganOrg/build/JUCE/modules/CMakeFiles/INSTALL.dir
+C:/Users/a_min/AMidiOrganOrg/build/JUCE/extras/Build/CMakeFiles/INSTALL.dir
+C:/Users/a_min/AMidiOrganOrg/build/JUCE/extras/Build/juceaide/CMakeFiles/INSTALL.dir

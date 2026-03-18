@@ -7,6 +7,7 @@
 */
 
 #include <JuceHeader.h>
+#include "BinaryData.h"
 #include "AMidiControl.h"
 
 class Application : public juce::JUCEApplication

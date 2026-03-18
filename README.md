@@ -1,5 +1,62 @@
 AMidiOrgan Features
 
+## Build
+
+### Prerequisites
+- CMake 3.22 or newer
+- JUCE source checkout (for example: `C:/JUCE` on Windows)
+
+### Windows (Visual Studio generator)
+From the repository root:
+
+```powershell
+cmake -S . -B build -DJUCE_ROOT="C:/JUCE"
+cmake --build build --config Debug --target AMidiOrgan
+```
+
+Output executable:
+- `build/AMidiOrgan_artefacts/Debug/AMidiOrgan.exe`
+
+### Run (Windows)
+From the repository root:
+
+```powershell
+# Run Debug build in a new process
+Start-Process "build/AMidiOrgan_artefacts/Debug/AMidiOrgan.exe"
+
+# Optional: run in the current terminal (foreground)
+& "build/AMidiOrgan_artefacts/Debug/AMidiOrgan.exe"
+```
+
+To run Release:
+
+```powershell
+cmake --build build --config Release --target AMidiOrgan
+Start-Process "build/AMidiOrgan_artefacts/Release/AMidiOrgan.exe"
+```
+
+### macOS (Xcode generator)
+From the repository root:
+
+```bash
+cmake -S . -B build-mac -G Xcode -DJUCE_ROOT="/path/to/JUCE"
+cmake --build build-mac --config Debug --target AMidiOrgan
+```
+
+Typical output app bundle:
+- `build-mac/Debug/AMidiOrgan.app`
+
+### Notes
+- UI images are packaged from `assets/*.png` via `juce_add_binary_data(...)` in `CMakeLists.txt`.
+
+### Asset Naming Contract
+The following asset filenames are referenced by code through `BinaryData` symbols and should remain stable unless code and CMake are updated together:
+- `assets/keyboard.png`
+- `assets/icons8arrowdown32.png`
+- `assets/icons8arrowup32.png`
+- `assets/icons8arrowdown32click.png`
+- `assets/icons8arrowup32click.png`
+
 New:
 - MIDI Hardeware and Software Sound Mdules: 
 	Deebach BlackBox, Roland Integra7, Ketron SD2, Midi GM. 
