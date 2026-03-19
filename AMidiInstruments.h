@@ -330,10 +330,24 @@ public:
     }
 
     int getCategoryVoiceCount(int cat) {
-        if ((cat < 0) || (cat > getCategoryCount()))
+        if (cat < 0)
             return 0;
 
-        return jsonInstrumentData["Instruments"][cat].size();
+        const auto instruments = jsonInstrumentData["Instruments"];
+        if (!instruments.isArray())
+            return 0;
+
+        const int categoryCount = instruments.size();
+        if (cat >= categoryCount)
+            return 0;
+
+        const auto category = instruments[cat];
+        if (!category.isArray())
+            return 0;
+
+        // Category entry layout is ["CategoryName", [voice1], [voice2], ...].
+        const int voiceCount = category.size() - 1;
+        return voiceCount > 0 ? voiceCount : 0;
     }
 
     ~MidiInstruments() {

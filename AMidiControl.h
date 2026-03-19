@@ -574,7 +574,6 @@ public:
 
         // Next we proceed to load an instument panel file from disk
         if (fromdisk) {
-
             if (!loadInstrumentPanel(instrumentDirectoryName, panelFileName, false))
             {
                 DBG("*** initInstrumentPanel(): Load InstrumentPanel from disk failed");
@@ -5028,9 +5027,9 @@ public:
         loadConfigButton.setButtonText("Load Config");
         loadConfigButton.setColour(TextButton::textColourOffId, Colours::white);
         loadConfigButton.setColour(TextButton::textColourOnId, Colours::white);
-        loadConfigButton.setColour(TextButton::buttonColourId, Colours::black.darker());
-        loadConfigButton.setColour(TextButton::buttonOnColourId, Colours::black.brighter());
-        loadConfigButton.setToggleState(false, dontSendNotification);
+        loadConfigButton.setColour(TextButton::buttonColourId, Colours::black);
+        loadConfigButton.setColour(TextButton::buttonOnColourId, Colours::black);
+        loadConfigButton.setToggleState(true, dontSendNotification);
         loadConfigButton.onClick = [=]()
             {
                 File fileToSave = File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
@@ -5077,12 +5076,18 @@ public:
                         bool bloaded = true;
 
                         appState.configfname = selectedfname;
+                        configfileLabel.setText(appState.configfname, {});
 
                         String msgloaded;
                         if (bloaded == true) {
+                            // Successful explicit config load becomes the new active baseline.
+                            appState.pnlconfigfname = appState.configfname;
+                            appState.configreload = false;
+                            configfileLabel.setColour(juce::Label::textColourId, juce::Colours::grey);
                             msgloaded = "Loaded: " + appState.configfname;
                         }
                         else {
+                            configfileLabel.setColour(juce::Label::textColourId, juce::Colours::red.darker());
                             msgloaded = "Load failed: " + appState.configfname;
                         }
 
@@ -5095,9 +5100,9 @@ public:
         loadPanelButton.setButtonText("Load Panel");
         loadPanelButton.setColour(TextButton::textColourOffId, Colours::white);
         loadPanelButton.setColour(TextButton::textColourOnId, Colours::white);
-        loadPanelButton.setColour(TextButton::buttonColourId, Colours::black.darker());
-        loadPanelButton.setColour(TextButton::buttonOnColourId, Colours::black.brighter());
-        loadPanelButton.setToggleState(false, dontSendNotification);
+        loadPanelButton.setColour(TextButton::buttonColourId, Colours::black);
+        loadPanelButton.setColour(TextButton::buttonOnColourId, Colours::black);
+        loadPanelButton.setToggleState(true, dontSendNotification);
         loadPanelButton.onClick = [=]()
             {
                 File fileToSave = File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
@@ -5147,7 +5152,7 @@ public:
 
                         String msgloaded;
                         if (bloaded == true) {
-                            msgloaded = "Loading\n Panel: " + appState.panelfname + "\n Config: " + appState.pnlconfigfname;
+                            msgloaded = "Loaded panel:\n " + appState.panelfname;
                         }
                         else {
                             msgloaded = "Panel load failed: " + appState.panelfname;
@@ -5242,9 +5247,31 @@ public:
                 }
             };
 
+        addAndMakeVisible(toConfig);
+        toConfig.setButtonText("Config");
+        toConfig.setClickingTogglesState(false);
+        toConfig.setColour(TextButton::textColourOffId, Colours::black);
+        toConfig.setColour(TextButton::textColourOnId, Colours::white);
+        toConfig.setColour(TextButton::buttonColourId, Colours::white);
+        toConfig.setColour(TextButton::buttonOnColourId, Colours::black.brighter());
+        toConfig.setBounds(mgroup + 810, mgroup + 200, 90, 50);
+        toConfig.setToggleState(true, dontSendNotification);
+        toConfig.onClick = [=, &tabs]()
+            {
+                tabs.setCurrentTabIndex(PTConfig, false);
+            };
+
+        addAndMakeVisible(panelPrefixLabel);
+        panelPrefixLabel.setColour(juce::Label::textColourId, juce::Colours::grey);
+        panelPrefixLabel.setJustificationType(juce::Justification::left);
+
         addAndMakeVisible(panelfileLabel);
         panelfileLabel.setColour(juce::Label::textColourId, juce::Colours::grey);
         panelfileLabel.setJustificationType(juce::Justification::left);
+
+        addAndMakeVisible(configPrefixLabel);
+        configPrefixLabel.setColour(juce::Label::textColourId, juce::Colours::grey);
+        configPrefixLabel.setJustificationType(juce::Justification::left);
 
         addAndMakeVisible(configfileLabel);
         configfileLabel.setColour(juce::Label::textColourId, juce::Colours::grey);
@@ -5254,35 +5281,6 @@ public:
         {
             int quickAccessMargin = 10;
             int xaccess = 720;
-
-            addAndMakeVisible(toHelp);
-            toHelp.setButtonText("Help");
-            toHelp.setClickingTogglesState(false);
-            toHelp.setColour(TextButton::textColourOffId, Colours::black);
-            toHelp.setColour(TextButton::textColourOnId, Colours::white);
-            toHelp.setColour(TextButton::buttonColourId, Colours::white);
-            toHelp.setColour(TextButton::buttonOnColourId, Colours::black.brighter());
-            toHelp.setBounds(quickAccessMargin + xaccess, quickAccessMargin + 200, 80, 50);
-            toHelp.setToggleState(true, dontSendNotification);
-            toHelp.onClick = [=, &tabs]()
-                {
-                    tabs.setCurrentTabIndex(PTHelp, false);
-                };
-
-            xaccess = xaccess + 100;
-            addAndMakeVisible(toConfig);
-            toConfig.setButtonText("Config");
-            toConfig.setClickingTogglesState(false);
-            toConfig.setColour(TextButton::textColourOffId, Colours::black);
-            toConfig.setColour(TextButton::textColourOnId, Colours::white);
-            toConfig.setColour(TextButton::buttonColourId, Colours::white);
-            toConfig.setColour(TextButton::buttonOnColourId, Colours::black.brighter());
-            toConfig.setBounds(quickAccessMargin + xaccess, quickAccessMargin + 200, 80, 50);
-            toConfig.setToggleState(true, dontSendNotification);
-            toConfig.onClick = [=, &tabs]()
-                {
-                    tabs.setCurrentTabIndex(PTConfig, false);
-                };
 
             xaccess = xaccess + 200;
             addAndMakeVisible(toUpperKBD);
@@ -5312,6 +5310,21 @@ public:
             toLowerKBD.onClick = [=, &tabs]()
                 {
                     tabs.setCurrentTabIndex(PTLower, false);
+                };
+
+            xaccess = xaccess + 100;
+            addAndMakeVisible(toBassKBD);
+            toBassKBD.setButtonText("Bass");
+            toBassKBD.setClickingTogglesState(false);
+            toBassKBD.setColour(TextButton::textColourOffId, Colours::black);
+            toBassKBD.setColour(TextButton::textColourOnId, Colours::white);
+            toBassKBD.setColour(TextButton::buttonColourId, Colours::white);
+            toBassKBD.setColour(TextButton::buttonOnColourId, Colours::black.brighter());
+            toBassKBD.setBounds(quickAccessMargin + xaccess, quickAccessMargin + 200, 80, 50);
+            toBassKBD.setToggleState(true, dontSendNotification);
+            toBassKBD.onClick = [=, &tabs]()
+                {
+                    tabs.setCurrentTabIndex(PTBass, false);
                 };
         }
 
@@ -5407,16 +5420,20 @@ public:
         pairButton.setBounds(margin, 2 * margin + 140,
             getWidth() - (2 * margin), 36);
 
-        //loadConfigButton.setBounds(1150, 235, 80, 30);
+        loadConfigButton.setBounds(180, margin + 205, 90, 50);
 
-        loadPanelButton.setBounds(1250, 235, 80, 30);
+        // Keep Load Panel aligned with Instruments/Config actions.
+        loadPanelButton.setBounds(280, margin + 205, 90, 50);
+        toConfig.setBounds(820, margin + 200, 90, 50);
 
         // Place Exit in the top-right header area for faster access.
         exitButton.setBounds(getWidth() - 90, 4, 80, 24);
 
-        panelfileLabel.setBounds(200, margin + 210, 160, 20);
+        panelPrefixLabel.setBounds(480, margin + 210, 70, 20);
+        panelfileLabel.setBounds(550, margin + 210, 280, 20);
 
-        configfileLabel.setBounds(200, margin + 230, 160, 20);
+        configPrefixLabel.setBounds(480, margin + 230, 70, 20);
+        configfileLabel.setBounds(550, margin + 230, 280, 20);
 
         statusLabel.setBounds(1180, margin + 200, 250, 20);
     }
@@ -5815,9 +5832,12 @@ private:
     TextButton toHelp{ "To Help" };
     TextButton toUpperKBD{ "To Upper" };
     TextButton toLowerKBD{ "To Lower" };
+    TextButton toBassKBD{ "To Bass" };
     TextButton toConfig{ "To Config" };
 
+    Label panelPrefixLabel{ "Panel Prefix", "Panel:" };
     Label panelfileLabel{ "Panel File" ,  "Panel File" };
+    Label configPrefixLabel{ "Config Prefix", "Config:" };
     Label configfileLabel { "Config File",  "Config File" };
     Label statusLabel{ "" };
 
