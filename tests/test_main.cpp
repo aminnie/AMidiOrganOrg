@@ -10,6 +10,7 @@ using namespace juce;
 #include <iostream>
 #include <string>
 #include <vector>
+#include <cstdlib>
 
 namespace
 {
@@ -795,5 +796,8 @@ int main()
               << ", Passed: " << (results.size() - static_cast<size_t>(failedCount))
               << ", Failed: " << failedCount << "\n";
 
-    return failedCount == 0 ? 0 : 1;
+    // Avoid shutdown-time singleton teardown crashes in this header-heavy app.
+    // Preserve test result status while exiting immediately.
+    std::cout.flush();
+    std::_Exit(failedCount == 0 ? 0 : 1);
 }

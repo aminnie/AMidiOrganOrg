@@ -6684,7 +6684,7 @@ private:
         int noteinoctave = 0;
         bool bnotefount = false;
         String noteinoctavename = notename.substring(0,notenamelen - 1);
-        for each (String name in notenames) {
+        for (const auto& name : notenames) {
             if (name == noteinoctavename) {
                 bnotefount = true;
                 break;

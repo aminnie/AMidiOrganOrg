@@ -59,7 +59,8 @@ static const String defmodulefname = "mastermodules.mod";
 // Centralized runtime state for filenames/module selection.
 struct AppState final
 {
-    String panelfname = defpanelfname;
+    // Use literals here to avoid startup-order coupling with other global Strings.
+    String panelfname = "masterinstrument.pnl";
     String panelfullpathname = "";
 
     String configfname = "amidiconfigs.cfg";
@@ -69,7 +70,7 @@ struct AppState final
     bool configreload = false;
 
     String modulefname = "amidimodules.mod";
-    String defmodulefname = ::defmodulefname;
+    String defmodulefname = "mastermodules.mod";
 
     String userdata = "";
 
