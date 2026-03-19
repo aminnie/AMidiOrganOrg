@@ -1525,7 +1525,6 @@ private:
         label.setColour(TextEditor::textColourId, Colours::white);
         label.setColour(TextEditor::backgroundColourId, Colour(0x00000000));
 
-        components.add(&label);
         addAndMakeVisible(&label);
     }
 
@@ -2126,7 +2125,6 @@ private:
         label.setColour(TextEditor::textColourId, Colours::white);
         label.setColour(TextEditor::backgroundColourId, Colour(0x00000000));
 
-        components.add(&label);
         addAndMakeVisible(&label);
     }
 
@@ -4755,7 +4753,7 @@ private:
     bool g3uppermute = false;
     bool g4uppermute = false;
 
-    OwnedArray<PresetButton> presetbuttons;
+    Array<PresetButton*> presetbuttons;
     bool bsetpreset = false;
 
     bool isPanelSavePending() const
@@ -6327,7 +6325,7 @@ public:
         lblDefaultEffectsVol.setText("Default Effects Vol", {});
 
         addAndMakeVisible(txtDefaultEffectsVol);
-        txtDefaultEffectsVol.setBounds(1315, 50, 60, 24);
+        txtDefaultEffectsVol.setBounds(1280, 50, 60, 24);
         txtDefaultEffectsVol.setText(std::to_string(appState.defaultEffectsVol));
         txtDefaultEffectsVol.onFocusLost = [=]() {
             const int val = txtDefaultEffectsVol.getText().getIntValue();
