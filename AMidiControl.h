@@ -319,6 +319,14 @@ struct ButtonGroup final : Component
         activevoicebutton = panelbuttonidx;
     }
 
+    int getMasterVolStep() {
+        return mastervolstep;
+    }
+
+    void setMasterVolStep(int sliderstep) {
+        mastervolstep = juce::jlimit(0, 10, sliderstep);
+    }
+
     // Track Velocity in Button Group
     bool getVelocityButtonStatus() {
         return velocity;
@@ -390,6 +398,7 @@ struct ButtonGroup final : Component
     String splitoutname = "--";
 
     int cureffectval[10] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+    int mastervolstep = 8;
 
     int activevoicebutton = 0;
     Component::SafePointer<MuteButton>mutebuttonptr;
@@ -549,6 +558,8 @@ public:
                 instrument.setFont(midiinstruments->getFont(instrumentgroup, voiceidx + 1));
                 instrument.setVoice(midiinstruments->getVoice(instrumentgroup, voiceidx + 1));
             }
+
+            instrument.setVol(appState.defaultEffectsVol);
 
             instrument.setChannel(buttongroupmidiout);
             instrument.setButtonIdx(panelbuttonidx);
@@ -1599,7 +1610,18 @@ public:
                 int sval = (int)slvol->getValue();
                 changeEffect(panelbuttonidx, CCVol, sval);
 
-                auto ccMessage = juce::MidiMessage::controllerEvent(buttongroupmidiout, CCVol, sval);
+                const int panelgroup = lookupPanelGroup(panelbuttonidx);
+                auto* selectedButtonGroup = instrumentpanel->getButtonGroup(panelgroup);
+                const int masterCc7 = sliderStepToMasterCc7(selectedButtonGroup->getMasterVolStep());
+                const int effectiveCc7 = selectedButtonGroup->getMuteButtonStatus()
+                    ? 0
+                    : computeEffectiveVolumeCc7(masterCc7, sval, getAppState().defaultEffectsVol);
+
+                // Compare against last sent group-level CC7, not raw per-voice Effects Vol.
+                if (!selectedButtonGroup->isEffectDirty(0, effectiveCc7))
+                    return;
+
+                auto ccMessage = juce::MidiMessage::controllerEvent(buttongroupmidiout, CCVol, effectiveCc7);
                 ccMessage.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
                 mididevices->sendToOutputs(ccMessage);
             };
@@ -2245,7 +2267,7 @@ struct KeyboardPanelPage final : public Component,
         //statusLabel->setColour(juce::Label::backgroundColourId, juce::Colours::black);
         statusLabel->setColour(juce::Label::textColourId, juce::Colours::grey);
         statusLabel->setJustificationType(juce::Justification::left);
-        statusLabel->setBounds(1250, 210, 200, 20);
+        statusLabel->setBounds(1250, 185, 200, 20);
 
         int g1width, g2width, g3width, g4width;
         int g1widthfull;
@@ -2405,25 +2427,10 @@ struct KeyboardPanelPage final : public Component,
 
                         //---------------------------------------------------------
                         // Only send Effects if they have been modified in this app
-                        // Set the Button Group volume slider to newly selected voice anyway.
-                        g1uppernvol = instrument.getVol();
-                        g1svol->setValue(((int)instrument.getVol() / 12.8));
-
-                        // Send Vol, or send 0 if Button Group is muted
-                        if (ptrbuttongroup->isEffectDirty(0, instrument.getVol()) == true) {
-                            //if ((isdirty & MAPVOL) || (buttongroupismuted)) {
-                            int channelvolume = instrument.getVol();
-                            if (buttongroupismuted) channelvolume = 0;
-
-                            controllerNumber = CCVol;
-                            ccMessage = juce::MidiMessage::controllerEvent(
-                                buttongroupmidiout,
-                                controllerNumber,
-                                channelvolume
-                            );
-                            ccMessage.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
-                            mididevices->sendToOutputs(ccMessage);
-                        }
+                        const int channelvolume = computeEffectiveCc7ForButton(ptrbuttongroup, g1svol, panelbuttonidx);
+                        updateVolumeSliderDebugText(g1svol, channelvolume);
+                        sendCombinedGroupVolume(ptrbuttongroup, buttongroupmidiout, channelvolume);
+                        updateVolumeStatusLine(statusLabel, buttongroupname, g1svol->getValue(), channelvolume);
 
                         // Send Exp
                         if (ptrbuttongroup->isEffectDirty(1, instrument.getExp())) {
@@ -2556,24 +2563,17 @@ struct KeyboardPanelPage final : public Component,
             g1svol->setTextBoxStyle(Slider::NoTextBox, false, 0, 0);
             g1svol->setBounds(g1xoffset + mgroup + (cbuttonsdisplayed / rbuttons) * bwidth + mgroup, ygroup + mgroup * 2, 20, mgroup + bheight * rbuttons + sbheight);
             g1svol->setPopupDisplayEnabled(true, true, this);
-            g1svol->setTextValueSuffix(" Vol");
-            g1svol->setValue(7);
-            g1uppernvol = 7 * 120 / 10;
+            g1svol->setValue(ptrbuttongroup->getMasterVolStep());
             g1svol->onValueChange = [=]()
                 {
-                    int svol = (int)g1svol->getValue();
+                    ButtonGroup* selectedButtonGroup = instrumentpanel->getButtonGroup(buttongroupidx);
+                    selectedButtonGroup->setMasterVolStep((int)g1svol->getValue());
 
-                    g1uppernvol = (svol * 120 / 10);
-                    auto ccMessage = juce::MidiMessage::controllerEvent(buttongroupmidiout, 7, g1uppernvol);
-                    ccMessage.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
-                    mididevices->sendToOutputs(ccMessage);
-
-                    // To do: Which one to use
-                    //ccMessage.setTimeStamp(juce::Time::getMillisecondCounterHiRes() * 0.001 - startTime);
-                    //addMessageToList(message);
-
-                    //String strstatus = "Sound Group: " + juce::String(bgroup) + ", Vol: " + juce::String(svol);
-                    //statusLabel->setText(strstatus, juce::dontSendNotification);
+                    const int activeButtonIdx = selectedButtonGroup->getActiveVoiceButton();
+                    const int effectiveCc7 = computeEffectiveCc7ForButton(selectedButtonGroup, g1svol, activeButtonIdx);
+                    updateVolumeSliderDebugText(g1svol, effectiveCc7);
+                    sendCombinedGroupVolume(selectedButtonGroup, buttongroupmidiout, effectiveCc7);
+                    updateVolumeStatusLine(statusLabel, buttongroupname, g1svol->getValue(), effectiveCc7);
                 };
 
             // Slider Volume up and down buttons
@@ -2620,7 +2620,6 @@ struct KeyboardPanelPage final : public Component,
 
                         g1tbmute->setButtonText("Muted");
 
-                        g1uppernvol = (int)(g1svol->getValue() * 120 / 10);
                         auto ccMessage = juce::MidiMessage::controllerEvent(buttongroupmidiout, 7, 0);
                         // To do: Which one to use
                         //ccMessage.setTimeStamp(juce::Time::getMillisecondCounterHiRes() * 0.001 - startTime);
@@ -2632,6 +2631,9 @@ struct KeyboardPanelPage final : public Component,
 
                         ButtonGroup* ptrbuttongroup = instrumentpanel->getButtonGroup(buttongroupidx);
                         ptrbuttongroup->setMuteButtonStatus(true);
+                        ptrbuttongroup->isEffectDirty(0, 0);
+                        updateVolumeSliderDebugText(g1svol, 0);
+                        updateVolumeStatusLine(statusLabel, buttongroupname, g1svol->getValue(), 0);
                         applyMutedGroupVisualCue(ptrbuttongroup, true);
                         g1uppermute = true;
                     }
@@ -2639,16 +2641,17 @@ struct KeyboardPanelPage final : public Component,
 
                         g1tbmute->setButtonText("Mute");
 
-                        auto ccMessage = juce::MidiMessage::controllerEvent(buttongroupmidiout, 7, g1uppernvol);
-                        ccMessage.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
-                        mididevices->sendToOutputs(ccMessage);
-
-                        g1svol->setEnabled(true);
-                        setArrowButtonsMutedState(g1bvup, g1bvdwn, false);
-
                         ButtonGroup* ptrbuttongroup = instrumentpanel->getButtonGroup(buttongroupidx);
                         ptrbuttongroup->setMuteButtonStatus(false);
                         applyMutedGroupVisualCue(ptrbuttongroup, false);
+                        g1svol->setEnabled(true);
+                        setArrowButtonsMutedState(g1bvup, g1bvdwn, false);
+
+                        const int activeButtonIdx = ptrbuttongroup->getActiveVoiceButton();
+                        const int effectiveCc7 = computeEffectiveCc7ForButton(ptrbuttongroup, g1svol, activeButtonIdx);
+                        updateVolumeSliderDebugText(g1svol, effectiveCc7);
+                        sendCombinedGroupVolume(ptrbuttongroup, buttongroupmidiout, effectiveCc7);
+                        updateVolumeStatusLine(statusLabel, buttongroupname, g1svol->getValue(), effectiveCc7);
                         g1uppermute = false;
                     }
 
@@ -2808,28 +2811,10 @@ struct KeyboardPanelPage final : public Component,
 
                         //---------------------------------------------------------
                         // Only send Effects if they have been modified in this app
-
-                        g2uppernvol = instrument.getVol();
-                        g2svol->setValue(((int)instrument.getVol() / 12.8));
-
-                        // Send Vol, or send 0 if Button Group is muted
-                        if (ptrbuttongroup->isEffectDirty(0, instrument.getVol()) == true) {
-                            //if ((isdirty & MAPVOL) || (buttongroupismuted)) {
-                            int channelvolume = instrument.getVol();
-                            if (buttongroupismuted) channelvolume = 0;
-
-                            if (ptrbuttongroup->isEffectDirty(0, channelvolume)) {
-                                controllerNumber = CCVol;
-                                ccMessage = juce::MidiMessage::controllerEvent(
-                                    buttongroupmidiout,
-                                    controllerNumber,
-                                    channelvolume
-                                );
-                                ccMessage.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
-                                mididevices->sendToOutputs(ccMessage);
-                            }
-
-                        }
+                        const int channelvolume = computeEffectiveCc7ForButton(ptrbuttongroup, g2svol, panelbuttonidx);
+                        updateVolumeSliderDebugText(g2svol, channelvolume);
+                        sendCombinedGroupVolume(ptrbuttongroup, buttongroupmidiout, channelvolume);
+                        updateVolumeStatusLine(statusLabel, buttongroupname, g2svol->getValue(), channelvolume);
 
                         // Send Exp
                         if (ptrbuttongroup->isEffectDirty(1, instrument.getExp())) {
@@ -2962,24 +2947,17 @@ struct KeyboardPanelPage final : public Component,
             g2svol->setTextBoxStyle(Slider::NoTextBox, false, 0, 0);
             g2svol->setBounds(g2xoffset + mgroup + col * bwidth + mgroup, ygroup + mgroup * 2, 20, mgroup + bheight * rbuttons + sbheight);
             g2svol->setPopupDisplayEnabled(true, true, this);
-            g2svol->setTextValueSuffix(" Vol");
-            g2svol->setValue(7);
-            g2uppernvol = 7 * 120 / 10;
+            g2svol->setValue(ptrbuttongroup->getMasterVolStep());
             g2svol->onValueChange = [=]()
                 {
-                    int svol = (int)g2svol->getValue();
+                    ButtonGroup* selectedButtonGroup = instrumentpanel->getButtonGroup(buttongroupidx);
+                    selectedButtonGroup->setMasterVolStep((int)g2svol->getValue());
 
-                    g2uppernvol = (svol * 120 / 10);
-                    auto ccMessage = juce::MidiMessage::controllerEvent(buttongroupmidiout, 7, g2uppernvol);
-                    ccMessage.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
-                    mididevices->sendToOutputs(ccMessage);
-
-                    // To do: Which one to use
-                    //ccMessage.setTimeStamp(juce::Time::getMillisecondCounterHiRes() * 0.001 - startTime);
-                    //addMessageToList(message);
-
-                    //String strstatus = "Sound Group: " + juce::String(bgroup) + ", Vol: " + juce::String(svol);
-                    //statusLabel->setText(strstatus, juce::dontSendNotification);
+                    const int activeButtonIdx = selectedButtonGroup->getActiveVoiceButton();
+                    const int effectiveCc7 = computeEffectiveCc7ForButton(selectedButtonGroup, g2svol, activeButtonIdx);
+                    updateVolumeSliderDebugText(g2svol, effectiveCc7);
+                    sendCombinedGroupVolume(selectedButtonGroup, buttongroupmidiout, effectiveCc7);
+                    updateVolumeStatusLine(statusLabel, buttongroupname, g2svol->getValue(), effectiveCc7);
                 };
 
             // Slider Volume up and down buttons
@@ -3020,7 +2998,6 @@ struct KeyboardPanelPage final : public Component,
 
                         g2tbmute->setButtonText("Muted");
 
-                        g2uppernvol = (int)(g2svol->getValue() * 120 / 10);
                         auto ccMessage = juce::MidiMessage::controllerEvent(buttongroupmidiout, 7, 0);
                         // To do: Which one to use
                         //ccMessage.setTimeStamp(juce::Time::getMillisecondCounterHiRes() * 0.001 - startTime);
@@ -3032,6 +3009,9 @@ struct KeyboardPanelPage final : public Component,
 
                         ButtonGroup* ptrbuttongroup = instrumentpanel->getButtonGroup(buttongroupidx);
                         ptrbuttongroup->setMuteButtonStatus(true);
+                        ptrbuttongroup->isEffectDirty(0, 0);
+                        updateVolumeSliderDebugText(g2svol, 0);
+                        updateVolumeStatusLine(statusLabel, buttongroupname, g2svol->getValue(), 0);
                         applyMutedGroupVisualCue(ptrbuttongroup, true);
                         g2uppermute = true;
                     }
@@ -3039,16 +3019,17 @@ struct KeyboardPanelPage final : public Component,
 
                         g2tbmute->setButtonText("Mute");
 
-                        auto ccMessage = juce::MidiMessage::controllerEvent(buttongroupmidiout, 7, g2uppernvol);
-                        ccMessage.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
-                        mididevices->sendToOutputs(ccMessage);
-
-                        g2svol->setEnabled(true);
-                        setArrowButtonsMutedState(g2bvup, g2bvdwn, false);
-
                         ButtonGroup* ptrbuttongroup = instrumentpanel->getButtonGroup(buttongroupidx);
                         ptrbuttongroup->setMuteButtonStatus(false);
                         applyMutedGroupVisualCue(ptrbuttongroup, false);
+                        g2svol->setEnabled(true);
+                        setArrowButtonsMutedState(g2bvup, g2bvdwn, false);
+
+                        const int activeButtonIdx = ptrbuttongroup->getActiveVoiceButton();
+                        const int effectiveCc7 = computeEffectiveCc7ForButton(ptrbuttongroup, g2svol, activeButtonIdx);
+                        updateVolumeSliderDebugText(g2svol, effectiveCc7);
+                        sendCombinedGroupVolume(ptrbuttongroup, buttongroupmidiout, effectiveCc7);
+                        updateVolumeStatusLine(statusLabel, buttongroupname, g2svol->getValue(), effectiveCc7);
                         g2uppermute = false;
                     }
 
@@ -3210,24 +3191,10 @@ struct KeyboardPanelPage final : public Component,
 
                         //---------------------------------------------------------
                         // Only send Effects if they have been modified in this app
-                        g3uppernvol = instrument.getVol();
-                        g3svol->setValue(((int)instrument.getVol() / 12.8));
-
-                        // Send Vol, or send 0 if Button Group is muted
-                        if (ptrbuttongroup->isEffectDirty(0, instrument.getVol()) == true) {
-                            //if ((isdirty & MAPVOL) || (buttongroupismuted)) {
-                            int channelvolume = instrument.getVol();
-                            if (buttongroupismuted) channelvolume = 0;
-
-                            controllerNumber = CCVol;
-                            ccMessage = juce::MidiMessage::controllerEvent(
-                                buttongroupmidiout,
-                                controllerNumber,
-                                channelvolume
-                            );
-                            ccMessage.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
-                            mididevices->sendToOutputs(ccMessage);
-                        }
+                        const int channelvolume = computeEffectiveCc7ForButton(ptrbuttongroup, g3svol, panelbuttonidx);
+                        updateVolumeSliderDebugText(g3svol, channelvolume);
+                        sendCombinedGroupVolume(ptrbuttongroup, buttongroupmidiout, channelvolume);
+                        updateVolumeStatusLine(statusLabel, buttongroupname, g3svol->getValue(), channelvolume);
 
                         // Send Exp
                         if (ptrbuttongroup->isEffectDirty(1, instrument.getExp()) == true) {
@@ -3360,24 +3327,17 @@ struct KeyboardPanelPage final : public Component,
             g3svol->setTextBoxStyle(Slider::NoTextBox, false, 0, 0);
             g3svol->setBounds(g3xoffset + mgroup + col * bwidth + mgroup, ygroup + mgroup * 2, 20, mgroup + bheight * rbuttons + sbheight);
             g3svol->setPopupDisplayEnabled(true, true, this);
-            g3svol->setTextValueSuffix(" Vol");
-            g3svol->setValue(7);
-            g3uppernvol = 7 * 120 / 10;
+            g3svol->setValue(ptrbuttongroup->getMasterVolStep());
             g3svol->onValueChange = [=]()
                 {
-                    int svol = (int)g3svol->getValue();
+                    ButtonGroup* selectedButtonGroup = instrumentpanel->getButtonGroup(buttongroupidx);
+                    selectedButtonGroup->setMasterVolStep((int)g3svol->getValue());
 
-                    g3uppernvol = (svol * 120 / 10);
-                    auto ccMessage = juce::MidiMessage::controllerEvent(buttongroupmidiout, 7, g3uppernvol);
-                    ccMessage.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
-                    mididevices->sendToOutputs(ccMessage);
-
-                    // To do: Which one to use
-                    //ccMessage.setTimeStamp(juce::Time::getMillisecondCounterHiRes() * 0.001 - startTime);
-                    //addMessageToList(message);
-
-                    //String strstatus = "Sound Group: " + juce::String(bgroup) + ", Vol: " + juce::String(svol);
-                    //statusLabel->setText(strstatus, juce::dontSendNotification);
+                    const int activeButtonIdx = selectedButtonGroup->getActiveVoiceButton();
+                    const int effectiveCc7 = computeEffectiveCc7ForButton(selectedButtonGroup, g3svol, activeButtonIdx);
+                    updateVolumeSliderDebugText(g3svol, effectiveCc7);
+                    sendCombinedGroupVolume(selectedButtonGroup, buttongroupmidiout, effectiveCc7);
+                    updateVolumeStatusLine(statusLabel, buttongroupname, g3svol->getValue(), effectiveCc7);
                 };
 
             // Slider Volume up and down buttons
@@ -3418,7 +3378,6 @@ struct KeyboardPanelPage final : public Component,
 
                         g3tbmute->setButtonText("Muted");
 
-                        g3uppernvol = (int)(g3svol->getValue() * 120 / 10);
                         auto ccMessage = juce::MidiMessage::controllerEvent(buttongroupmidiout, 7, 0);
                         // To do: Which one to use
                         //ccMessage.setTimeStamp(juce::Time::getMillisecondCounterHiRes() * 0.001 - startTime);
@@ -3430,6 +3389,9 @@ struct KeyboardPanelPage final : public Component,
 
                         ButtonGroup* ptrbuttongroup = instrumentpanel->getButtonGroup(buttongroupidx);
                         ptrbuttongroup->setMuteButtonStatus(true);
+                        ptrbuttongroup->isEffectDirty(0, 0);
+                        updateVolumeSliderDebugText(g3svol, 0);
+                        updateVolumeStatusLine(statusLabel, buttongroupname, g3svol->getValue(), 0);
                         applyMutedGroupVisualCue(ptrbuttongroup, true);
                         g3uppermute = true;
                     }
@@ -3437,16 +3399,17 @@ struct KeyboardPanelPage final : public Component,
 
                         g3tbmute->setButtonText("Mute");
 
-                        auto ccMessage = juce::MidiMessage::controllerEvent(buttongroupmidiout, 7, g3uppernvol);
-                        ccMessage.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
-                        mididevices->sendToOutputs(ccMessage);
-
-                        g3svol->setEnabled(true);
-                        setArrowButtonsMutedState(g3bvup, g3bvdwn, false);
-
                         ButtonGroup* ptrbuttongroup = instrumentpanel->getButtonGroup(buttongroupidx);
                         ptrbuttongroup->setMuteButtonStatus(false);
                         applyMutedGroupVisualCue(ptrbuttongroup, false);
+                        g3svol->setEnabled(true);
+                        setArrowButtonsMutedState(g3bvup, g3bvdwn, false);
+
+                        const int activeButtonIdx = ptrbuttongroup->getActiveVoiceButton();
+                        const int effectiveCc7 = computeEffectiveCc7ForButton(ptrbuttongroup, g3svol, activeButtonIdx);
+                        updateVolumeSliderDebugText(g3svol, effectiveCc7);
+                        sendCombinedGroupVolume(ptrbuttongroup, buttongroupmidiout, effectiveCc7);
+                        updateVolumeStatusLine(statusLabel, buttongroupname, g3svol->getValue(), effectiveCc7);
                         g3uppermute = false;
                     }
 
@@ -3618,24 +3581,10 @@ struct KeyboardPanelPage final : public Component,
 
                         //---------------------------------------------------------
                         // Only send Effects if they have been modified in this app
-                        g4uppernvol = instrument.getVol();
-                        g4svol->setValue(((int)instrument.getVol() / 12.8));
-
-                        // Send Vol, or send 0 if Button Group is muted
-                        if (selectedButtonGroup->isEffectDirty(0, instrument.getVol()) == true) {
-                            //if ((isdirty & MAPVOL) || (buttongroupismuted)) {
-                            int channelvolume = instrument.getVol();
-                            if (buttongroupismuted) channelvolume = 0;
-
-                            controllerNumber = CCVol;
-                            ccMessage = juce::MidiMessage::controllerEvent(
-                                buttongroupmidiout,
-                                controllerNumber,
-                                channelvolume
-                            );
-                            ccMessage.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
-                            mididevices->sendToOutputs(ccMessage);
-                        }
+                        const int channelvolume = computeEffectiveCc7ForButton(selectedButtonGroup, g4svol, panelbuttonidx);
+                        updateVolumeSliderDebugText(g4svol, channelvolume);
+                        sendCombinedGroupVolume(selectedButtonGroup, buttongroupmidiout, channelvolume);
+                        updateVolumeStatusLine(statusLabel, buttongroupname, g4svol->getValue(), channelvolume);
 
                         // Send Exp
                         if (selectedButtonGroup->isEffectDirty(1, instrument.getExp()) == true) {
@@ -3768,24 +3717,17 @@ struct KeyboardPanelPage final : public Component,
             g4svol->setTextBoxStyle(Slider::NoTextBox, false, 0, 0);
             g4svol->setBounds(g4xoffset + mgroup + col * bwidth + mgroup, ygroup + mgroup * 2, 20, mgroup + bheight * rbuttons + sbheight);
             g4svol->setPopupDisplayEnabled(true, true, this);
-            g4svol->setTextValueSuffix(" Vol");
-            g4svol->setValue(7);
-            g4uppernvol = 7 * 120 / 10;
+            g4svol->setValue(ptrbuttongroup->getMasterVolStep());
             g4svol->onValueChange = [=]()
                 {
-                    int svol = (int)g4svol->getValue();
+                    ButtonGroup* selectedButtonGroup = instrumentpanel->getButtonGroup(buttongroupidx);
+                    selectedButtonGroup->setMasterVolStep((int)g4svol->getValue());
 
-                    g4uppernvol = (svol * 120 / 10);
-                    auto ccMessage = juce::MidiMessage::controllerEvent(buttongroupmidiout, 7, g4uppernvol);
-                    ccMessage.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
-                    mididevices->sendToOutputs(ccMessage);
-
-                    // To do: Which one to use
-                    //ccMessage.setTimeStamp(juce::Time::getMillisecondCounterHiRes() * 0.001 - startTime);
-                    //addMessageToList(message);
-
-                    //String strstatus = "Sound Group: " + juce::String(bgroup) + ", Vol: " + juce::String(svol);
-                    //statusLabel->setText(strstatus, juce::dontSendNotification);
+                    const int activeButtonIdx = selectedButtonGroup->getActiveVoiceButton();
+                    const int effectiveCc7 = computeEffectiveCc7ForButton(selectedButtonGroup, g4svol, activeButtonIdx);
+                    updateVolumeSliderDebugText(g4svol, effectiveCc7);
+                    sendCombinedGroupVolume(selectedButtonGroup, buttongroupmidiout, effectiveCc7);
+                    updateVolumeStatusLine(statusLabel, buttongroupname, g4svol->getValue(), effectiveCc7);
                 };
 
             // Slider Volume up and down buttons
@@ -3826,7 +3768,6 @@ struct KeyboardPanelPage final : public Component,
 
                         g4tbmute->setButtonText("Muted");
 
-                        g4uppernvol = (int)(g4svol->getValue() * 120 / 10);
                         auto ccMessage = juce::MidiMessage::controllerEvent(buttongroupmidiout, 7, 0);
                         // To do: Which one to use
                         //ccMessage.setTimeStamp(juce::Time::getMillisecondCounterHiRes() * 0.001 - startTime);
@@ -3838,6 +3779,9 @@ struct KeyboardPanelPage final : public Component,
 
                         ButtonGroup* ptrbuttongroup = instrumentpanel->getButtonGroup(buttongroupidx);
                         ptrbuttongroup->setMuteButtonStatus(true);
+                        ptrbuttongroup->isEffectDirty(0, 0);
+                        updateVolumeSliderDebugText(g4svol, 0);
+                        updateVolumeStatusLine(statusLabel, buttongroupname, g4svol->getValue(), 0);
                         applyMutedGroupVisualCue(ptrbuttongroup, true);
                         g4uppermute = true;
                     }
@@ -3845,16 +3789,17 @@ struct KeyboardPanelPage final : public Component,
 
                         g4tbmute->setButtonText("Mute");
 
-                        auto ccMessage = juce::MidiMessage::controllerEvent(buttongroupmidiout, 7, g4uppernvol);
-                        ccMessage.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
-                        mididevices->sendToOutputs(ccMessage);
-
-                        g4svol->setEnabled(true);
-                        setArrowButtonsMutedState(g4bvup, g4bvdwn, false);
-
                         ButtonGroup* ptrbuttongroup = instrumentpanel->getButtonGroup(buttongroupidx);
                         ptrbuttongroup->setMuteButtonStatus(false);
                         applyMutedGroupVisualCue(ptrbuttongroup, false);
+                        g4svol->setEnabled(true);
+                        setArrowButtonsMutedState(g4bvup, g4bvdwn, false);
+
+                        const int activeButtonIdx = ptrbuttongroup->getActiveVoiceButton();
+                        const int effectiveCc7 = computeEffectiveCc7ForButton(ptrbuttongroup, g4svol, activeButtonIdx);
+                        updateVolumeSliderDebugText(g4svol, effectiveCc7);
+                        sendCombinedGroupVolume(ptrbuttongroup, buttongroupmidiout, effectiveCc7);
+                        updateVolumeStatusLine(statusLabel, buttongroupname, g4svol->getValue(), effectiveCc7);
                         g4uppermute = false;
                     }
 
@@ -4806,13 +4751,9 @@ private:
     int gmidichan = 1;
 
     bool g1uppermute = false;
-    int g1uppernvol = 0;
     bool g2uppermute = false;
-    int g2uppernvol = 0;
     bool g3uppermute = false;
-    int g3uppernvol = 0;
     bool g4uppermute = false;
-    int g4uppernvol = 0;
 
     OwnedArray<PresetButton> presetbuttons;
     bool bsetpreset = false;
@@ -4911,8 +4852,53 @@ private:
 
         s->setRange(0.0, 10.0, 1.0);
         s->setPopupMenuEnabled(true);
-        s->setValue(Random::getSystemRandom().nextDouble() * 7.0, dontSendNotification);
+        s->setValue(8.0, dontSendNotification);
+        updateVolumeSliderDebugText(s, sliderStepToMasterCc7(8));
         return s;
+    }
+
+    int computeEffectiveCc7ForButton(ButtonGroup* buttonGroup, Slider* groupSlider, int panelbtnidx) const
+    {
+        if (buttonGroup == nullptr || groupSlider == nullptr)
+            return 0;
+
+        auto* voiceButton = instrumentpanel->getVoiceButton(panelbtnidx);
+        if (voiceButton == nullptr)
+            return 0;
+
+        const int masterCc7 = sliderStepToMasterCc7((int)groupSlider->getValue());
+        const int effectVol = voiceButton->getInstrument().getVol();
+        const int effectiveCc7 = computeEffectiveVolumeCc7(masterCc7, effectVol, appState.defaultEffectsVol);
+        return buttonGroup->getMuteButtonStatus() ? 0 : effectiveCc7;
+    }
+
+    void sendCombinedGroupVolume(ButtonGroup* buttonGroup, int midiOut, int effectiveCc7)
+    {
+        if (buttonGroup == nullptr)
+            return;
+
+        const int clampedCc7 = juce::jlimit(0, 127, effectiveCc7);
+        if (!buttonGroup->isEffectDirty(0, clampedCc7))
+            return;
+
+        auto ccMessage = juce::MidiMessage::controllerEvent(midiOut, CCVol, clampedCc7);
+        ccMessage.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
+        mididevices->sendToOutputs(ccMessage);
+    }
+
+    void updateVolumeSliderDebugText(Slider* slider, int effectiveCc7) const
+    {
+        if (slider == nullptr)
+            return;
+
+        slider->setTextValueSuffix(" / CC7 " + juce::String(juce::jlimit(0, 127, effectiveCc7)));
+    }
+
+    void updateVolumeStatusLine(Label* label, const String& groupName, double sliderVal, int effectiveCc7) const
+    {
+        if (label == nullptr)
+            return;
+        label->setText(groupName + " " + String((int)sliderVal) + "→" + String(effectiveCc7), dontSendNotification);
     }
 
     static juce::String getMidiMessageDescription(const juce::MidiMessage& m)
@@ -6336,6 +6322,25 @@ public:
             juce::Logger::outputDebugString("Velocity changed to " + stateString);
         };
 
+        addAndMakeVisible(lblDefaultEffectsVol);
+        lblDefaultEffectsVol.setBounds(1150, 50, 160, 24);
+        lblDefaultEffectsVol.setText("Default Effects Vol", {});
+
+        addAndMakeVisible(txtDefaultEffectsVol);
+        txtDefaultEffectsVol.setBounds(1315, 50, 60, 24);
+        txtDefaultEffectsVol.setText(std::to_string(appState.defaultEffectsVol));
+        txtDefaultEffectsVol.onFocusLost = [=]() {
+            const int val = txtDefaultEffectsVol.getText().getIntValue();
+            if (val < 1 || val > 127) {
+                txtDefaultEffectsVol.setText(std::to_string(appState.defaultEffectsVol), false);
+                saveButton.setEnabled(false);
+                return;
+            }
+
+            appState.defaultEffectsVol = val;
+            saveButton.setEnabled(true);
+        };
+
         addAndMakeVisible(loadConfigButton);
         loadConfigButton.setButtonText("Load");
         loadConfigButton.setColour(TextButton::textColourOffId, Colours::white);
@@ -6639,9 +6644,9 @@ private:
     ComboBox comboConfig{ "ConfigCombo" };
     GroupComponent group{ "group", "Button Group Configs" };
     juce::TextButton SoundModule;
-    juce::TextEditor txtGroupName, txtMidiIn, txtMidiOut, txtSplit, txtOctave;
+    juce::TextEditor txtGroupName, txtMidiIn, txtMidiOut, txtSplit, txtOctave, txtDefaultEffectsVol;
     juce::Label lblKeyboard, lblGroupName, lblButtonCount, lblMidiIn, lblMidiOut, lblSplit, lblOctave;
-    juce::Label lblPassthrough,lblVelocity, lblconfigfile, label11, label31;
+    juce::Label lblPassthrough,lblVelocity, lblDefaultEffectsVol, lblconfigfile, label11, label31;
     juce::ToggleButton togglePassthrough, toggleVelocity;
     juce::TextButton loadConfigButton, saveButton, saveAsButton, resetButton, exitButton;
     juce::TextButton toUpperKBD, toLowerKBD, toBassKBD;
@@ -6802,6 +6807,7 @@ private:
     {
         static Identifier configsType("configs");           // Pre-create an Identifier
         static Identifier buttongroupType("group");         // Child
+        static Identifier defaultEffectsVolType("defaultEffectsVol");
 
         static Identifier indexType("index");               // Child Properties
         static Identifier midikeyboardType("keyboard");
@@ -6821,6 +6827,7 @@ private:
 
         // Configs ValueTree
         ValueTree configsTree(configsType);
+        configsTree.setProperty(defaultEffectsVolType, appState.defaultEffectsVol, nullptr);
 
         for (int i = 0; i < numberbuttongroups; i++) {
             ValueTree vtcfg(buttongroupType);
@@ -6932,6 +6939,7 @@ private:
 
         static Identifier configsType("configs");       // Pre-create an Identifier
         static Identifier buttongroupType("group");     // Child
+        static Identifier defaultEffectsVolType("defaultEffectsVol");
 
         static Identifier indexType("index");           // Child Properties
         static Identifier midikeyboardType("keyboard");
@@ -6958,6 +6966,11 @@ private:
 
         // For testing
         //String vtxml = vtconfigs.toXmlString();
+
+        if (vtconfigs.hasProperty(defaultEffectsVolType))
+            appState.defaultEffectsVol = juce::jlimit(1, 127, (int)vtconfigs.getProperty(defaultEffectsVolType));
+        else
+            appState.defaultEffectsVol = 100;
 
         for (int i = 0; i < numberbuttongroups; i++) {
             ValueTree vtcfg = vtconfigs.getChild(i);
@@ -7058,6 +7071,11 @@ private:
         if (passthroughstate == true) {
             togglePassthrough.setToggleState(true, dontSendNotification);
         }
+        else {
+            togglePassthrough.setToggleState(false, dontSendNotification);
+        }
+
+        txtDefaultEffectsVol.setText(std::to_string(appState.defaultEffectsVol), false);
 
         return true;
     }

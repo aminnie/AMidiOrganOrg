@@ -48,6 +48,7 @@ namespace
         String panelfname;
         String configfname;
         String pnlconfigfname;
+        int defaultEffectsVol = 100;
         bool configreload = false;
     };
 
@@ -60,6 +61,7 @@ namespace
         snapshot.panelfname = state.panelfname;
         snapshot.configfname = state.configfname;
         snapshot.pnlconfigfname = state.pnlconfigfname;
+        snapshot.defaultEffectsVol = state.defaultEffectsVol;
         snapshot.configreload = state.configreload;
         return snapshot;
     }
@@ -72,6 +74,7 @@ namespace
         state.panelfname = snapshot.panelfname;
         state.configfname = snapshot.configfname;
         state.pnlconfigfname = snapshot.pnlconfigfname;
+        state.defaultEffectsVol = snapshot.defaultEffectsVol;
         state.configreload = snapshot.configreload;
     }
 
@@ -124,6 +127,29 @@ namespace
             && expectEqual(check1to16(8), 8, "check1to16(8)", details)
             && expectEqual(check1to16(16), 16, "check1to16(16)", details)
             && expectEqual(check1to16(99), 16, "check1to16(99)", details);
+    }
+
+    bool runVolumeMathHelpers(std::string& details)
+    {
+        if (!expectEqual(sliderStepToMasterCc7(0), 0, "sliderStepToMasterCc7(0)", details) ||
+            !expectEqual(sliderStepToMasterCc7(8), 102, "sliderStepToMasterCc7(8)", details) ||
+            !expectEqual(sliderStepToMasterCc7(10), 127, "sliderStepToMasterCc7(10)", details))
+        {
+            return false;
+        }
+
+        if (!expectEqual(computeEffectiveVolumeCc7(102, 100, 100), 102,
+                         "computeEffectiveVolumeCc7 baseline passthrough", details) ||
+            !expectEqual(computeEffectiveVolumeCc7(102, 50, 100), 51,
+                         "computeEffectiveVolumeCc7 half trim", details) ||
+            !expectEqual(computeEffectiveVolumeCc7(127, 127, 100), 127,
+                         "computeEffectiveVolumeCc7 clamps high", details))
+        {
+            return false;
+        }
+
+        return expectEqual(computeEffectiveVolumeCc7(100, 100, 0), 127,
+                           "computeEffectiveVolumeCc7 guards default denominator", details);
     }
 
     bool runAppStateAliasBackcompat(std::string& details)
@@ -705,6 +731,11 @@ int main()
     {
         std::string details;
         results.push_back({ "check1to16 clamps values", runCheck1to16(details), details });
+    }
+
+    {
+        std::string details;
+        results.push_back({ "Volume helper math and clamping", runVolumeMathHelpers(details), details });
     }
 
     {
