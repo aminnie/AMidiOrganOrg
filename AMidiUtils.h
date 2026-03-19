@@ -66,6 +66,7 @@ struct AppState final
     String configfname = "amidiconfigs.cfg";
     String pnlconfigfname = "amidiconfigs.cfg";
     String configdir = "configs";
+    int defaultEffectsVol = 100;
     bool configchanged = false;
     bool configreload = false;
 
@@ -103,6 +104,7 @@ inline String& panelfullpathname = getAppState().panelfullpathname;
 inline String& configfname = getAppState().configfname;
 inline String& pnlconfigfname = getAppState().pnlconfigfname;
 inline String& configdir = getAppState().configdir;
+inline int& defaultEffectsVol = getAppState().defaultEffectsVol;
 inline bool& configchanged = getAppState().configchanged;
 inline bool& configreload = getAppState().configreload;
 inline String& modulefname = getAppState().modulefname;
@@ -118,6 +120,22 @@ inline String& sdefVoice = getAppState().sdefVoice;
 inline int& sdefMSB = getAppState().sdefMSB;
 inline int& sdefLSB = getAppState().sdefLSB;
 inline int& sdefFont = getAppState().sdefFont;
+
+// Volume model helpers
+static int sliderStepToMasterCc7(int sliderStep)
+{
+    const auto clampedStep = juce::jlimit(0, 10, sliderStep);
+    return juce::jlimit(0, 127, juce::roundToInt((clampedStep / 10.0) * 127.0));
+}
+
+static int computeEffectiveVolumeCc7(int masterCc7, int effectVol, int defaultEffectsVolValue)
+{
+    const auto master = juce::jlimit(0, 127, masterCc7);
+    const auto effect = juce::jlimit(0, 127, effectVol);
+    const auto defaultVol = juce::jmax(1, defaultEffectsVolValue);
+    const auto computed = juce::roundToInt(master * (effect / static_cast<double>(defaultVol)));
+    return juce::jlimit(0, 127, computed);
+}
 
 // To do: Consider moving quick access static Midi in keyboard handler vars below directly 
 // from config classes. Updated during Config save or loads.
