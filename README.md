@@ -3,11 +3,13 @@
 ## Build
 
 ### Prerequisites
+
 - CMake 3.22 or newer
 - JUCE source checkout (for example: `C:/JUCE` on Windows or `./.deps/JUCE` in this repo on macOS)
 - macOS builds: Xcode + Command Line Tools
 
 ### Windows (Visual Studio generator)
+
 From the repository root:
 
 ```powershell
@@ -16,9 +18,11 @@ cmake --build build --config Debug --target AMidiOrgan
 ```
 
 Output executable:
+
 - `build/AMidiOrgan_artefacts/Debug/AMidiOrgan.exe`
 
 ### Run (Windows)
+
 From the repository root:
 
 ```powershell
@@ -37,6 +41,7 @@ Start-Process "build/AMidiOrgan_artefacts/Release/AMidiOrgan.exe"
 ```
 
 ### Test (Windows)
+
 From the repository root:
 
 ```powershell
@@ -48,6 +53,7 @@ ctest --test-dir build -C Debug --output-on-failure
 ```
 
 ### Continuous Integration (GitHub Actions)
+
 - Workflow file: `.github/workflows/ci.yml`
 - Triggers: push to `main`, pull requests targeting `main`, and manual dispatch.
 - Platforms: `windows-latest` and `macos-latest`.
@@ -58,26 +64,28 @@ ctest --test-dir build -C Debug --output-on-failure
   - Build `AMidiOrgan` (Debug build on both platforms).
 
 ### Recommended Manual UI Smoke Test
+
 After a successful build, run this quick checklist (5-10 minutes):
 
 1. Launch the app and open each tab once:
-   - `Start`, `Upper`, `Lower`, `Bass&Drums`, `Sounds`, `Effects`, `Config`, `Help`.
+  - `Start`, `Upper`, `Lower`, `Bass&Drums`, `Sounds`, `Effects`, `Config`, `Help`.
 2. On `Start`:
-   - Load a config file.
-   - Load a panel file.
-   - Confirm panel/config labels update and mismatch coloring behaves as expected.
+  - Load a config file.
+  - Load a panel file.
+  - Confirm panel/config labels update and mismatch coloring behaves as expected.
 3. On `Upper`, `Lower`, and `Bass&Drums`:
-   - Click several voice buttons and confirm active-state behavior.
-   - Use panel `Save` and `Save As`, then reload the saved panel.
+  - Click several voice buttons and confirm active-state behavior.
+  - Use panel `Save` and `Save As`, then reload the saved panel.
 4. On `Sounds` and `Effects`:
-   - Change a voice and a few effect values.
-   - Return to a keyboard tab and confirm state is preserved.
+  - Change a voice and a few effect values.
+  - Return to a keyboard tab and confirm state is preserved.
 5. On `Config`:
-   - Change one mapping value, save, reload, and confirm it persists.
+  - Change one mapping value, save, reload, and confirm it persists.
 6. If MIDI hardware is connected:
-   - Open/close MIDI input and output devices and confirm no crash/hang.
+  - Open/close MIDI input and output devices and confirm no crash/hang.
 
 ### macOS (Xcode generator)
+
 From the repository root:
 
 ```bash
@@ -93,9 +101,11 @@ cmake --build build-mac --config Debug --target AMidiOrgan
 ```
 
 Typical output app bundle:
+
 - `build-mac/Debug/AMidiOrgan.app`
 
 ### macOS Quick Start (Mac mini)
+
 Use this as the repeatable baseline on a dedicated macOS build machine:
 
 ```bash
@@ -120,17 +130,22 @@ open build-mac/AMidiOrgan_artefacts/Debug/AMidiOrgan.app
 ```
 
 Recommended upkeep on a Mac mini:
+
 - Run `git fetch --prune` periodically.
 - Keep builds in `build-mac` only (avoid mixing generators in one build dir).
 - If something looks stale, remove `build-mac` and reconfigure from scratch.
 
 ### Notes
+
 - UI images are packaged from `assets/*.png` via `juce_add_binary_data(...)` in `CMakeLists.txt`.
 - On macOS, `docs/` is copied into `AMidiOrgan.app/Contents/Resources/docs` during build so first-run data seeding works when launching the bundle outside the repo tree.
+- On startup, the app seeds `Documents/AMidiOrgan` from `docs/` on first run, then ensures missing files under `configs/` and `instruments/` are restored on subsequent runs (without overwriting existing user-edited files).
 - On macOS, the current test executable is compiled but runtime execution is temporarily disabled in CTest due a shutdown-time crash; app build validation remains fully enabled.
 
 ### Asset Naming Contract
+
 The following asset filenames are referenced by code through `BinaryData` symbols and should remain stable unless code and CMake are updated together:
+
 - `assets/keyboard.png`
 - `assets/icons8arrowdown32.png`
 - `assets/icons8arrowup32.png`
@@ -140,29 +155,37 @@ The following asset filenames are referenced by code through `BinaryData` symbol
 ## UI Screenshots
 
 ### Start Tab
-![Start Tab](docs/images/tab-start.png)
+
+Start Tab
 
 ### Upper Tab
-![Upper Tab](docs/images/tab-upper.png)
+
+Upper Tab
 
 ### Lower Tab
-![Lower Tab](docs/images/tab-lower.png)
+
+Lower Tab
 
 ### Bass Tab
-![Bass Tab](docs/images/tab-bass.png)
+
+Bass Tab
 
 ### Sounds Tab
-![Sounds Tab](docs/images/tab-sounds.png)
+
+Sounds Tab
 
 ### Effects Tab
-![Effects Tab](docs/images/tab-effects.png)
+
+Effects Tab
 
 ### Config Tab
-![Config Tab](docs/images/tab-config.png)
+
+Config Tab
 
 ## Functional Overview
 
 Supported MIDI hardware and software sound modules:
+
 - Deebach BlackBox
 - Roland Integra7
 - Ketron SD2
@@ -170,11 +193,13 @@ Supported MIDI hardware and software sound modules:
 - Contact developer for additional module support.
 
 ### 1. Voice Buttons
+
 - MIDI instrument sound from loaded device (MSB, LSB, soundfont).
 - Ten MIDI effects (VOL, EXP, REV, CHO, MOD, TIM, ATK, REL, BRI, PAN) applied to the button group MIDI output channel.
 - MIDI sound settings are unique per voice button; effects may differ per button.
 
 ### 2. Voice Button Groups
+
 - A voice button group is a logical grouping of voice buttons.
 - Logical groupings can be changed by the user in the Config page.
 - Each voice button group stores:
@@ -197,6 +222,7 @@ Supported MIDI hardware and software sound modules:
 - To do: adjust Bass/Drums panel to allow all messages on first Drum button group.
 
 ### 3. Instrument Panel
+
 - System supports one instrument panel containing:
   - Upper keyboard panel
   - Lower keyboard panel
@@ -212,6 +238,7 @@ Supported MIDI hardware and software sound modules:
 - To do: make voice button group sizing/count configurable.
 
 ### 4. Presets
+
 - Total presets: 7
   - 1 Manual preset (default on startup)
   - 6 programmable presets
@@ -226,17 +253,20 @@ Supported MIDI hardware and software sound modules:
 - Save instrument panel to persist preset selections to disk.
 
 ### 5. Rotary Button Group
+
 - Available on Upper and Lower keyboard panels.
 - Controls rotor speed (Fast/Slow) and Brake On/Off.
 - Uses internal ramp list at 100 ms intervals for speed transitions.
 - To do: improve synchronization of voice startup fast/slow state.
 
 ### 6. Keyboard Panel
+
 - Each keyboard panel contains four voice button groups.
 - Seven presets are supported per panel (shared preset set across panels).
 - Upper/Lower rotary function is associated with button group 1 (Organ by default).
 
 ### 7. Sounds Edit Page
+
 - Any supported instrument MIDI sound can be selected and programmed into any voice button.
 - Select intended voice button before opening Sounds page.
 - Selected sound is sent on button group MIDI Out channel for demo play.
@@ -244,6 +274,7 @@ Supported MIDI hardware and software sound modules:
 - To do: assess long-term use of JUCE popup menu (mouse-first UX).
 
 ### 8. Effects Edit Page
+
 - Any supported MIDI effect can be programmed into a voice button.
 - Select intended voice button before opening Effects page.
 - Effect changes are applied in real time to the button group MIDI output channel.
@@ -256,6 +287,7 @@ Supported MIDI hardware and software sound modules:
   - consider reading current device effect values as defaults.
 
 ### 9. Config Page
+
 - Configure button group parameters:
   - group name (1..12),
   - MIDI In/Out channel,
@@ -272,6 +304,7 @@ Supported MIDI hardware and software sound modules:
   - add feature to load different instrument JSON files.
 
 ### 10. MIDI Start Page
+
 - MIDI input/output devices are dynamically listed on connect/disconnect.
 - Supports multiple MIDI input keyboards and output devices.
 - Current design assumes one active MIDI sound device at a time.
@@ -284,12 +317,14 @@ Supported MIDI hardware and software sound modules:
 - To do: test Bluetooth connectivity support through JUCE.
 
 ### 11. General
+
 - Built using JUCE and C++.
 - Application can be compiled for multiple operating systems and devices.
 - Current CI validates Windows and macOS builds.
 - Touch panel is supported; mouse/keyboard navigation is optional.
 
 ### 12. Device Support
+
 - MIDI keyboards:
   - Every button group supports MIDI keyboard input and/or shared MIDI In.
   - For dedicated solo keyboard input, set split value to `0` for MIDI Out.
@@ -303,9 +338,12 @@ Supported MIDI hardware and software sound modules:
   - Contact the developer for additional display requests.
 
 ### 13. Up Next
-- Use JUCE to compile/test controller with Raspberry Pi or LattePanda SBC.
+
+- Use JUCE to compile/test controller with Raspberry Pi
   - Goal: cost-effective standalone controller + display without requiring a PC.
 - Add optional hardware support for selected buttons and sliders.
 
 ## Contact Details
+
 - Anton Minnie: `a_minnie@hotmail.com`
+
