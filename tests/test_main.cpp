@@ -11,6 +11,7 @@ using namespace juce;
 #include <string>
 #include <vector>
 #include <cstdlib>
+#include <utility>
 
 namespace
 {
@@ -663,6 +664,292 @@ namespace
         return true;
     }
 
+    bool runMidiDeviceOpenCloseBounds(std::string& details)
+    {
+        auto* devices = MidiDevices::getInstance();
+        if (devices == nullptr)
+        {
+            details = "MidiDevices::getInstance() returned nullptr";
+            return false;
+        }
+
+        const auto oldInputs = devices->midiInputs;
+        const auto oldOutputs = devices->midiOutputs;
+        const int oldMidiViewIdx = devices->midiviewidx;
+
+        devices->midiInputs.clear();
+        devices->midiOutputs.clear();
+        devices->midiviewidx = 255;
+
+        MidiDeviceInfo inInfo;
+        inInfo.identifier = "test-input-missing";
+        inInfo.name = "Test Input";
+        devices->midiInputs.add(new MidiDeviceListEntry(inInfo));
+
+        MidiDeviceInfo outInfo;
+        outInfo.identifier = "test-output-missing";
+        outInfo.name = "Test Output";
+        devices->midiOutputs.add(new MidiDeviceListEntry(outInfo));
+
+        if (!expectEqual(devices->closeDevice(true, 0) ? 1 : 0, 1, "closeDevice input valid index", details) ||
+            !expectEqual(devices->closeDevice(false, 0) ? 1 : 0, 1, "closeDevice output valid index", details))
+        {
+            devices->midiInputs = oldInputs;
+            devices->midiOutputs = oldOutputs;
+            devices->midiviewidx = oldMidiViewIdx;
+            return false;
+        }
+
+        if (!expectEqual(devices->openDevice(true, 999) ? 1 : 0, 0, "openDevice rejects invalid input index", details) ||
+            !expectEqual(devices->openDevice(false, 999) ? 1 : 0, 0, "openDevice rejects invalid output index", details) ||
+            !expectEqual(devices->closeDevice(true, -1) ? 1 : 0, 0, "closeDevice rejects negative input index", details) ||
+            !expectEqual(devices->closeDevice(false, -1) ? 1 : 0, 0, "closeDevice rejects negative output index", details))
+        {
+            devices->midiInputs = oldInputs;
+            devices->midiOutputs = oldOutputs;
+            devices->midiviewidx = oldMidiViewIdx;
+            return false;
+        }
+
+        // Missing test identifiers should fail to open safely without crashing.
+        if (!expectEqual(devices->openDevice(true, 0) ? 1 : 0, 0, "openDevice fails safely for missing input identifier", details) ||
+            !expectEqual(devices->openDevice(false, 0) ? 1 : 0, 0, "openDevice fails safely for missing output identifier", details))
+        {
+            devices->midiInputs = oldInputs;
+            devices->midiOutputs = oldOutputs;
+            devices->midiviewidx = oldMidiViewIdx;
+            return false;
+        }
+
+        devices->midiInputs = oldInputs;
+        devices->midiOutputs = oldOutputs;
+        devices->midiviewidx = oldMidiViewIdx;
+        return true;
+    }
+
+    bool runResetAllControllersEmission(std::string& details)
+    {
+        auto* devices = MidiDevices::getInstance();
+        if (devices == nullptr)
+        {
+            details = "MidiDevices::getInstance() returned nullptr";
+            return false;
+        }
+
+        std::vector<MidiMessage> sentMessages;
+        devices->testSendHook = [&sentMessages](const MidiMessage& message)
+        {
+            sentMessages.push_back(message);
+        };
+
+        devices->resetAllControllers();
+        devices->testSendHook = nullptr;
+
+        if (!expectEqual(static_cast<int>(sentMessages.size()), 32, "resetAllControllers emits 32 messages", details))
+            return false;
+
+        for (int chan = 1; chan <= 16; ++chan)
+        {
+            const auto& resetCc = sentMessages[static_cast<size_t>(chan - 1)];
+            if (!expectEqual(resetCc.getChannel(), chan, "reset CC channel sequencing", details) ||
+                !expectEqual(resetCc.getControllerNumber(), 121, "reset CC controller number", details) ||
+                !expectEqual(resetCc.getControllerValue(), 0, "reset CC value", details))
+            {
+                return false;
+            }
+
+            const auto& allNotesOff = sentMessages[static_cast<size_t>(16 + chan - 1)];
+            if (!expectEqual(allNotesOff.getChannel(), chan, "all-notes-off channel sequencing", details) ||
+                !expectEqual(allNotesOff.getControllerNumber(), 123, "all-notes-off controller number", details) ||
+                !expectEqual(allNotesOff.getControllerValue(), 0, "all-notes-off value", details))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    bool runRewriteSendVelocityAndTranspose(std::string& details)
+    {
+        auto* devices = MidiDevices::getInstance();
+        if (devices == nullptr)
+        {
+            details = "MidiDevices::getInstance() returned nullptr";
+            return false;
+        }
+
+        devices->clearMidiIOMap();
+        std::vector<MidiMessage> sentMessages;
+        devices->testSendHook = [&sentMessages](const MidiMessage& message)
+        {
+            sentMessages.push_back(message);
+        };
+
+        devices->octxpose[5] = 1;
+        devices->velocityout[5] = false;
+
+        const auto noteOn = MidiMessage::noteOn(1, 60, static_cast<juce::uint8>(100));
+        if (!expectEqual(devices->rewriteSendNoteMessage(noteOn, 5) ? 1 : 0, 1, "rewriteSendNoteMessage note-on succeeds", details))
+        {
+            devices->testSendHook = nullptr;
+            return false;
+        }
+
+        if (!expectEqual(static_cast<int>(sentMessages.size()), 1, "one note-on message emitted", details))
+        {
+            devices->testSendHook = nullptr;
+            return false;
+        }
+
+        const auto readVelocityByte = [](const MidiMessage& message) -> int
+        {
+            if (message.getRawDataSize() >= 3)
+                return static_cast<int>(message.getRawData()[2]);
+            return 0;
+        };
+
+        const auto& rewrittenOn = sentMessages[0];
+        if (!expectEqual(rewrittenOn.getChannel(), 5, "rewritten note-on channel", details) ||
+            !expectEqual(rewrittenOn.getNoteNumber(), 72, "rewritten note-on transpose", details) ||
+            !expectEqual(readVelocityByte(rewrittenOn), defvelocityout, "rewritten note-on fixed velocity", details))
+        {
+            devices->testSendHook = nullptr;
+            return false;
+        }
+
+        const auto noteOff = MidiMessage::noteOff(1, 60, static_cast<juce::uint8>(45));
+        if (!expectEqual(devices->rewriteSendNoteMessage(noteOff, 5) ? 1 : 0, 1, "rewriteSendNoteMessage note-off succeeds", details))
+        {
+            devices->testSendHook = nullptr;
+            return false;
+        }
+
+        if (!expectEqual(static_cast<int>(sentMessages.size()), 2, "note-off message emitted", details))
+        {
+            devices->testSendHook = nullptr;
+            return false;
+        }
+
+        const auto& rewrittenOff = sentMessages[1];
+        if (!expectEqual(rewrittenOff.getChannel(), 5, "rewritten note-off channel", details) ||
+            !expectEqual(rewrittenOff.getNoteNumber(), 72, "rewritten note-off transpose", details) ||
+            !expectEqual(readVelocityByte(rewrittenOff), 45, "rewritten note-off keeps velocity", details))
+        {
+            devices->testSendHook = nullptr;
+            return false;
+        }
+
+        devices->testSendHook = nullptr;
+        return true;
+    }
+
+    bool runInstrumentVoiceAndEffectsRoundtrip(std::string& details)
+    {
+        auto* midiInstruments = MidiInstruments::getInstance();
+        auto* instrumentPanel = InstrumentPanel::getInstance();
+        if (midiInstruments == nullptr || instrumentPanel == nullptr)
+        {
+            details = "MidiInstruments/InstrumentPanel singleton not available";
+            return false;
+        }
+
+        const auto snapshot = takeAppStateSnapshot();
+        auto& state = getAppState();
+
+        const String testDir = "AMidiOrganTestData";
+        const String testInstrumentFile = "integration_test_instruments.json";
+        const String panelFile = "integration_voice_effects.pnl";
+        const int panelButtonIdxUnderTest = 22;
+
+        if (!prepareTestInstrumentJson(testDir, testInstrumentFile, details))
+            return false;
+
+        if (!midiInstruments->loadMidiInstruments(state.instrumentfname))
+        {
+            details = "Failed to load test instrument JSON";
+            restoreAppState(snapshot);
+            return false;
+        }
+
+        state.panelfname = panelFile;
+        state.configfname = "voice_effects.cfg";
+
+        if (!instrumentPanel->initInstrumentPanel(testDir, panelFile, false))
+        {
+            details = "initInstrumentPanel for voice/effects roundtrip failed";
+            restoreAppState(snapshot);
+            return false;
+        }
+
+        auto* voiceButton = instrumentPanel->getVoiceButton(panelButtonIdxUnderTest);
+        auto* instrument = voiceButton->getInstrumentPtr();
+
+        instrument->setMSB(122);
+        instrument->setLSB(33);
+        instrument->setFont(87);
+        instrument->setVol(111);
+        instrument->setExp(95);
+        instrument->setRev(44);
+        instrument->setCho(31);
+        instrument->setMod(27);
+        instrument->setTim(61);
+        instrument->setAtk(12);
+        instrument->setRel(71);
+        instrument->setBri(89);
+        instrument->setPan(64);
+
+        if (!instrumentPanel->saveInstrumentPanel(testDir, panelFile))
+        {
+            details = "saveInstrumentPanel for voice/effects roundtrip failed";
+            restoreAppState(snapshot);
+            return false;
+        }
+
+        instrument->setMSB(1);
+        instrument->setLSB(2);
+        instrument->setFont(3);
+        instrument->setVol(4);
+        instrument->setExp(5);
+        instrument->setRev(6);
+        instrument->setCho(7);
+        instrument->setMod(8);
+        instrument->setTim(9);
+        instrument->setAtk(10);
+        instrument->setRel(11);
+        instrument->setBri(12);
+        instrument->setPan(13);
+
+        if (!instrumentPanel->loadInstrumentPanel(testDir, panelFile, false))
+        {
+            details = "loadInstrumentPanel for voice/effects roundtrip failed";
+            restoreAppState(snapshot);
+            return false;
+        }
+
+        auto* loadedInstrument = instrumentPanel->getVoiceButton(panelButtonIdxUnderTest)->getInstrumentPtr();
+        if (!expectEqual(loadedInstrument->getMSB(), 122, "roundtrip MSB", details) ||
+            !expectEqual(loadedInstrument->getLSB(), 33, "roundtrip LSB", details) ||
+            !expectEqual(loadedInstrument->getFont(), 87, "roundtrip font/program", details) ||
+            !expectEqual(loadedInstrument->getVol(), 111, "roundtrip volume", details) ||
+            !expectEqual(loadedInstrument->getExp(), 95, "roundtrip expression", details) ||
+            !expectEqual(loadedInstrument->getRev(), 44, "roundtrip reverb", details) ||
+            !expectEqual(loadedInstrument->getCho(), 31, "roundtrip chorus", details) ||
+            !expectEqual(loadedInstrument->getMod(), 27, "roundtrip mod", details) ||
+            !expectEqual(loadedInstrument->getTim(), 61, "roundtrip timbre", details) ||
+            !expectEqual(loadedInstrument->getAtk(), 12, "roundtrip attack", details) ||
+            !expectEqual(loadedInstrument->getRel(), 71, "roundtrip release", details) ||
+            !expectEqual(loadedInstrument->getBri(), 89, "roundtrip brightness", details) ||
+            !expectEqual(loadedInstrument->getPan(), 64, "roundtrip pan", details))
+        {
+            restoreAppState(snapshot);
+            return false;
+        }
+
+        restoreAppState(snapshot);
+        return true;
+    }
+
     bool runMidiRoutingSplitLayerEdgeCases(std::string& details)
     {
         auto* devices = MidiDevices::getInstance();
@@ -801,6 +1088,26 @@ int main()
     {
         std::string details;
         results.push_back({ "Preset recall persists across groups/buttons", runPresetRecallPersistenceAcrossGroups(details), details });
+    }
+
+    {
+        std::string details;
+        results.push_back({ "MidiDevices open/close index guards and lifecycle safety", runMidiDeviceOpenCloseBounds(details), details });
+    }
+
+    {
+        std::string details;
+        results.push_back({ "MidiDevices reset sends full channel controller sweep", runResetAllControllersEmission(details), details });
+    }
+
+    {
+        std::string details;
+        results.push_back({ "MidiDevices rewrite applies velocity policy and transpose", runRewriteSendVelocityAndTranspose(details), details });
+    }
+
+    {
+        std::string details;
+        results.push_back({ "InstrumentPanel roundtrip preserves MSB/LSB/program/effects", runInstrumentVoiceAndEffectsRoundtrip(details), details });
     }
 
     {

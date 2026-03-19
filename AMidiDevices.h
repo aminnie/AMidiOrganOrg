@@ -9,6 +9,7 @@
 */
 
 #pragma once
+#include <functional>
 
 
 //==============================================================================
@@ -76,8 +77,12 @@ public:
         return isInput ? midiInputs[index] : midiOutputs[index];
     }
 
-    void openDevice(bool isInput, int index)
+    bool openDevice(bool isInput, int index)
     {
+        auto& list = isInput ? midiInputs : midiOutputs;
+        if (index < 0 || index >= list.size())
+            return false;
+
         if (isInput)
         {
             jassert(midiInputs[index]->inDevice.get() == nullptr);
@@ -86,10 +91,11 @@ public:
             if (midiInputs[index]->inDevice.get() == nullptr)
             {
                 DBG("*** MidiDemo::openDevice: open input device for index = " << index << " failed!");
-                return;
+                return false;
             }
 
             midiInputs[index]->inDevice->start();
+            return true;
         }
         else
         {
@@ -102,17 +108,23 @@ public:
 
             if (midiOutputs[index]->outDevice.get() == nullptr) {
                 DBG("*** AMidiDevices::openDevice: open output device for index: " << index << " failed!");
+                return false;
             }
             else {
                 juce::Logger::writeToLog("*** AMidiDevices: Discovered device " + midiOutputs[index]->deviceInfo.name);
+                return true;
             }
         }
     }
 
-    void closeDevice(bool isInput, int index)
+    bool closeDevice(bool isInput, int index)
     {
         auto& list = isInput ? midiInputs : midiOutputs;
+        if (index < 0 || index >= list.size())
+            return false;
+
         list[index]->stopAndReset();
+        return true;
     }
 
     bool isValidMidiChannel(int channel) const noexcept
@@ -266,6 +278,9 @@ public:
     // Send Midi Messages to all connected Output Devices
     void sendToOutputs(const MidiMessage& msg)
     {
+        if (testSendHook)
+            testSendHook(msg);
+
         // Send msg to all active Outputs
         //for (auto midiOutput : midiOutputs) {
         //    if (midiOutput->outDevice != nullptr) {
@@ -375,6 +390,9 @@ public:
 
     // Remember the MidiView monitoring output channel for message duplication
     int midiviewidx = 255;
+
+    // Test hook for observing emitted output messages without hardware.
+    std::function<void(const MidiMessage&)> testSendHook;
 
     //==============================================================================
     ReferenceCountedArray<MidiDeviceListEntry> midiInputs, midiOutputs;
