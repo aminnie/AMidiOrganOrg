@@ -4,7 +4,8 @@
 
 ### Prerequisites
 - CMake 3.22 or newer
-- JUCE source checkout (for example: `C:/JUCE` on Windows)
+- JUCE source checkout (for example: `C:/JUCE` on Windows or `./.deps/JUCE` in this repo on macOS)
+- macOS builds: Xcode + Command Line Tools
 
 ### Windows (Visual Studio generator)
 From the repository root:
@@ -80,7 +81,14 @@ After a successful build, run this quick checklist (5-10 minutes):
 From the repository root:
 
 ```bash
-cmake -S . -B build-mac -G Xcode -DJUCE_ROOT="/path/to/JUCE"
+# Optional one-time JUCE checkout (matches CI source-based flow)
+mkdir -p .deps
+git clone --depth 1 https://github.com/juce-framework/JUCE.git .deps/JUCE
+
+# Configure, build tests, run ctest, and build app
+cmake -S . -B build-mac -G Xcode -DJUCE_ROOT="$PWD/.deps/JUCE"
+cmake --build build-mac --config Debug --target AMidiOrganTests
+ctest --test-dir build-mac -C Debug --output-on-failure
 cmake --build build-mac --config Debug --target AMidiOrgan
 ```
 
@@ -89,6 +97,8 @@ Typical output app bundle:
 
 ### Notes
 - UI images are packaged from `assets/*.png` via `juce_add_binary_data(...)` in `CMakeLists.txt`.
+- On macOS, `docs/` is copied into `AMidiOrgan.app/Contents/Resources/docs` during build so first-run data seeding works when launching the bundle outside the repo tree.
+- On macOS, the current test executable is compiled but runtime execution is temporarily disabled in CTest due a shutdown-time crash; app build validation remains fully enabled.
 
 ### Asset Naming Contract
 The following asset filenames are referenced by code through `BinaryData` symbols and should remain stable unless code and CMake are updated together:
@@ -247,7 +257,7 @@ Supported MIDI hardware and software sound modules:
 ### 11. General
 - Built using JUCE and C++.
 - Application can be compiled for multiple operating systems and devices.
-- Initial executable targets Windows systems.
+- Current CI validates Windows and macOS builds.
 - Touch panel is supported; mouse/keyboard navigation is optional.
 
 ### 12. Device Support

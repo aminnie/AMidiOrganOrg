@@ -70,6 +70,10 @@ private:
             {
                 return base.getChildFile("docs");
             };
+        auto docsInBundleResources = [](const juce::File& base)
+            {
+                return base.getChildFile("Resources").getChildFile("docs");
+            };
 
         // 1) Prefer working-directory docs (typical dev run).
         auto docsDir = docsIn(juce::File::getCurrentWorkingDirectory());
@@ -81,6 +85,12 @@ private:
         for (int depth = 0; depth < 6 && probe.exists(); ++depth)
         {
             docsDir = docsIn(probe);
+            if (docsDir.exists() && docsDir.isDirectory())
+                return docsDir;
+
+            // Support macOS app bundles where docs are packaged under
+            // Contents/Resources/docs.
+            docsDir = docsInBundleResources(probe);
             if (docsDir.exists() && docsDir.isDirectory())
                 return docsDir;
 
