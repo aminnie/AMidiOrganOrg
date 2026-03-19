@@ -156,31 +156,31 @@ The following asset filenames are referenced by code through `BinaryData` symbol
 
 ### Start Tab
 
-Start Tab
+![Start Tab](docs/images/tab-start.png)
 
 ### Upper Tab
 
-Upper Tab
+![Upper Tab](docs/images/tab-upper.png)
 
 ### Lower Tab
 
-Lower Tab
+![Lower Tab](docs/images/tab-lower.png)
 
 ### Bass Tab
 
-Bass Tab
+![Bass Tab](docs/images/tab-bass.png)
 
 ### Sounds Tab
 
-Sounds Tab
+![Sounds Tab](docs/images/tab-sounds.png)
 
 ### Effects Tab
 
-Effects Tab
+![Effects Tab](docs/images/tab-effects.png)
 
 ### Config Tab
 
-Config Tab
+![Config Tab](docs/images/tab-config.png)
 
 ## Functional Overview
 
