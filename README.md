@@ -62,6 +62,7 @@ ctest --test-dir build -C Debug --output-on-failure
   - Build `AMidiOrganTests`.
   - Run `ctest`.
   - Build `AMidiOrgan` (Debug build on both platforms).
+- Current regression tests cover utility bounds, MIDI split/layer routing, preset/config persistence roundtrips, MIDI controller reset emission, and shutdown-ownership crash paths.
 
 ### Recommended Manual UI Smoke Test
 
