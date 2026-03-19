@@ -95,6 +95,35 @@ cmake --build build-mac --config Debug --target AMidiOrgan
 Typical output app bundle:
 - `build-mac/Debug/AMidiOrgan.app`
 
+### macOS Quick Start (Mac mini)
+Use this as the repeatable baseline on a dedicated macOS build machine:
+
+```bash
+# 1) Clone and enter repo
+git clone https://github.com/aminnie/AMidiOrganOrg.git
+cd AMidiOrganOrg
+
+# 2) (One time) Get JUCE source locally
+mkdir -p .deps
+git clone --depth 1 https://github.com/juce-framework/JUCE.git .deps/JUCE
+
+# 3) Configure + build
+cmake -S . -B build-mac -G Xcode -DJUCE_ROOT="$PWD/.deps/JUCE"
+cmake --build build-mac --config Debug --target AMidiOrgan
+
+# 4) Optional tests
+cmake --build build-mac --config Debug --target AMidiOrganTests
+ctest --test-dir build-mac -C Debug --output-on-failure
+
+# 5) Run app bundle
+open build-mac/AMidiOrgan_artefacts/Debug/AMidiOrgan.app
+```
+
+Recommended upkeep on a Mac mini:
+- Run `git fetch --prune` periodically.
+- Keep builds in `build-mac` only (avoid mixing generators in one build dir).
+- If something looks stale, remove `build-mac` and reconfigure from scratch.
+
 ### Notes
 - UI images are packaged from `assets/*.png` via `juce_add_binary_data(...)` in `CMakeLists.txt`.
 - On macOS, `docs/` is copied into `AMidiOrgan.app/Contents/Resources/docs` during build so first-run data seeding works when launching the bundle outside the repo tree.
