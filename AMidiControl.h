@@ -6507,7 +6507,7 @@ public:
                             BubbleMessage(*focused, msgloaded, this->bubbleMessage);
                     }
                     else {
-                        ////statusLabel->setText("Empty file name save! " + configfname, juce::dontSendNotification);
+                        ////statusLabel->setText("Empty file name save! " + appState.configfname, juce::dontSendNotification);
                     }
                 });
 
@@ -6890,7 +6890,7 @@ private:
         // Prepare to save Instrument Configs to Disk
         File outputFile = File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
             .getChildFile(organdir)
-            .getChildFile(configdir)
+            .getChildFile(appState.configdir)
             .getChildFile(configfile);
 
         if (outputFile.existsAsFile())
@@ -6910,11 +6910,11 @@ private:
         output.flush();
         if (output.getStatus().failed())
         {
-            juce::Logger::writeToLog("*** saveConfigs(): Config file save failed " + configfname);
+            juce::Logger::writeToLog("*** saveConfigs(): Config file save failed " + configfile);
             // To do: Add more error handling
             return false;
         }
-        juce::Logger::writeToLog("*** saveConfigs(): Config file saved " + configfname);
+        juce::Logger::writeToLog("*** saveConfigs(): Config file saved " + configfile);
 
         // Roundtip Save/Reload and update vars
         //loadConfigs(configsname);
@@ -7018,7 +7018,7 @@ private:
         // Prepare to read Configs Panel from Disk
         File inputFile = File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
             .getChildFile(organdir)
-            .getChildFile(configdir)
+            .getChildFile(appState.configdir)
             .getChildFile(configsname);
 
         if (!inputFile.existsAsFile())

@@ -45,7 +45,7 @@
   - Effect CC sends
   - Panel/config save+reload
   - Completed in tests: panel/config roundtrip, preset persistence, split/layer routing edges.
-  - Still pending: automated MIDI device open/close coverage and richer effect-path assertions.
+  - Still pending: richer effect-path assertions.
 
 ## State Migration Progress
 - [x] **Slice 1**: Introduced `AppState` and alias-backward compatibility.
@@ -54,10 +54,9 @@
 - [x] **Slice 3B**: Migrated `KeyboardPanelPage` state references to explicit `appState`.
 - [x] **Slice 3C**: Migrated `InstrumentPanel` panel/config metadata and reload logic.
 - [x] **Slice 3D**: Warning-oriented cleanup of shadowed legacy names tied to migration.
-- [ ] **Next slice (proposed 3E)**: Finish explicit `appState` usage in `ConfigPage` persistence helpers:
-  - `saveConfigs(...)` currently uses alias globals in file path and logs (`configdir`, `configfname`).
-  - `loadConfigs(...)` path assembly still references alias globals in some paths.
-  - Goal: remove these remaining alias reads/writes from `AMidiControl.h`.
+- [x] **Slice 3E**: Finished explicit `appState` usage in `ConfigPage` persistence helpers:
+  - `saveConfigs(...)` and `loadConfigs(...)` now use `appState` path/log fields instead of alias globals.
+  - Preserved existing on-disk file formats and locations.
 
 ## Later Compile/Verification Pass
 - [x] Build on Windows using local JUCE at `c:\JUCE`.
