@@ -32,10 +32,7 @@ public:
         );
         Logger::setCurrentLogger(flogger);
 
-        // Get user home directory
-        //File fileToSave = File::getCurrentWorkingDirectory().getChildFile(instrumentdname);
-        File filespecialloc = File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
-            .getChildFile(organdir);
+        ensureUserDataFolderSeeded();
 
         mainWindow.reset (new MainWindow ("        ", new AMidiControl, *this));
     }
@@ -67,6 +64,83 @@ public:
     }
 
 private:
+    static juce::File findDocsSeedDirectory()
+    {
+        auto docsIn = [](const juce::File& base)
+            {
+                return base.getChildFile("docs");
+            };
+
+        // 1) Prefer working-directory docs (typical dev run).
+        auto docsDir = docsIn(juce::File::getCurrentWorkingDirectory());
+        if (docsDir.exists() && docsDir.isDirectory())
+            return docsDir;
+
+        // 2) Walk up from executable location (packaged/dev launch fallback).
+        auto probe = juce::File::getSpecialLocation(juce::File::currentExecutableFile).getParentDirectory();
+        for (int depth = 0; depth < 6 && probe.exists(); ++depth)
+        {
+            docsDir = docsIn(probe);
+            if (docsDir.exists() && docsDir.isDirectory())
+                return docsDir;
+
+            auto parent = probe.getParentDirectory();
+            if (parent == probe)
+                break;
+            probe = parent;
+        }
+
+        return {};
+    }
+
+    static void copyDirectoryContents(const juce::File& sourceDir, const juce::File& targetDir)
+    {
+        for (const auto& entry : juce::RangedDirectoryIterator(sourceDir, false, "*", juce::File::findFilesAndDirectories))
+        {
+            const auto src = entry.getFile();
+            const auto dst = targetDir.getChildFile(src.getFileName());
+
+            if (src.isDirectory())
+            {
+                if (!dst.exists() && !dst.createDirectory())
+                    juce::Logger::writeToLog("*** Startup seed: Failed to create directory " + dst.getFullPathName());
+
+                if (!src.copyDirectoryTo(dst))
+                    juce::Logger::writeToLog("*** Startup seed: Failed to copy directory " + src.getFullPathName());
+            }
+            else if (src.existsAsFile())
+            {
+                if (!src.copyFileTo(dst))
+                    juce::Logger::writeToLog("*** Startup seed: Failed to copy file " + src.getFullPathName());
+            }
+        }
+    }
+
+    void ensureUserDataFolderSeeded()
+    {
+        const auto userDataDir = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory)
+            .getChildFile(organdir);
+
+        // Only seed on first start: folder absent.
+        if (userDataDir.exists())
+            return;
+
+        if (!userDataDir.createDirectory())
+        {
+            juce::Logger::writeToLog("*** Startup seed: Failed to create user data folder " + userDataDir.getFullPathName());
+            return;
+        }
+
+        const auto docsSeed = findDocsSeedDirectory();
+        if (!docsSeed.exists() || !docsSeed.isDirectory())
+        {
+            juce::Logger::writeToLog("*** Startup seed: docs directory not found; skipping initial copy");
+            return;
+        }
+
+        copyDirectoryContents(docsSeed, userDataDir);
+    }
+
     class MainWindow : public juce::DocumentWindow
     {
     public:
