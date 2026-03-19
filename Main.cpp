@@ -64,6 +64,34 @@ public:
     }
 
 private:
+    static void copyMissingDirectoryContents(const juce::File& sourceDir, const juce::File& targetDir)
+    {
+        if (!sourceDir.exists() || !sourceDir.isDirectory())
+            return;
+
+        if (!targetDir.exists() && !targetDir.createDirectory())
+        {
+            juce::Logger::writeToLog("*** Startup seed: Failed to create directory " + targetDir.getFullPathName());
+            return;
+        }
+
+        for (const auto& entry : juce::RangedDirectoryIterator(sourceDir, false, "*", juce::File::findFilesAndDirectories))
+        {
+            const auto src = entry.getFile();
+            const auto dst = targetDir.getChildFile(src.getFileName());
+
+            if (src.isDirectory())
+            {
+                copyMissingDirectoryContents(src, dst);
+            }
+            else if (src.existsAsFile() && !dst.existsAsFile())
+            {
+                if (!src.copyFileTo(dst))
+                    juce::Logger::writeToLog("*** Startup seed: Failed to copy file " + src.getFullPathName());
+            }
+        }
+    }
+
     static juce::File findDocsSeedDirectory()
     {
         auto docsIn = [](const juce::File& base)
@@ -131,11 +159,9 @@ private:
         const auto userDataDir = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory)
             .getChildFile(organdir);
 
-        // Only seed on first start: folder absent.
-        if (userDataDir.exists())
-            return;
+        const bool isFirstStart = !userDataDir.exists();
 
-        if (!userDataDir.createDirectory())
+        if (isFirstStart && !userDataDir.createDirectory())
         {
             juce::Logger::writeToLog("*** Startup seed: Failed to create user data folder " + userDataDir.getFullPathName());
             return;
@@ -148,7 +174,19 @@ private:
             return;
         }
 
-        copyDirectoryContents(docsSeed, userDataDir);
+        // First run: bootstrap all shipped docs/assets into user workspace.
+        if (isFirstStart)
+            copyDirectoryContents(docsSeed, userDataDir);
+
+        // Every startup: ensure configs folder/files exist in the user workspace.
+        const auto sourceConfigDir = docsSeed.getChildFile(configdir);
+        const auto targetConfigDir = userDataDir.getChildFile(configdir);
+        copyMissingDirectoryContents(sourceConfigDir, targetConfigDir);
+
+        // Every startup: ensure instruments folder/files exist in the user workspace.
+        const auto sourceInstrumentDir = docsSeed.getChildFile(instrumentdir);
+        const auto targetInstrumentDir = userDataDir.getChildFile(instrumentdir);
+        copyMissingDirectoryContents(sourceInstrumentDir, targetInstrumentDir);
     }
 
     class MainWindow : public juce::DocumentWindow
