@@ -34,6 +34,21 @@ static int lasttabidx = 1;
 static bool tabchanged = false;
 static bool bvoiceupdated = false;
 static bool beffectsupdated = false;
+static bool bpendingSoundEdit = false;
+static bool bpendingEffectsEdit = false;
+static bool bpendingPresetSet = false;
+
+static bool hasPendingExitSavePrompt()
+{
+    return bpendingSoundEdit || bpendingEffectsEdit || bpendingPresetSet;
+}
+
+static void clearPendingExitSavePrompt()
+{
+    bpendingSoundEdit = false;
+    bpendingEffectsEdit = false;
+    bpendingPresetSet = false;
+}
 
 // Single config file supported with master panel file for each Midi mpdule supported
 static const String organdir = "AMidiOrgan";

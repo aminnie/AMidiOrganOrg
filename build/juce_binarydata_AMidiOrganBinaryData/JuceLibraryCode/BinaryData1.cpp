@@ -11312,6 +11312,7 @@ const char* getNamedResource (const char* resourceNameUTF8, int& numBytes)
         case 0xf68e620f:  numBytes = 813142; return icons8arrowup32_png;
         case 0x0edd67c6:  numBytes = 869006; return icons8arrowdown32click_png;
         case 0xef02c16d:  numBytes = 1035581; return icons8arrowup32click_png;
+        case 0x3007cf55:  numBytes = 2803; return help_md;
         default: break;
     }
 
@@ -11325,7 +11326,8 @@ const char* namedResourceList[] =
     "icons8arrowdown32_png",
     "icons8arrowup32_png",
     "icons8arrowdown32click_png",
-    "icons8arrowup32click_png"
+    "icons8arrowup32click_png",
+    "help_md"
 };
 
 const char* originalFilenames[] =
@@ -11334,7 +11336,8 @@ const char* originalFilenames[] =
     "icons8arrowdown32.png",
     "icons8arrowup32.png",
     "icons8arrowdown32click.png",
-    "icons8arrowup32click.png"
+    "icons8arrowup32click.png",
+    "help.md"
 };
 
 const char* getNamedResourceOriginalFilename (const char* resourceNameUTF8);

@@ -29,6 +29,7 @@ juce_add_binary_data(AMidiOrganBinaryData
         assets/icons8arrowup32.png
         assets/icons8arrowdown32click.png
         assets/icons8arrowup32click.png
+        assets/help.md
 )
 
 target_sources(AMidiOrgan

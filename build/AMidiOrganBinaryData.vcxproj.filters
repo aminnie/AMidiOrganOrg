@@ -16,6 +16,9 @@
     <ClCompile Include="C:\Users\a_min\AMidiOrganOrg\build\juce_binarydata_AMidiOrganBinaryData\JuceLibraryCode\BinaryData5.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="C:\Users\a_min\AMidiOrganOrg\build\juce_binarydata_AMidiOrganBinaryData\JuceLibraryCode\BinaryData6.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="C:\Users\a_min\AMidiOrganOrg\build\juce_binarydata_AMidiOrganBinaryData\JuceLibraryCode\BinaryData.h">

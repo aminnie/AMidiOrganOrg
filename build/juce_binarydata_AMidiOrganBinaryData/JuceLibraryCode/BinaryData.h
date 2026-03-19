@@ -23,8 +23,11 @@ namespace BinaryData
     extern const char*   icons8arrowup32click_png;
     const int            icons8arrowup32click_pngSize = 1035581;
 
+    extern const char*   help_md;
+    const int            help_mdSize = 2803;
+
     // Number of elements in the namedResourceList and originalFileNames arrays.
-    const int namedResourceListSize = 5;
+    const int namedResourceListSize = 6;
 
     // Points to the start of a list of resource names.
     extern const char* namedResourceList[];
