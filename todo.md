@@ -38,7 +38,8 @@
 ## Priority 3 (Stability / maintainability)
 - [~] Reduce broad mutable global state in `AMidiUtils.h` over time (prefer encapsulated state where feasible).
   - Slices 1, 2, 3A, 3B, 3C, and 3D completed.
-  - Remaining explicit alias/global references are concentrated in `ConfigPage` persistence internals (`saveConfigs` / `loadConfigs` path handling and logging).
+  - Slice 3E completed the `ConfigPage` persistence helper conversion to explicit `appState` usage.
+  - Remaining alias/global references are now in non-persistence legacy paths and can be migrated incrementally.
 - [~] Add lightweight regression checks for:
   - MIDI in/out open/close
   - Voice MSB/LSB/PC send path
