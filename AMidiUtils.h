@@ -82,7 +82,10 @@ struct AppState final
 
     // Instrument module defaults. Changed when new module selected.
     int moduleidx = 1;
+    /** Instrument JSON catalogs live under Documents/AMidiOrgan/instruments/ */
     String instrumentdir = "instruments";
+    /** Panel .pnl files live under Documents/AMidiOrgan/panels/ */
+    String paneldir = "panels";
     String instrumentfname = "maxplus.json";
     String vendorname = "Deebach Blackbox";
     String instrumentdname = "BlackBox";
@@ -124,6 +127,7 @@ inline String& modulefname = getAppState().modulefname;
 inline String& userdata = getAppState().userdata;
 inline int& moduleidx = getAppState().moduleidx;
 inline String& instrumentdir = getAppState().instrumentdir;
+inline String& paneldir = getAppState().paneldir;
 inline String& instrumentfname = getAppState().instrumentfname;
 inline String& vendorname = getAppState().vendorname;
 inline String& instrumentdname = getAppState().instrumentdname;
@@ -133,6 +137,24 @@ inline String& sdefVoice = getAppState().sdefVoice;
 inline int& sdefMSB = getAppState().sdefMSB;
 inline int& sdefLSB = getAppState().sdefLSB;
 inline int& sdefFont = getAppState().sdefFont;
+
+/** `Documents/AMidiOrgan` (folder may not exist until first run). */
+inline juce::File getOrganUserDocumentsRoot()
+{
+    return juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile(organdir);
+}
+
+/**
+ * Canonical folder for `.pnl` files (`Documents/AMidiOrgan/panels` by default).
+ * Ensures the directory exists so native FileChooser dialogs reliably open there.
+ */
+inline juce::File getDefaultPanelsDirectory()
+{
+    juce::File dir = getOrganUserDocumentsRoot().getChildFile(getAppState().paneldir);
+    if (!dir.isDirectory())
+        dir.createDirectory();
+    return dir;
+}
 
 // Volume model helpers
 static int sliderStepToMasterCc7(int sliderStep)
@@ -169,7 +191,8 @@ inline bool moduleIdxBaselineDiffersFromCurrent(const std::array<int, numberbutt
 }
 
 /**
- * Recursively finds *.pnl under organRoot, reads each root ValueTree, and counts panels whose
+ * Recursively finds *.pnl under organRoot (typically Documents/AMidiOrgan, including panels/,
+ * configs-free subtrees, and legacy instruments/), reads each root ValueTree, and counts panels whose
  * embedded configfilename property equals configBaseName (e.g. "amidiconfigs.cfg").
  */
 inline PanelScanResult countPanelsReferencingConfigFile(const juce::File& organRoot,

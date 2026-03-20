@@ -57,6 +57,7 @@
 #include "AMidiRotors.h"
 
 #include <functional>
+#include <memory>
 #include<iostream>
 #include<fstream>
 
@@ -674,11 +675,15 @@ public:
             if (!bfullpath) {
                 const auto organRoot = File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
                     .getChildFile(organdir);
-                const auto canonicalPanelDir = organRoot.getChildFile(appState.instrumentdir);
+                const auto canonicalPanelDir = organRoot.getChildFile(appState.paneldir);
                 const auto canonicalPath = canonicalPanelDir.getChildFile(panelFileName);
 
-                // Prefer canonical panel location under Documents/AMidiOrgan/instruments.
+                // Prefer canonical panel location under Documents/AMidiOrgan/panels.
                 inputFile = canonicalPath;
+
+                // Legacy: panel files previously stored under instruments/
+                if (!inputFile.existsAsFile())
+                    inputFile = organRoot.getChildFile(appState.instrumentdir).getChildFile(panelFileName);
 
                 // Legacy fallback: module-named folder under org root.
                 if (!inputFile.existsAsFile() && instrumentDirectoryName.isNotEmpty())
@@ -698,10 +703,10 @@ public:
             {
                 juce::Logger::writeToLog("loadInstrumentPanel(): Panel file " + panelFileName + " does not exists! We will revert to the Master Panel File");
 
-                // Final fallback for master panel in canonical panel directory.
+                // Final fallback for master panel in canonical panels directory.
                 inputFile = File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
                     .getChildFile(organdir)
-                    .getChildFile(appState.instrumentdir)
+                    .getChildFile(appState.paneldir)
                     .getChildFile(panelFileName);
             }
 
@@ -768,7 +773,7 @@ public:
             juce::ignoreUnused(instrumentDirectoryName);
             File outputFile = File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
                 .getChildFile(organdir)
-                .getChildFile(appState.instrumentdir)
+                .getChildFile(appState.paneldir)
                 .getChildFile(panelFileName);
 
             if (!outputFile.getParentDirectory().exists() && !outputFile.getParentDirectory().createDirectory())
@@ -801,7 +806,7 @@ public:
 
         appState.panelfullpathname = File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
             .getChildFile(organdir)
-            .getChildFile(appState.instrumentdir)
+            .getChildFile(appState.paneldir)
             .getChildFile(panelFileName)
             .getFullPathName();
 
@@ -833,7 +838,7 @@ public:
             {
                 outputFile = File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
                     .getChildFile(organdir)
-                    .getChildFile(appState.instrumentdir)
+                    .getChildFile(appState.paneldir)
                     .getChildFile(appState.panelfname);
             }
 
@@ -4503,19 +4508,14 @@ struct KeyboardPanelPage final : public Component,
             tbSaveAs->setToggleState(false, dontSendNotification);
             tbSaveAs->onClick = [=]()
                 {
-                    File fileToSave = File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
-                        .getChildFile(organdir)
-                        .getChildFile(appState.instrumentdname);
-
                     bool useNativeVersion = false;
-                    //filechooser.reset(new FileChooser("Save Panel As: Select existing or create new *.pnl",
-                    //    File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
-                    //    .getChildFile(organdir)
-                    //    .getChildFile(appState.instrumentdname),
-                    //    "*.pnl", useNativeVersion));
+                    const juce::File savePanelStart = appState.panelfullpathname.isNotEmpty()
+                        ? juce::File(appState.panelfullpathname)
+                        : getDefaultPanelsDirectory().getChildFile(
+                            appState.panelfname.isNotEmpty() ? appState.panelfname : defpanelfname);
 
                     filechooser.reset(new FileChooser("Save Panel As: Select existing or create new *.pnl",
-                        File(appState.panelfullpathname),
+                        savePanelStart,
                         "*.pnl", useNativeVersion));
 
                     filechooser->launchAsync(
@@ -5378,16 +5378,16 @@ public:
         loadConfigButton.setToggleState(true, dontSendNotification);
         loadConfigButton.onClick = [this]()
             {
-                File fileToSave = File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
-                    .getChildFile(organdir)
-                    .getChildFile(appState.configdir);
-
-                bool useNativeVersion = false;
-                filechooser.reset(new FileChooser("Select Config file to load", 
+                // 6-arg ctor: explicit useOSNativeDialogBox=false => JUCE FileBrowser (not OS shell dialog).
+                filechooser.reset(new FileChooser(
+                    "Select Config file to load",
                     File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
-                    .getChildFile(organdir)
-                    .getChildFile(appState.configdir),
-                    "*.cfg", useNativeVersion));
+                        .getChildFile(organdir)
+                        .getChildFile(appState.configdir),
+                    "*.cfg",
+                    false,
+                    false,
+                    nullptr));
 
                 filechooser->launchAsync(
                     FileBrowserComponent::openMode
@@ -5490,18 +5490,16 @@ public:
         loadPanelButton.setColour(TextButton::buttonColourId, Colours::black);
         loadPanelButton.setColour(TextButton::buttonOnColourId, Colours::black);
         loadPanelButton.setToggleState(true, dontSendNotification);
-        loadPanelButton.onClick = [=]()
+        loadPanelButton.onClick = [this]()
             {
-                File fileToSave = File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
-                    .getChildFile(organdir)
-                    .getChildFile(appState.instrumentdname);
-
-                bool useNativeVersion = false;
-                filechooser.reset(new FileChooser("Select Button Panel file to load",
-                    File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
-                    .getChildFile(organdir)
-                    .getChildFile(appState.instrumentdname),
-                    "*.pnl", useNativeVersion));
+                // Match Load Config: JUCE FileChooserDialogBox + FileBrowserComponent (useOSNativeDialogBox=false).
+                filechooser.reset(new FileChooser(
+                    "Select Button Panel file to load",
+                    getDefaultPanelsDirectory(),
+                    "*.pnl",
+                    false,
+                    false,
+                    nullptr));
 
                 filechooser->launchAsync(
                     FileBrowserComponent::openMode
@@ -5513,13 +5511,10 @@ public:
                         String selectedfullpathfname;
                         auto results = chooser.getURLResults();
 
-                        //for (auto result : results)
-                        //    selectedfname << (result.isLocalFile() 
-                        //        ? result.getLocalFile().getFileName() //.getFullPathName()
-                        //        : result.toString(false));
-
-                        for (auto result : results) {
-                            if (result.isLocalFile()) {
+                        for (auto result : results)
+                        {
+                            if (result.isLocalFile())
+                            {
                                 selectedfname = result.getLocalFile().getFileName();
                                 selectedfullpathfname = result.getLocalFile().getFullPathName();
                             }
@@ -5527,95 +5522,10 @@ public:
                                 result.toString(false);
                         }
 
-                        if (selectedfname == "") return;
-
-                        const juce::File pnlFile(selectedfullpathfname);
-                        const juce::String embeddedCfg = readEmbeddedConfigFilenameFromPanelFile(pnlFile);
-
-                        auto finishPanelLoadUi = [this, selectedfname, selectedfullpathfname](bool bloaded)
-                            {
-                                appState.panelfname = selectedfname;
-                                appState.panelfullpathname = selectedfullpathfname;
-
-                                juce::String msgloaded;
-                                if (bloaded == true)
-                                    msgloaded = "Loaded panel:\n " + appState.panelfname;
-                                else
-                                    msgloaded = "Panel load failed: " + appState.panelfname;
-
-                                if (TextButton* focused = &loadPanelButton)
-                                    BubbleMessage(*focused, msgloaded, this->bubbleMessage);
-
-                                panelfileLabel.setText(appState.panelfname, {});
-
-                                clearConfigPanelPairingMismatchIfAligned(appState);
-
-                                appState.configreload = (appState.configfname.compare(appState.pnlconfigfname) != 0);
-
-                                if (appState.configreload == true)
-                                    configfileLabel.setColour(juce::Label::textColourId, juce::Colours::red.darker());
-                                else
-                                    configfileLabel.setColour(juce::Label::textColourId, juce::Colours::grey);
-
-                                if (refreshKeyboardPanelSaveAvailability)
-                                    refreshKeyboardPanelSaveAvailability();
-                            };
-
-                        auto runPanelLoad = [this, selectedfname, selectedfullpathfname, finishPanelLoadUi]()
-                            {
-                                juce::Logger::writeToLog("*** MidiStartPage(): Loading Instrument Panel: " + selectedfname);
-                                const bool bloaded = instrumentpanel->loadInstrumentPanel(appState.instrumentdname, selectedfullpathfname, true);
-                                finishPanelLoadUi(bloaded);
-                            };
-
-                        if (embeddedCfg.isEmpty() || embeddedCfg == appState.configfname)
-                        {
-                            if (embeddedCfg == appState.configfname)
-                                appState.configPanelPairingMismatchAcknowledged = false;
-                            runPanelLoad();
+                        if (selectedfname.isEmpty())
                             return;
-                        }
 
-                        const juce::String msg = juce::String("This panel file was saved with config \"") + embeddedCfg
-                            + "\".\nThe active config is \"" + appState.configfname + "\".\n\n"
-                            "Routing may not match this song/style until configs align.\n\n"
-                            "Load anyway?";
-
-                        auto safeStart = juce::Component::SafePointer<MidiStartPage>(this);
-                        juce::AlertWindow::showOkCancelBox(
-                            juce::AlertWindow::WarningIcon,
-                            "Config / panel mismatch",
-                            msg,
-                            "Load anyway",
-                            "Abort",
-                            this,
-                            juce::ModalCallbackFunction::create([safeStart, selectedfname, selectedfullpathfname](int result)
-                                {
-                                    if (safeStart == nullptr || result != 1)
-                                        return;
-                                    safeStart->appState.configPanelPairingMismatchAcknowledged = true;
-                                    juce::Logger::writeToLog("*** MidiStartPage(): Loading Instrument Panel: " + selectedfname);
-                                    const bool bloaded = safeStart->instrumentpanel->loadInstrumentPanel(
-                                        safeStart->appState.instrumentdname, selectedfullpathfname, true);
-                                    safeStart->appState.panelfname = selectedfname;
-                                    safeStart->appState.panelfullpathname = selectedfullpathfname;
-                                    juce::String msgloaded;
-                                    if (bloaded == true)
-                                        msgloaded = "Loaded panel:\n " + safeStart->appState.panelfname;
-                                    else
-                                        msgloaded = "Panel load failed: " + safeStart->appState.panelfname;
-                                    if (juce::TextButton* focused = &safeStart->loadPanelButton)
-                                        BubbleMessage(*focused, msgloaded, safeStart->bubbleMessage);
-                                    safeStart->panelfileLabel.setText(safeStart->appState.panelfname, {});
-                                    clearConfigPanelPairingMismatchIfAligned(safeStart->appState);
-                                    safeStart->appState.configreload = (safeStart->appState.configfname.compare(safeStart->appState.pnlconfigfname) != 0);
-                                    if (safeStart->appState.configreload == true)
-                                        safeStart->configfileLabel.setColour(juce::Label::textColourId, juce::Colours::red.darker());
-                                    else
-                                        safeStart->configfileLabel.setColour(juce::Label::textColourId, juce::Colours::grey);
-                                    if (safeStart->refreshKeyboardPanelSaveAvailability)
-                                        safeStart->refreshKeyboardPanelSaveAvailability();
-                                }));
+                        proceedWithPickedPanelFile(juce::File(selectedfullpathfname));
                     });
             };
 
@@ -5904,6 +5814,98 @@ public:
     }
 
 private:
+
+    void proceedWithPickedPanelFile(const juce::File& pnlFile)
+    {
+        const String selectedfname = pnlFile.getFileName();
+        const String selectedfullpathfname = pnlFile.getFullPathName();
+        const juce::String embeddedCfg = readEmbeddedConfigFilenameFromPanelFile(pnlFile);
+
+        auto finishPanelLoadUi = [this, selectedfname, selectedfullpathfname](bool bloaded)
+            {
+                appState.panelfname = selectedfname;
+                appState.panelfullpathname = selectedfullpathfname;
+
+                juce::String msgloaded;
+                if (bloaded == true)
+                    msgloaded = "Loaded panel:\n " + appState.panelfname;
+                else
+                    msgloaded = "Panel load failed: " + appState.panelfname;
+
+                if (TextButton* focused = &loadPanelButton)
+                    BubbleMessage(*focused, msgloaded, this->bubbleMessage);
+
+                panelfileLabel.setText(appState.panelfname, {});
+
+                clearConfigPanelPairingMismatchIfAligned(appState);
+
+                appState.configreload = (appState.configfname.compare(appState.pnlconfigfname) != 0);
+
+                if (appState.configreload == true)
+                    configfileLabel.setColour(juce::Label::textColourId, juce::Colours::red.darker());
+                else
+                    configfileLabel.setColour(juce::Label::textColourId, juce::Colours::grey);
+
+                if (refreshKeyboardPanelSaveAvailability)
+                    refreshKeyboardPanelSaveAvailability();
+            };
+
+        auto runPanelLoad = [this, selectedfname, selectedfullpathfname, finishPanelLoadUi]()
+            {
+                juce::Logger::writeToLog("*** MidiStartPage(): Loading Instrument Panel: " + selectedfname);
+                const bool bloaded = instrumentpanel->loadInstrumentPanel(appState.instrumentdname, selectedfullpathfname, true);
+                finishPanelLoadUi(bloaded);
+            };
+
+        if (embeddedCfg.isEmpty() || embeddedCfg == appState.configfname)
+        {
+            if (embeddedCfg == appState.configfname)
+                appState.configPanelPairingMismatchAcknowledged = false;
+            runPanelLoad();
+            return;
+        }
+
+        const juce::String msg = juce::String("This panel file was saved with config \"") + embeddedCfg
+            + "\".\nThe active config is \"" + appState.configfname + "\".\n\n"
+            "Routing may not match this song/style until configs align.\n\n"
+            "Load anyway?";
+
+        auto safeStart = juce::Component::SafePointer<MidiStartPage>(this);
+        juce::AlertWindow::showOkCancelBox(
+            juce::AlertWindow::WarningIcon,
+            "Config / panel mismatch",
+            msg,
+            "Load anyway",
+            "Abort",
+            this,
+            juce::ModalCallbackFunction::create([safeStart, selectedfname, selectedfullpathfname](int result)
+                {
+                    if (safeStart == nullptr || result != 1)
+                        return;
+                    safeStart->appState.configPanelPairingMismatchAcknowledged = true;
+                    juce::Logger::writeToLog("*** MidiStartPage(): Loading Instrument Panel: " + selectedfname);
+                    const bool bloaded = safeStart->instrumentpanel->loadInstrumentPanel(
+                        safeStart->appState.instrumentdname, selectedfullpathfname, true);
+                    safeStart->appState.panelfname = selectedfname;
+                    safeStart->appState.panelfullpathname = selectedfullpathfname;
+                    juce::String msgloaded;
+                    if (bloaded == true)
+                        msgloaded = "Loaded panel:\n " + safeStart->appState.panelfname;
+                    else
+                        msgloaded = "Panel load failed: " + safeStart->appState.panelfname;
+                    if (juce::TextButton* focused = &safeStart->loadPanelButton)
+                        BubbleMessage(*focused, msgloaded, safeStart->bubbleMessage);
+                    safeStart->panelfileLabel.setText(safeStart->appState.panelfname, {});
+                    clearConfigPanelPairingMismatchIfAligned(safeStart->appState);
+                    safeStart->appState.configreload = (safeStart->appState.configfname.compare(safeStart->appState.pnlconfigfname) != 0);
+                    if (safeStart->appState.configreload == true)
+                        safeStart->configfileLabel.setColour(juce::Label::textColourId, juce::Colours::red.darker());
+                    else
+                        safeStart->configfileLabel.setColour(juce::Label::textColourId, juce::Colours::grey);
+                    if (safeStart->refreshKeyboardPanelSaveAvailability)
+                        safeStart->refreshKeyboardPanelSaveAvailability();
+                }));
+    }
 
     //-----------------------------------------------------------------------------
     //*** Start of MidiDeviceListBox Class
@@ -7214,7 +7216,7 @@ private:
         if (scan.referencingCount > 0)
         {
             const String msg = String::formatted(
-                "This configuration file is referenced by %d instrument panel(s) (scanned %d .pnl files under AMidiOrgan). "
+                "This configuration file is referenced by %d instrument panel(s) (scanned %d .pnl files under panels/, instruments/, or legacy paths). "
                 "Saving would change the MIDI sound module assignment for one or more button groups. "
                 "To keep existing song/style panels valid, use Save As and choose a new file name.",
                 scan.referencingCount,
@@ -7620,8 +7622,9 @@ private:
 
             inputFile = File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
                 .getChildFile(organdir)
+                .getChildFile(appState.configdir)
                 .getChildFile("masterconfigs.cfg");
-            juce::Logger::writeToLog("*** loadConfigs(): Loading file masterConfigs.cfg instead");
+            juce::Logger::writeToLog("*** loadConfigs(): Loading file configs/masterconfigs.cfg instead");
         }
 
         FileInputStream input(inputFile);

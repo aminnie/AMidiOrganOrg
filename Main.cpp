@@ -183,10 +183,15 @@ private:
         const auto targetConfigDir = userDataDir.getChildFile(configdir);
         copyMissingDirectoryContents(sourceConfigDir, targetConfigDir);
 
-        // Every startup: ensure instruments folder/files exist in the user workspace.
+        // Every startup: ensure instruments folder/files exist in the user workspace (JSON catalogs).
         const auto sourceInstrumentDir = docsSeed.getChildFile(instrumentdir);
         const auto targetInstrumentDir = userDataDir.getChildFile(instrumentdir);
         copyMissingDirectoryContents(sourceInstrumentDir, targetInstrumentDir);
+
+        // Every startup: ensure panels folder (.pnl) exists in the user workspace.
+        const auto sourcePanelDir = docsSeed.getChildFile(paneldir);
+        const auto targetPanelDir = userDataDir.getChildFile(paneldir);
+        copyMissingDirectoryContents(sourcePanelDir, targetPanelDir);
     }
 
     class MainWindow : public juce::DocumentWindow

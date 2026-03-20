@@ -46,6 +46,7 @@ namespace
     struct AppStateSnapshot
     {
         String instrumentdir;
+        String paneldir;
         String instrumentfname;
         String panelfname;
         String configfname;
@@ -64,6 +65,7 @@ namespace
         auto& state = getAppState();
         AppStateSnapshot snapshot;
         snapshot.instrumentdir = state.instrumentdir;
+        snapshot.paneldir = state.paneldir;
         snapshot.instrumentfname = state.instrumentfname;
         snapshot.panelfname = state.panelfname;
         snapshot.configfname = state.configfname;
@@ -82,6 +84,7 @@ namespace
     {
         auto& state = getAppState();
         state.instrumentdir = snapshot.instrumentdir;
+        state.paneldir = snapshot.paneldir;
         state.instrumentfname = snapshot.instrumentfname;
         state.panelfname = snapshot.panelfname;
         state.configfname = snapshot.configfname;

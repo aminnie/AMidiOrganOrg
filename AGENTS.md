@@ -28,6 +28,11 @@ For canonical build/run commands, use the `Build` section in `README.md`.
 - When touching persistence, keep ValueTree property names backward compatible.
 - Do not silently change on-disk locations under user Documents (`AMidiOrgan/...`).
 
+## User Documents layout (`Documents/AMidiOrgan`)
+- **`configs/`** — `.cfg` configuration files (see `AppState::configdir`).
+- **`panels/`** — `.pnl` instrument panel files (see `AppState::paneldir`); canonical read/write target; older installs may still load from legacy `instruments/` or module-named folders via fallbacks.
+- **`instruments/`** — JSON instrument catalogs only (not `.pnl`).
+
 ## Ownership And Lifetime Rules (Critical)
 - JUCE singleton instances from `juce_DeclareSingleton` are non-owning when accessed via `getInstance()`.
 - Do **not** store singleton pointers in owning smart pointers (`std::unique_ptr`) unless ownership transfer is intentional and safe.
