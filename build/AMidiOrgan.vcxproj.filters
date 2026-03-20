@@ -89,6 +89,9 @@
     <CustomBuild Include="C:\Users\a_min\AMidiOrganOrg\CMakeLists.txt" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="C:\Users\a_min\AMidiOrganOrg\build\AMidiOrgan_artefacts\JuceLibraryCode\icon.ico" />
+  </ItemGroup>
+  <ItemGroup>
     <Object Include="C:\Users\a_min\AMidiOrganOrg\build\AMidiOrgan_rc_lib.dir\$(Configuration)\AMidiOrgan_resources.res">
       <Filter>Object Libraries</Filter>
     </Object>

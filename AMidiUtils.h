@@ -10,6 +10,8 @@
 
 #pragma once
 
+#include <array>
+
 //==============================================================================
 static void BubbleMessage(Component& targetComponent, const String& textToShow,
     std::unique_ptr<BubbleMessageComponent>& bmc);
@@ -135,6 +137,62 @@ static int computeEffectiveVolumeCc7(int masterCc7, int effectVol, int defaultEf
     const auto defaultVol = juce::jmax(1, defaultEffectsVolValue);
     const auto computed = juce::roundToInt(master * (effect / static_cast<double>(defaultVol)));
     return juce::jlimit(0, 127, computed);
+}
+
+/** Result of scanning .pnl files under the AMidiOrgan user folder for a config basename match. */
+struct PanelScanResult
+{
+    int panelsScanned = 0;
+    int referencingCount = 0;
+};
+
+/** True if any per-group MIDI module index differs between the two snapshots (config "hard" change). */
+inline bool moduleIdxBaselineDiffersFromCurrent(const std::array<int, numberbuttongroups>& baseline,
+                                                const std::array<int, numberbuttongroups>& current) noexcept
+{
+    for (size_t i = 0; i < baseline.size(); ++i)
+        if (baseline[i] != current[i])
+            return true;
+
+    return false;
+}
+
+/**
+ * Recursively finds *.pnl under organRoot, reads each root ValueTree, and counts panels whose
+ * embedded configfilename property equals configBaseName (e.g. "amidiconfigs.cfg").
+ */
+inline PanelScanResult countPanelsReferencingConfigFile(const juce::File& organRoot,
+                                                        juce::StringRef configBaseName)
+{
+    PanelScanResult r;
+
+    if (!organRoot.isDirectory())
+        return r;
+
+    static const juce::Identifier instrumentPanelType("InstrumentPanel");
+    static const juce::Identifier configfilenameType("configfilename");
+
+    for (const auto& entry : juce::RangedDirectoryIterator(organRoot, true, "*.pnl", juce::File::findFiles))
+    {
+        const juce::File panelFile = entry.getFile();
+        if (!panelFile.existsAsFile())
+            continue;
+
+        ++r.panelsScanned;
+        juce::FileInputStream in(panelFile);
+        if (in.openedOk())
+        {
+            juce::ValueTree vt = juce::ValueTree::readFromStream(in);
+            if (vt.isValid() && vt.hasType(instrumentPanelType))
+            {
+                const juce::String embedded = vt.getProperty(configfilenameType).toString();
+                if (embedded == configBaseName)
+                    ++r.referencingCount;
+            }
+        }
+    }
+
+    return r;
 }
 
 // To do: Consider moving quick access static Midi in keyboard handler vars below directly 

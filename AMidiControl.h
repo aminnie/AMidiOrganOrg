@@ -6044,6 +6044,8 @@ public:
         loadConfigs(appState.configfname);
         lblconfigfile.setText(appState.configfname, {});
 
+        captureModuleIdxBaselineFromPanel();
+
         // 2. Prepare Midi IO Map router Map by reading initial Confg into IOMap array
         //    for quick access during Midi IO routing (sendToOutputs())
         presetMidiIOMap();
@@ -6403,6 +6405,7 @@ public:
                         String msgloaded;
                         if (bloaded == true) {
                             msgloaded = "Loading:\n " + appState.configfname;
+                            captureModuleIdxBaselineFromPanel();
                         }
                         else {
                             msgloaded = "Load failed:\n " + appState.configfname;
@@ -6423,25 +6426,8 @@ public:
         saveButton.setBounds(20, 225, 80, 30);
         saveButton.setBounds(120, 225, 80, 30);
         saveButton.setEnabled(false);
-        saveButton.onClick = [=]() {
-            bool bsaved = saveConfigs(appState.configfname);
-
-            appState.configchanged = true;
-
-            String msgloaded;
-            if (!bsaved) {
-                msgloaded = "Config save failed!";
-                juce::Logger::writeToLog("*** ConfigPage(): Config save failed! ");
-            }
-            else {
-                msgloaded = "Config saved";
-                juce::Logger::writeToLog("*** ConfigPage(): Config saved!");
-            }
-
-            if (TextButton* focused = &saveButton)
-                BubbleMessage(*focused, msgloaded, this->bubbleMessage);
-
-            saveButton.setEnabled(false);
+        saveButton.onClick = [this]() {
+            handleConfigSaveRequest(saveButton);
             };
 
         addAndMakeVisible(saveAsButton);
@@ -6452,7 +6438,7 @@ public:
         saveAsButton.setColour(TextButton::buttonOnColourId, Colours::black.brighter());
         saveAsButton.setBounds(220, 225, 80, 30);
         saveAsButton.setToggleState(false, dontSendNotification);
-        saveAsButton.onClick = [=]() {
+        saveAsButton.onClick = [this]() {
             File fileToSave = File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
                 .getChildFile(organdir)
                 .getChildFile(appState.configdir);
@@ -6460,20 +6446,22 @@ public:
             bool useNativeVersion = false;
             filechooser.reset(new FileChooser("Save Config As: Select existing or create new *.cfg",
                 File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
-                .getChildFile(organdir)
-                .getChildFile(appState.configdir),
+                    .getChildFile(organdir)
+                    .getChildFile(appState.configdir),
                 "*.cfg", useNativeVersion));
+
+            const String previousConfigFname = appState.configfname;
 
             filechooser->launchAsync(
                 FileBrowserComponent::saveMode
                 | FileBrowserComponent::canSelectFiles
                 | FileBrowserComponent::warnAboutOverwriting,
-                [=](const FileChooser& chooser)
+                [this, previousConfigFname](const FileChooser& chooser)
                 {
-                    //String selectedfname;
                     bool bsaved = false;
 
                     auto results = chooser.getURLResults();
+                    selconfigfname.clear();
 
                     for (auto result : results)
                         selconfigfname << (result.isLocalFile() ? result.getLocalFile().getFileName()
@@ -6487,8 +6475,15 @@ public:
                             selconfigfname = selconfigfname + ".cfg";
                         }
 
-                        // Update static/global config file name and save to this file
                         appState.configfname = selconfigfname;
+
+                        if (selconfigfname == previousConfigFname)
+                        {
+                            handleConfigSaveRequest(saveAsButton);
+                            lblconfigfile.setText(appState.configfname, {});
+                            return;
+                        }
+
                         bsaved = saveConfigs(appState.configfname);
 
                         appState.configchanged = true;
@@ -6499,21 +6494,22 @@ public:
                             juce::Logger::writeToLog("*** ConfigPage(): Save As failed! " + appState.configfname);
                         }
                         else {
+                            captureModuleIdxBaselineFromPanel();
                             msgloaded = "Saved as: " + appState.configfname;
                             juce::Logger::writeToLog("*** ConfigPage(): Saved As " + appState.configfname);
                         }
 
                         if (TextButton* focused = &saveAsButton)
                             BubbleMessage(*focused, msgloaded, this->bubbleMessage);
+
+                        saveButton.setEnabled(false);
                     }
                     else {
                         ////statusLabel->setText("Empty file name save! " + appState.configfname, juce::dontSendNotification);
                     }
+
+                    lblconfigfile.setText(appState.configfname, {});
                 });
-
-                saveAsButton.setEnabled(false);
-
-                lblconfigfile.setText(appState.configfname, {});
             };
 
         addAndMakeVisible(lblconfigfile);
@@ -6659,6 +6655,96 @@ private:
     juce::StringArray notenames = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
 
     juce::Label statusLabel;
+
+    std::array<int, numberbuttongroups> cfgModuleIdxBaseline{};
+
+    void captureModuleIdxBaselineFromPanel()
+    {
+        for (int i = 0; i < numberbuttongroups; ++i)
+            cfgModuleIdxBaseline[(size_t) i] = instrumentpanel->getButtonGroup(i)->getMidiModule();
+    }
+
+    bool hasHardModuleChangeVersusBaseline() const
+    {
+        for (int i = 0; i < numberbuttongroups; ++i)
+            if (instrumentpanel->getButtonGroup(i)->getMidiModule() != cfgModuleIdxBaseline[(size_t) i])
+                return true;
+
+        return false;
+    }
+
+    void handleConfigSaveRequest(TextButton& bubbleButton)
+    {
+        if (!hasHardModuleChangeVersusBaseline())
+        {
+            const bool bsaved = saveConfigs(appState.configfname);
+
+            appState.configchanged = true;
+
+            String msgloaded;
+            if (!bsaved) {
+                msgloaded = "Config save failed!";
+                juce::Logger::writeToLog("*** ConfigPage(): Config save failed! ");
+            }
+            else {
+                msgloaded = "Config saved";
+                juce::Logger::writeToLog("*** ConfigPage(): Config saved!");
+                captureModuleIdxBaselineFromPanel();
+            }
+
+            BubbleMessage(bubbleButton, msgloaded, this->bubbleMessage);
+
+            if (bsaved)
+                saveButton.setEnabled(false);
+
+            return;
+        }
+
+        const File organRoot = File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
+            .getChildFile(organdir);
+        const auto scan = countPanelsReferencingConfigFile(organRoot, appState.configfname);
+
+        if (scan.referencingCount > 0)
+        {
+            const String msg = String::formatted(
+                "This configuration file is referenced by %d instrument panel(s) (scanned %d .pnl files under AMidiOrgan). "
+                "Saving would change the MIDI sound module assignment for one or more button groups. "
+                "To keep existing song/style panels valid, use Save As and choose a new file name.",
+                scan.referencingCount,
+                scan.panelsScanned);
+
+            // JUCE AlertWindow (not NativeMessageBox) so styling matches app LookAndFeel.
+            juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
+                "Cannot save configuration",
+                msg,
+                {},
+                this,
+                nullptr);
+            return;
+        }
+
+        const bool bsaved = saveConfigs(appState.configfname);
+
+        appState.configchanged = true;
+
+        String msgloaded;
+        if (!bsaved) {
+            msgloaded = "Config save failed!";
+            juce::Logger::writeToLog("*** ConfigPage(): Config save failed! ");
+        }
+        else {
+            msgloaded = String::formatted(
+                "Config saved. Checked %d panel files; none reference this config.",
+                scan.panelsScanned);
+            juce::Logger::writeToLog("*** ConfigPage(): Config saved!");
+            captureModuleIdxBaselineFromPanel();
+        }
+
+        BubbleMessage(bubbleButton, msgloaded, this->bubbleMessage);
+
+        if (bsaved)
+            saveButton.setEnabled(false);
+    }
 
     //-------------------------------------------------------------------------
     // Convert Note Names to and from Numbers for range Ocave 2 to 7

@@ -33,10 +33,12 @@ else()
 endif()
 
 if(WIN32)
+    # juceaide winicon uses Drawable::createFromImageFile; some .ico variants produce no
+    # embedded images (configure then fails looking for JuceLibraryCode/icon.ico). PNG works.
     juce_add_gui_app(AMidiOrgan
         PRODUCT_NAME "AMidiOrgan"
-        ICON_BIG "${CMAKE_CURRENT_SOURCE_DIR}/assets/icons/AMidiOrgan.ico"
-        ICON_SMALL "${CMAKE_CURRENT_SOURCE_DIR}/assets/icons/AMidiOrgan.ico"
+        ICON_BIG "${CMAKE_CURRENT_SOURCE_DIR}/assets/icons/app-icon-master.png"
+        ICON_SMALL "${CMAKE_CURRENT_SOURCE_DIR}/assets/icons/app-icon-master.png"
     )
 else()
     juce_add_gui_app(AMidiOrgan

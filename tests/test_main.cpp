@@ -10,6 +10,7 @@ using namespace juce;
 #include <iostream>
 #include <string>
 #include <vector>
+#include <array>
 #include <cstdlib>
 #include <utility>
 
@@ -151,6 +152,94 @@ namespace
 
         return expectEqual(computeEffectiveVolumeCc7(100, 100, 0), 127,
                            "computeEffectiveVolumeCc7 guards default denominator", details);
+    }
+
+    bool runModuleIdxBaselineDiffers(std::string& details)
+    {
+        std::array<int, numberbuttongroups> a{};
+        std::array<int, numberbuttongroups> b{};
+
+        for (int i = 0; i < numberbuttongroups; ++i)
+        {
+            a[(size_t) i] = i;
+            b[(size_t) i] = i;
+        }
+
+        if (moduleIdxBaselineDiffersFromCurrent(a, b))
+        {
+            details = "identical module indices should not report a difference";
+            return false;
+        }
+
+        b[0] = 99;
+        if (!moduleIdxBaselineDiffersFromCurrent(a, b))
+        {
+            details = "changed module index should report a difference";
+            return false;
+        }
+
+        return true;
+    }
+
+    bool runPanelConfigReferencingScan(std::string& details)
+    {
+        const File tempRoot = File::getSpecialLocation(File::tempDirectory)
+            .getChildFile("AMidiOrgan_panel_cfg_scan_test");
+
+        if (tempRoot.exists())
+            tempRoot.deleteRecursively();
+
+        if (!tempRoot.createDirectory())
+        {
+            details = "failed to create temp directory for panel scan test";
+            return false;
+        }
+
+        struct Cleanup { File f; ~Cleanup() { f.deleteRecursively(); } } cleanup{ tempRoot };
+
+        const File sub = tempRoot.getChildFile("nested");
+        if (!sub.createDirectory())
+        {
+            details = "failed to create nested temp directory";
+            return false;
+        }
+
+        static const Identifier instrumentPanelType("InstrumentPanel");
+        static const Identifier configfilenameType("configfilename");
+
+        auto writePanel = [&](const File& file, const String& cfgName) -> bool
+        {
+            ValueTree vt(instrumentPanelType);
+            vt.setProperty(configfilenameType, cfgName, nullptr);
+            FileOutputStream out(file);
+            if (!out.openedOk())
+                return false;
+            vt.writeToStream(out);
+            out.flush();
+            return out.getStatus().wasOk();
+        };
+
+        if (!writePanel(tempRoot.getChildFile("song_a.pnl"), "shared.cfg"))
+        {
+            details = "failed to write song_a.pnl";
+            return false;
+        }
+
+        if (!writePanel(sub.getChildFile("song_b.pnl"), "other.cfg"))
+        {
+            details = "failed to write song_b.pnl";
+            return false;
+        }
+
+        const auto scan = countPanelsReferencingConfigFile(tempRoot, "shared.cfg");
+
+        if (!expectEqual(scan.panelsScanned, 2, "panelsScanned", details))
+            return false;
+
+        if (!expectEqual(scan.referencingCount, 1, "referencingCount", details))
+            return false;
+
+        return true;
     }
 
     bool runAppStateAliasBackcompat(std::string& details)
@@ -1023,6 +1112,16 @@ int main()
     {
         std::string details;
         results.push_back({ "Volume helper math and clamping", runVolumeMathHelpers(details), details });
+    }
+
+    {
+        std::string details;
+        results.push_back({ "moduleIdx baseline differs detects per-group module changes", runModuleIdxBaselineDiffers(details), details });
+    }
+
+    {
+        std::string details;
+        results.push_back({ "Panel scan counts configfilename references under AMidiOrgan tree", runPanelConfigReferencingScan(details), details });
     }
 
     {

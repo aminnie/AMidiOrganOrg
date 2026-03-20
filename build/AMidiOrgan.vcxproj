@@ -421,6 +421,8 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
+    <None Include="C:\Users\a_min\AMidiOrganOrg\build\AMidiOrgan_artefacts\JuceLibraryCode\icon.ico">
+    </None>
     <ClInclude Include="C:\Users\a_min\AMidiOrganOrg\build\AMidiOrgan_artefacts\JuceLibraryCode\JuceHeader.h" />
     <ClCompile Include="C:\Users\a_min\AMidiOrganOrg\Main.cpp" />
     <ClInclude Include="C:\Users\a_min\AMidiOrganOrg\AMidiControl.h" />
