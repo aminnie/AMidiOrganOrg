@@ -244,11 +244,13 @@ Supported MIDI hardware and software sound modules:
   - 1 Manual preset (default on startup)
   - 6 programmable presets
 - Each preset stores active/selected voice button in each button group for all 3 keyboard panels.
+- Each preset also stores per-button-group **rotary** snapshot values (used with preset recall). Values are **0** = slow, **1** = fast, **2** = brake. Upper manual rotary updates groups 0–3; Lower updates groups 4–7.
 - Preset references reflect currently selected sound and effects.
 - Preset programming flow:
   - Select target preset.
   - Adjust active buttons as needed across panels.
   - Click `Preset Set`, then click preset button to update.
+- Changing the Upper/Lower **Rotary** controls also updates the **active** preset’s stored rotary (so **Save** on the panel writes non-zero `rotary` fields without an extra Set step). Use **Preset Set** to capture a full snapshot (all groups, including Bass) into the selected preset.
 - Preset button group is shared by all keyboard panels.
   - Selection on any panel captures all three panels into the preset.
 - Save instrument panel to persist preset selections to disk.
@@ -256,7 +258,9 @@ Supported MIDI hardware and software sound modules:
 ### 5. Rotary Button Group
 
 - Available on Upper and Lower keyboard panels.
+- Switching the main **Upper** / **Lower** / **Bass&Drums** tabs refreshes the rotary control labels/toggles from saved manual state (no extra MIDI on tab change).
 - Controls rotor speed (Fast/Slow) and Brake On/Off.
+- **Upper** and **Lower** manual Fast/Slow and Brake positions are saved on the **instrument panel** root (with **Save** / **Save As**) and restored on panel load—separate from the per-group **rotary** field stored **inside each preset** (see Presets).
 - Uses internal ramp list at 100 ms intervals for speed transitions.
 - To do: improve synchronization of voice startup fast/slow state.
 
@@ -300,7 +304,8 @@ Supported MIDI hardware and software sound modules:
   - Useful when solo channel output conflicts with keyboard split behavior.
   - Block list recalculated on startup or Config save.
 - Config applies globally to the application, independent of loaded instrument panel.
-- **Load pairing:** The **Load** button uses the same cfg-vs-panel embedded-name check as the Start tab: if the chosen `.cfg` does not match the panel’s embedded `configfilename`, you get **Abort** or **Load anyway** (JUCE dialog); **Load anyway** records `configPanelPairingMismatchAcknowledged`.
+- **Load pairing:** The **Load** button uses the same cfg-vs-panel embedded-name check as the Start tab: if the chosen `.cfg` does not match the panel’s embedded `configfilename`, you get **Abort** or **Load anyway** (JUCE dialog); **Load anyway** sets `configPanelPairingMismatchAcknowledged`.
+- **Panel save (pairing):** While that flag is set, the keyboard **Save** button stays disabled. **Save As** and **Exit → Save and Exit** show a **Save anyway / Cancel** dialog first; confirming saves the panel (embedding the active config name) and clears the flag. A successful **Save** also updates the in-memory pairing so the flag clears when the embedded name matches the active config. Hover tooltips on **Save** / **Save As** explain why a button is disabled or that a confirmation dialog will appear.
 - **Save guard (sound module changes):** If you change the **MIDI sound module** assignment for any button group and then choose **Save** on the same `.cfg` file, the app scans all `*.pnl` files under `Documents/AMidiOrgan` for panels whose embedded `configfilename` matches that config. If any reference it, **Save is blocked** and a dialog explains why—use **Save As** with a **new** file name so existing song/style panels keep using the previous rig file. If nothing references the config, you get a short confirmation that the scan ran. **Save As** to a different file name is never blocked by this rule; choosing the **same** file name as the active config runs the same check as **Save**.
 - To do:
   - evaluate moving config scope into panel saves (per instrument panel),
@@ -308,7 +313,7 @@ Supported MIDI hardware and software sound modules:
 
 ### 10. MIDI Start Page
 
-- **Load pairing:** **Load Config** and **Load Panel** compare the selected file to the current pairing: the active `.cfg` basename vs the `configfilename` embedded in the instrument panel ValueTree (and for **Load Panel**, the embedded name read from the file you picked). If they differ, a JUCE dialog offers **Abort** or **Load anyway**. **Load anyway** sets `configPanelPairingMismatchAcknowledged` in application state (reserved for a future panel-save gate). **Load Config** on this tab applies the full configuration from disk, consistent with the Config tab **Load** button.
+- **Load pairing:** **Load Config** and **Load Panel** compare the selected file to the current pairing: the active `.cfg` basename vs the `configfilename` embedded in the instrument panel ValueTree (and for **Load Panel**, the embedded name read from the file you picked). If they differ, a JUCE dialog offers **Abort** or **Load anyway**. **Load anyway** sets `configPanelPairingMismatchAcknowledged` (see Config tab notes for **Panel save (pairing)**). **Load Config** on this tab applies the full configuration from disk, consistent with the Config tab **Load** button.
 - MIDI input/output devices are dynamically listed on connect/disconnect.
 - Supports multiple MIDI input keyboards and output devices.
 - Current design assumes one active MIDI sound device at a time.

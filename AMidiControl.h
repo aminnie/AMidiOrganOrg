@@ -468,6 +468,50 @@ public:
         return bgroup;
     }
 
+    /** Copy active preset rotary snapshot into each ButtonGroup::rotary (used before Save / after panel load). */
+    void syncButtonGroupRotaryFromActivePreset()
+    {
+        if (panelpresets == nullptr)
+            return;
+
+        const int pst = juce::jlimit(0, numberpresets - 1, panelpresets->getActivePresetIdx());
+        for (int i = 0; i < numberbuttongroups; ++i)
+        {
+            const int r = juce::jlimit(0, 2, panelpresets->getRotaryStatus(pst, i));
+            getButtonGroup(i)->rotary = r;
+        }
+    }
+
+    /** Send rotor CC for each button group from current ButtonGroup::rotary (e.g. after preset recall). */
+    void sendMidiForStoredButtonGroupRotaryState()
+    {
+        auto* mod = InstrumentModules::getInstance();
+        auto* dev = MidiDevices::getInstance();
+        if (mod == nullptr || dev == nullptr)
+            return;
+
+        for (int i = 0; i < numberbuttongroups; ++i)
+        {
+            ButtonGroup* bg = getButtonGroup(i);
+            const int r = juce::jlimit(0, 2, bg->rotary);
+            const int midx = bg->moduleidx;
+            if (mod->getRotorType(midx) < 1)
+                continue;
+
+            const int mout = bg->midiout;
+            const int cc = mod->getRotorCC(midx);
+            int val = mod->getRotorSlow(midx);
+            if (r == 2)
+                val = mod->getRotorOff(midx);
+            else if (r == 1)
+                val = mod->getRotorFast(midx);
+
+            auto ccMessage = juce::MidiMessage::controllerEvent(mout, cc, val);
+            ccMessage.setTimeStamp(juce::Time::getMillisecondCounterHiRes() * 0.001);
+            dev->sendToOutputs(ccMessage);
+        }
+    }
+
     //-------------------------------------------------------------------------
     bool initInstrumentPanel(String instrumentDirectoryName, const String& panelFileName, bool fromdisk) 
     {
@@ -599,7 +643,7 @@ public:
         else {
             // When not loading from disk, we recreate the masterpanel file - for now
             // and until custom panels supported.
-            saveInstrumentPanel(instrumentDirectoryName, panelFileName);
+            saveInstrumentPanel(instrumentDirectoryName, panelFileName, true);
         }
 
         return true;
@@ -682,6 +726,11 @@ public:
                 //int instrumentcount = vtinstrumentpanel.getNumChildren();
 
                 loadVTInstrumentPanel();
+
+                syncButtonGroupRotaryFromActivePreset();
+
+                if (gNotifyManualRotarySyncFromAppState)
+                    gNotifyManualRotarySyncFromAppState();
             }
         }
 
@@ -694,9 +743,15 @@ public:
     // https://forum.juce.com/t/example-for-creating-a-file-and-doing-something-with-it/31998
     // Save current Instrument Panel to Disk
     //-------------------------------------------------------------------------
-    bool saveInstrumentPanel(String instrumentDirectoryName, const String& panelFileName) {
+    bool saveInstrumentPanel(String instrumentDirectoryName, const String& panelFileName, bool allowPairingMismatchSave = false) {
 
         juce::Logger::writeToLog("*** saveInstrumentPanel(): Saving Instrument Panel " + panelFileName);
+
+        if (appState.configPanelPairingMismatchAcknowledged && !allowPairingMismatchSave)
+        {
+            juce::Logger::writeToLog("saveInstrumentPanel(): Blocked (config/panel pairing mismatch not confirmed for save)");
+            return false;
+        }
 
         {   // Scoping
             // Prepare to save Instrument Panel to Disk
@@ -727,13 +782,25 @@ public:
             }
         }
 
+        appState.pnlconfigfname = appState.configfname;
+        clearConfigPanelPairingMismatchIfAligned(appState);
+
+        if (gNotifyPanelSaveAvailabilityChanged)
+            gNotifyPanelSaveAvailabilityChanged();
+
         return true;
     }
 
     // Save Panel with Full Path Name
-    bool saveInstrumentPanel(const String& panelfullpathfname) {
+    bool saveInstrumentPanel(const String& panelfullpathfname, bool allowPairingMismatchSave = false) {
 
         juce::Logger::writeToLog("*** saveInstrumentPanel(): Saving Instrument Panel " + panelfullpathfname);
+
+        if (appState.configPanelPairingMismatchAcknowledged && !allowPairingMismatchSave)
+        {
+            juce::Logger::writeToLog("saveInstrumentPanel(): Blocked (config/panel pairing mismatch not confirmed for save)");
+            return false;
+        }
 
         {   // Scoping
             // Prepare to save Instrument Panel to Disk
@@ -760,6 +827,12 @@ public:
                 return false;
             }
         }
+
+        appState.pnlconfigfname = appState.configfname;
+        clearConfigPanelPairingMismatchIfAligned(appState);
+
+        if (gNotifyPanelSaveAvailabilityChanged)
+            gNotifyPanelSaveAvailabilityChanged();
 
         return true;
     }
@@ -870,6 +943,15 @@ private:
         panelTree.setProperty(filenameType, appState.panelfname, nullptr);
         panelTree.setProperty(vendorType, vendorname, nullptr);
         panelTree.setProperty(configfilenameType, appState.configfname, nullptr);
+
+        static const juce::Identifier manualRotaryUpperFastId("manualRotaryUpperFast");
+        static const juce::Identifier manualRotaryUpperBrakeId("manualRotaryUpperBrake");
+        static const juce::Identifier manualRotaryLowerFastId("manualRotaryLowerFast");
+        static const juce::Identifier manualRotaryLowerBrakeId("manualRotaryLowerBrake");
+        panelTree.setProperty(manualRotaryUpperFastId, appState.upperManualRotaryFast, nullptr);
+        panelTree.setProperty(manualRotaryUpperBrakeId, appState.upperManualRotaryBrake, nullptr);
+        panelTree.setProperty(manualRotaryLowerFastId, appState.lowerManualRotaryFast, nullptr);
+        panelTree.setProperty(manualRotaryLowerBrakeId, appState.lowerManualRotaryBrake, nullptr);
 
         // Add VoiceButton Instruments from Panel to ValueTree
         for (int i = 0; i < numbervoicebuttons; i++)
@@ -1015,6 +1097,15 @@ private:
         appState.pnlconfigfname = vtinstrumentpanel.getProperty(configfilenameType);
         // Flag a Config reload needed based on config paramter in Panel File
         appState.configreload = (appState.configfname.compare(appState.pnlconfigfname) != 0);
+
+        static const juce::Identifier manualRotaryUpperFastId("manualRotaryUpperFast");
+        static const juce::Identifier manualRotaryUpperBrakeId("manualRotaryUpperBrake");
+        static const juce::Identifier manualRotaryLowerFastId("manualRotaryLowerFast");
+        static const juce::Identifier manualRotaryLowerBrakeId("manualRotaryLowerBrake");
+        appState.upperManualRotaryFast = (bool) vtinstrumentpanel.getProperty(manualRotaryUpperFastId, true);
+        appState.upperManualRotaryBrake = (bool) vtinstrumentpanel.getProperty(manualRotaryUpperBrakeId, false);
+        appState.lowerManualRotaryFast = (bool) vtinstrumentpanel.getProperty(manualRotaryLowerFastId, true);
+        appState.lowerManualRotaryBrake = (bool) vtinstrumentpanel.getProperty(manualRotaryLowerBrakeId, false);
 
         panelbuttonidx = 0;
 
@@ -3848,9 +3939,7 @@ struct KeyboardPanelPage final : public Component,
             gxtbchange->onClick = [=, &tabs, &voicespage]()
                 {
                     bpendingSoundEdit = true;
-                    if (cbSave != nullptr)
-                        cbSave->setEnabled(true);
-                    updatePanelSaveButtonsPendingStyle();
+                    refreshPanelSaveAvailability();
 
                     //String strstatus = "Change Sound Button";
                     //statusLabel->setText(strstatus, juce::dontSendNotification);
@@ -3885,9 +3974,7 @@ struct KeyboardPanelPage final : public Component,
             gxtbedit->onClick = [=, &tabs, &effectspage]()
                 {
                     bpendingEffectsEdit = true;
-                    if (cbSave != nullptr)
-                        cbSave->setEnabled(true);
-                    updatePanelSaveButtonsPendingStyle();
+                    refreshPanelSaveAvailability();
 
                     //String strstatus = "Edit Sound Button";
                     //statusLabel->setText(strstatus, juce::dontSendNotification);
@@ -3961,9 +4048,7 @@ struct KeyboardPanelPage final : public Component,
                     if (tbsetpreset->getToggleState()) {
                         bsetpreset = true;
                         bpendingPresetSet = true;
-                        if (cbSave != nullptr)
-                            cbSave->setEnabled(true);
-                        updatePanelSaveButtonsPendingStyle();
+                        refreshPanelSaveAvailability();
 
                         DBG("PresetButton.onClick(): Set");
                     }
@@ -4145,16 +4230,25 @@ struct KeyboardPanelPage final : public Component,
                         tbrotslow->setButtonText("Slow");
                         isFastUpper = false;
                     }
-                };
 
-            // Preset rotary change control value to slow
-            RotaryFastSlow(gmidichan, 
-                instrumentmodules->getRotorCC(buttongroupmoduleidx),        //74
-                instrumentmodules->getRotorSlow(buttongroupmoduleidx)
-            );
-            //// Check slow/fast startup as organ rotary seems to be out of sync at startp
-            //// If we keep, then is the above redundant?
-            tbrotslow->onClick();
+                    commitManualRotaryToAppState();
+                    {
+                        const int enc = encodePresetRotaryFromManual(isFastUpper, rotarybrake);
+                        const int pst = juce::jlimit(0, numberpresets - 1, instrumentpanel->panelpresets->getActivePresetIdx());
+                        if (tabidx == PTUpper) {
+                            for (int gg = 0; gg <= 3; ++gg) {
+                                instrumentpanel->getButtonGroup(gg)->rotary = enc;
+                                instrumentpanel->panelpresets->setRotaryStatus(pst, gg, enc);
+                            }
+                        }
+                        else if (tabidx == PTLower) {
+                            for (int gg = 4; gg <= 7; ++gg) {
+                                instrumentpanel->getButtonGroup(gg)->rotary = enc;
+                                instrumentpanel->panelpresets->setRotaryStatus(pst, gg, enc);
+                            }
+                        }
+                    }
+                };
 
             tbrotbrake = addToList(new CommandButton());
             tbrotbrake->setButtonText("Brake Off");
@@ -4212,9 +4306,29 @@ struct KeyboardPanelPage final : public Component,
                         tbrotbrake->setButtonText("Brake Off");
                         rotarybrake = false;
 
-                        tbrotslow->setEnabled(true);     // Enable rotor fast/slow changes
+                        tbrotslow->setEnabled(isrotary);     // Enable rotor fast/slow changes when module supports it
+                    }
+
+                    commitManualRotaryToAppState();
+                    {
+                        const int enc = encodePresetRotaryFromManual(isFastUpper, rotarybrake);
+                        const int pst = juce::jlimit(0, numberpresets - 1, instrumentpanel->panelpresets->getActivePresetIdx());
+                        if (tabidx == PTUpper) {
+                            for (int gg = 0; gg <= 3; ++gg) {
+                                instrumentpanel->getButtonGroup(gg)->rotary = enc;
+                                instrumentpanel->panelpresets->setRotaryStatus(pst, gg, enc);
+                            }
+                        }
+                        else if (tabidx == PTLower) {
+                            for (int gg = 4; gg <= 7; ++gg) {
+                                instrumentpanel->getButtonGroup(gg)->rotary = enc;
+                                instrumentpanel->panelpresets->setRotaryStatus(pst, gg, enc);
+                            }
+                        }
                     }
                 };
+
+            applyManualRotaryFromAppState();
         }   // End - Rotary Group
 
         // Quick Access Keyboard Buttons
@@ -4322,7 +4436,7 @@ struct KeyboardPanelPage final : public Component,
 
                     String msgloaded;
                     if (!bsaved) {
-                        msgloaded = "Saved failed: " + appState.panelfname;
+                        msgloaded = "Save failed: " + appState.panelfname;
                         juce::Logger::writeToLog("*** KeyboardManualPage(): Save failed! " + appState.panelfname);
                     }
                     else {
@@ -4335,9 +4449,7 @@ struct KeyboardPanelPage final : public Component,
 
                     if (bsaved)
                         clearPendingExitSavePrompt();
-                    updatePanelSaveButtonsPendingStyle();
-
-                    tbSave->setEnabled(false);
+                    refreshPanelSaveAvailability();
                 };
             tbSave->setEnabled(false);
 
@@ -4374,7 +4486,6 @@ struct KeyboardPanelPage final : public Component,
                         [=](const FileChooser& chooser)
                         {
                             String selectedfname;
-                            bool bsaved = false;
 
                             auto results = chooser.getURLResults();
 
@@ -4390,24 +4501,51 @@ struct KeyboardPanelPage final : public Component,
                                     selectedfname = selectedfname + ".pnl";
                                 }
 
-                                bsaved = instrumentpanel->saveInstrumentPanel(appState.instrumentdname, selectedfname);
+                                auto finishSaveAs = [this, tbSaveAs, selectedfname](bool allowMismatch)
+                                    {
+                                        const bool ok = instrumentpanel->saveInstrumentPanel(
+                                            appState.instrumentdname, selectedfname, allowMismatch);
 
-                                String msgloaded;
-                                if (!bsaved) {
-                                    msgloaded = "Save as failed: " + selectedfname;
-                                    juce::Logger::writeToLog("*** KeyboardManualPage(): Save as failed! " + selectedfname);
+                                        String msgloaded;
+                                        if (!ok) {
+                                            msgloaded = "Save as failed: " + selectedfname + "\nConfig: " + appState.configfname;
+                                            juce::Logger::writeToLog("*** KeyboardManualPage(): Save as failed! " + selectedfname);
+                                        }
+                                        else {
+                                            msgloaded = "Saved as: " + selectedfname + "\nConfig: " + appState.configfname;
+                                            juce::Logger::writeToLog("*** KeyboardManualPage(): Saved as " + selectedfname
+                                                + " (embedded config: " + appState.configfname + ")");
+                                        }
+
+                                        if (TextButton* focused = tbSaveAs)
+                                            BubbleMessage(*focused, msgloaded, this->bubbleMessage);
+
+                                        if (ok)
+                                            clearPendingExitSavePrompt();
+                                        refreshPanelSaveAvailability();
+                                    };
+
+                                if (appState.configPanelPairingMismatchAcknowledged)
+                                {
+                                    auto safeKb = juce::Component::SafePointer<KeyboardPanelPage>(this);
+                                    juce::AlertWindow::showOkCancelBox(
+                                        juce::AlertWindow::WarningIcon,
+                                        "Config / panel mismatch",
+                                        getPanelSavePairingMismatchMessage(),
+                                        "Save anyway",
+                                        "Cancel",
+                                        this,
+                                        juce::ModalCallbackFunction::create([safeKb, finishSaveAs](int r)
+                                            {
+                                                if (safeKb == nullptr || r != 1)
+                                                    return;
+                                                finishSaveAs(true);
+                                            }));
                                 }
-                                else {
-                                    msgloaded = "Saved as: " + selectedfname;
-                                    juce::Logger::writeToLog("*** KeyboardManualPage(): Saved as " + selectedfname);
+                                else
+                                {
+                                    finishSaveAs(false);
                                 }
-
-                                if (TextButton* focused = tbSaveAs)
-                                    BubbleMessage(*focused, msgloaded, this->bubbleMessage);
-
-                                if (bsaved)
-                                    clearPendingExitSavePrompt();
-                                updatePanelSaveButtonsPendingStyle();
                             }
                             else {
                                 statusLabel->setText("Empty file name save! " + selectedfname, juce::dontSendNotification);
@@ -4464,10 +4602,13 @@ struct KeyboardPanelPage final : public Component,
             instrumentpanel->panelpresets->setMuteStatus(pstidx, i, bmuted);
         }
 
-        cbSave->setEnabled(true);
-        updatePanelSaveButtonsPendingStyle();
+        // Read Rotary Status for every Button Group (0=slow, 1=fast, 2=brake — matches .pnl preset field)
+        for (int i = 0; i < numberbuttongroups; i++) {
+            ButtonGroup* ptrbuttongroup = instrumentpanel->getButtonGroup(i);
+            instrumentpanel->panelpresets->setRotaryStatus(pstidx, i, ptrbuttongroup->rotary);
+        }
 
-        // Read Rotary Status for every Button Group
+        refreshPanelSaveAvailability();
     }
 
     // Preset Keyboard Panel Voice Buttons with selected Preset (all 3 keyboards)
@@ -4502,7 +4643,16 @@ struct KeyboardPanelPage final : public Component,
             }
         }
 
-        // Activate Rotary for every Button Group
+        // Activate Rotary for every Button Group (snapshot + MIDI + Upper/Lower UI)
+        for (int i = 0; i < numberbuttongroups; i++) {
+            const int irotary = instrumentpanel->panelpresets->getRotaryStatus(pstidx, i);
+            instrumentpanel->getButtonGroup(i)->rotary = juce::jlimit(0, 2, irotary);
+        }
+
+        instrumentpanel->sendMidiForStoredButtonGroupRotaryState();
+
+        if (gNotifyPresetRotarySyncFromButtonGroups)
+            gNotifyPresetRotarySyncFromButtonGroups();
     }
 
     // After Panel Load, update all the Buttons by triggering a click on every first button in a Group
@@ -4624,8 +4774,7 @@ struct KeyboardPanelPage final : public Component,
 
             bvoiceupdated = false;
 
-            cbSave->setEnabled(true);
-            updatePanelSaveButtonsPendingStyle();
+            refreshPanelSaveAvailability();
 
             return;
         }
@@ -4634,8 +4783,7 @@ struct KeyboardPanelPage final : public Component,
         else if (beffectsupdated) {
             beffectsupdated = false;
 
-            cbSave->setEnabled(true);
-            updatePanelSaveButtonsPendingStyle();
+            refreshPanelSaveAvailability();
 
             return;
         }
@@ -4708,6 +4856,7 @@ struct KeyboardPanelPage final : public Component,
         }
 
         lblpanelfile->setText(appState.panelfname, {});
+        refreshPanelSaveAvailability();
     }
 
     //-----------------------------------------------------------------------------
@@ -4716,7 +4865,158 @@ struct KeyboardPanelPage final : public Component,
         DBG("== KeyboardManualPage(): Destructor " + std::to_string(--zinstcntmanualpage));
     }
 
+    void refreshPanelSaveAvailability()
+    {
+        if (cbSave != nullptr)
+        {
+            const bool pending = hasPendingExitSavePrompt();
+            const bool pairingOk = !appState.configPanelPairingMismatchAcknowledged;
+            const bool canSave = pending && pairingOk;
+            cbSave->setEnabled(canSave);
+
+            if (canSave)
+            {
+                cbSave->setTooltip("Save the instrument panel to the current .pnl file.");
+            }
+            else if (!pairingOk)
+            {
+                cbSave->setTooltip(
+                    "Config/panel mismatch (you chose Load anyway). Save is disabled here; use Save As, "
+                    "or load a config and panel that match.");
+            }
+            else if (!pending)
+            {
+                cbSave->setTooltip("Save appears when you change sounds, effects, or preset set on the panel.");
+            }
+            else
+            {
+                cbSave->setTooltip({});
+            }
+        }
+
+        if (cbSaveAs != nullptr)
+        {
+            if (appState.configPanelPairingMismatchAcknowledged)
+            {
+                cbSaveAs->setTooltip(
+                    "A dialog will ask you to confirm; the saved panel will embed the current config file name.");
+            }
+            else
+            {
+                cbSaveAs->setTooltip("Save the panel under a new or existing .pnl file name.");
+            }
+        }
+
+        updatePanelSaveButtonsPendingStyle();
+    }
+
+    /** After preset recall: update this tab's rotary controls from ButtonGroup::rotary (Upper=0, Lower=4). */
+    void applyPresetRotaryUiFromStoredGroups()
+    {
+        if (currenttabidx == PTBass || tbrotslow == nullptr || tbrotbrake == nullptr)
+            return;
+
+        const int g = (currenttabidx == PTLower) ? 4 : 0;
+        bool wantFast = false;
+        bool wantBrake = false;
+        decodePresetRotary(instrumentpanel->getButtonGroup(g)->rotary, wantFast, wantBrake);
+        applyRotaryUiSnapshot(wantFast, wantBrake, true);
+    }
+
+    /** When sendMidi is false, only syncs widget state from AppState (e.g. main tab Upper/Lower switch). */
+    void applyManualRotaryFromAppState(bool sendMidi = true)
+    {
+        if (currenttabidx == PTBass || tbrotslow == nullptr || tbrotbrake == nullptr)
+            return;
+
+        const bool wantFast = (currenttabidx == PTUpper) ? appState.upperManualRotaryFast : appState.lowerManualRotaryFast;
+        const bool wantBrake = (currenttabidx == PTUpper) ? appState.upperManualRotaryBrake : appState.lowerManualRotaryBrake;
+
+        applyRotaryUiSnapshot(wantFast, wantBrake, sendMidi);
+
+        // Align ButtonGroup::rotary with manual Leslie (panel root) for Save + per-preset rotary in .pnl
+        const int eU = encodePresetRotaryFromManual(appState.upperManualRotaryFast, appState.upperManualRotaryBrake);
+        for (int g = 0; g <= 3; ++g)
+            instrumentpanel->getButtonGroup(g)->rotary = eU;
+        const int eL = encodePresetRotaryFromManual(appState.lowerManualRotaryFast, appState.lowerManualRotaryBrake);
+        for (int g = 4; g <= 7; ++g)
+            instrumentpanel->getButtonGroup(g)->rotary = eL;
+    }
+
 private:
+    void applyRotaryUiSnapshot(bool wantFast, bool wantBrake, bool sendMidi)
+    {
+        if (currenttabidx == PTBass || tbrotslow == nullptr || tbrotbrake == nullptr)
+            return;
+
+        const int buttongroupidx = (currenttabidx == PTLower) ? 4 : 0;
+        ButtonGroup* ptrbuttongroup = instrumentpanel->getButtonGroup(buttongroupidx);
+        const int buttongroupmoduleidx = ptrbuttongroup->moduleidx;
+        const int buttongroupmidiout = ptrbuttongroup->midiout;
+        const int rotorType = instrumentmodules->getRotorType(buttongroupmoduleidx);
+
+        if (wantBrake)
+        {
+            if (sendMidi)
+            {
+                RotaryFastSlow(buttongroupmidiout,
+                    instrumentmodules->getRotorCC(buttongroupmoduleidx),
+                    instrumentmodules->getRotorOff(buttongroupmoduleidx)
+                );
+            }
+            tbrotbrake->setToggleState(true, dontSendNotification);
+            tbrotbrake->setButtonText("Brake On");
+            rotarybrake = true;
+            tbrotslow->setEnabled(false);
+            isFastUpper = wantFast;
+        }
+        else
+        {
+            tbrotbrake->setToggleState(false, dontSendNotification);
+            tbrotbrake->setButtonText("Brake Off");
+            rotarybrake = false;
+            const bool rotaryUiEnabled = (isrotary == true) && ((currenttabidx == PTUpper) || (currenttabidx == PTLower));
+            tbrotslow->setEnabled(rotaryUiEnabled);
+
+            if (wantFast)
+            {
+                if (sendMidi)
+                {
+                    if (rotorType == 1) {
+                        RotaryFastSlow(buttongroupmidiout,
+                            instrumentmodules->getRotorCC(buttongroupmoduleidx),
+                            instrumentmodules->getRotorFast(buttongroupmoduleidx)
+                        );
+                    }
+                    else if (rotorType == 2) {
+                        rotorsarray.add(new RotaryFastThread(*this, buttongroupmidiout));
+                    }
+                }
+                tbrotslow->setToggleState(false, dontSendNotification);
+                tbrotslow->setButtonText("Fast");
+                isFastUpper = true;
+            }
+            else
+            {
+                if (sendMidi)
+                {
+                    if (rotorType == 1) {
+                        RotaryFastSlow(buttongroupmidiout,
+                            instrumentmodules->getRotorCC(buttongroupmoduleidx),
+                            instrumentmodules->getRotorSlow(buttongroupmoduleidx)
+                        );
+                    }
+                    else if (rotorType == 2) {
+                        rotorsarray.add(new RotarySlowThread(*this, buttongroupmidiout));
+                    }
+                }
+                tbrotslow->setToggleState(true, dontSendNotification);
+                tbrotslow->setButtonText("Slow");
+                isFastUpper = false;
+            }
+        }
+    }
+
     OwnedArray<Component> components;
 
     double startTime;
@@ -4949,6 +5249,23 @@ private:
         mididevices->sendToOutputs(ccMessage);
     }
 
+    void commitManualRotaryToAppState()
+    {
+        if (currenttabidx == PTBass || tbrotslow == nullptr)
+            return;
+
+        if (currenttabidx == PTUpper)
+        {
+            appState.upperManualRotaryFast = isFastUpper;
+            appState.upperManualRotaryBrake = rotarybrake;
+        }
+        else if (currenttabidx == PTLower)
+        {
+            appState.lowerManualRotaryFast = isFastUpper;
+            appState.lowerManualRotaryBrake = rotarybrake;
+        }
+    }
+
 
     //-----------------------------------------------------------------------------
     // Function adds a component to a list and calls addAndMakeVisible on it
@@ -4975,7 +5292,10 @@ class MidiStartPage final : public Component,
     public ComponentListener
 {
 public:
-    MidiStartPage(TabbedComponent& tabs, std::function<bool(const juce::String&)> loadConfigFromBasenameFn) : midiKeyboard(keyboardState, MidiKeyboardComponent::horizontalKeyboard),
+    MidiStartPage(TabbedComponent& tabs,
+                  std::function<bool(const juce::String&)> loadConfigFromBasenameFn,
+                  std::function<void()> refreshKeyboardPanelSaveAvailabilityFn = {}) :
+        midiKeyboard(keyboardState, MidiKeyboardComponent::horizontalKeyboard),
         midiInputSelector(new MidiDeviceListBox("Midi Input Selector", *this, true)),
         midiOutputSelector(new MidiDeviceListBox("Midi Output Selector", *this, false)),
         instrumentmodules(InstrumentModules::getInstance()),
@@ -4983,7 +5303,8 @@ public:
         mididevices(MidiDevices::getInstance()),
         instrumentpanel(InstrumentPanel::getInstance()),
         appState(getAppState()),
-        loadConfigFromBasename(std::move(loadConfigFromBasenameFn))
+        loadConfigFromBasename(std::move(loadConfigFromBasenameFn)),
+        refreshKeyboardPanelSaveAvailability(std::move(refreshKeyboardPanelSaveAvailabilityFn))
     {
         juce::Logger::writeToLog("== MidiStartPage(): Constructor " + std::to_string(zinstcntMidiStartPage++));
 
@@ -5075,6 +5396,8 @@ public:
                                     : ("Load failed: " + selectedfname);
                                 if (TextButton* focused = &loadConfigButton)
                                     BubbleMessage(*focused, msgloaded, this->bubbleMessage);
+                                if (refreshKeyboardPanelSaveAvailability)
+                                    refreshKeyboardPanelSaveAvailability();
                             };
 
                         if (selectedfname == appState.pnlconfigfname)
@@ -5115,6 +5438,8 @@ public:
                                         : ("Load failed: " + selectedfname);
                                     if (juce::TextButton* focused = &safeStart->loadConfigButton)
                                         BubbleMessage(*focused, msgloaded, safeStart->bubbleMessage);
+                                    if (safeStart->refreshKeyboardPanelSaveAvailability)
+                                        safeStart->refreshKeyboardPanelSaveAvailability();
                                 }));
                     });
             };
@@ -5192,6 +5517,9 @@ public:
                                     configfileLabel.setColour(juce::Label::textColourId, juce::Colours::red.darker());
                                 else
                                     configfileLabel.setColour(juce::Label::textColourId, juce::Colours::grey);
+
+                                if (refreshKeyboardPanelSaveAvailability)
+                                    refreshKeyboardPanelSaveAvailability();
                             };
 
                         auto runPanelLoad = [this, selectedfname, selectedfullpathfname, finishPanelLoadUi]()
@@ -5246,6 +5574,8 @@ public:
                                         safeStart->configfileLabel.setColour(juce::Label::textColourId, juce::Colours::red.darker());
                                     else
                                         safeStart->configfileLabel.setColour(juce::Label::textColourId, juce::Colours::grey);
+                                    if (safeStart->refreshKeyboardPanelSaveAvailability)
+                                        safeStart->refreshKeyboardPanelSaveAvailability();
                                 }));
                     });
             };
@@ -5927,6 +6257,7 @@ private:
     InstrumentPanel* instrumentpanel = nullptr;
     MidiInstruments* midiInstruments = nullptr;
     std::function<bool(const juce::String&)> loadConfigFromBasename;
+    std::function<void()> refreshKeyboardPanelSaveAvailability;
     AppState& appState;
     bool shutdownRequested = false;
 
@@ -6126,11 +6457,12 @@ static int zinstcntvoicespage = 0;
 class ConfigPage final : public Component
 {
 public:
-    ConfigPage(TabbedComponent& tabs) :
+    ConfigPage(TabbedComponent& tabs, std::function<void()> refreshKeyboardPanelSaveAvailabilityFn = {}) :
         instrumentmodules(InstrumentModules::getInstance()),
         mididevices(MidiDevices::getInstance()), // Singleton if there isn't already one
         instrumentpanel(InstrumentPanel::getInstance()), // Singleton if there isn't already one
-        appState(getAppState())
+        appState(getAppState()),
+        refreshKeyboardPanelSaveAvailability(std::move(refreshKeyboardPanelSaveAvailabilityFn))
     {
         juce::Logger::writeToLog("== ConfigPage(): Constructor " + std::to_string(zinstcntvoicespage++));
 
@@ -6501,6 +6833,8 @@ public:
                             appState.configPanelPairingMismatchAcknowledged = false;
                             const bool bloaded = loadConfigFileBasename(selectedfname);
                             bubbleResult(bloaded);
+                            if (refreshKeyboardPanelSaveAvailability)
+                                refreshKeyboardPanelSaveAvailability();
                             return;
                         }
 
@@ -6527,6 +6861,8 @@ public:
                                         : ("Load failed:\n " + selectedfname);
                                     if (juce::TextButton* focused = &safeThis->loadConfigButton)
                                         BubbleMessage(*focused, msgloaded, safeThis->bubbleMessage);
+                                    if (safeThis->refreshKeyboardPanelSaveAvailability)
+                                        safeThis->refreshKeyboardPanelSaveAvailability();
                                 }));
                     });
             };
@@ -6763,6 +7099,7 @@ private:
     InstrumentPanel* instrumentpanel = nullptr;
     InstrumentModules* instrumentmodules = nullptr;
     AppState& appState;
+    std::function<void()> refreshKeyboardPanelSaveAvailability;
 
     ValueTree vtconfigs;
 
@@ -7416,7 +7753,14 @@ public:
 
         auto colour = findColour (ResizableWindow::backgroundColourId);
 
-        ConfigPage* configspage = new ConfigPage(*this);
+        std::function<void()> refreshKbPanelSaves = [this]()
+            {
+                for (int i = 0; i < getNumTabs(); ++i)
+                    if (auto* k = dynamic_cast<KeyboardPanelPage*>(getTabContentComponent(i)))
+                        k->refreshPanelSaveAvailability();
+            };
+
+        ConfigPage* configspage = new ConfigPage(*this, refreshKbPanelSaves);
         EffectsPage* effectspage = new EffectsPage(*this);
         VoicesPage* voicespage = new VoicesPage(*this);
 
@@ -7424,7 +7768,7 @@ public:
         addTab("Start",        colour, new MidiStartPage(*this, [configspage](const juce::String& b)
             {
                 return configspage->loadConfigFileBasename(b);
-            }), true);
+            }, refreshKbPanelSaves), true);
 
         // Create Upper, Lower and Bass&Drum Pages
         //KeyboardPanelPage* upperpanel = new KeyboardPanelPage(*this, PTUpper, *effectspage, *voicespage);
@@ -7449,7 +7793,32 @@ public:
         this->setCurrentTabIndex(PTStart, true);
         String sname = this->getCurrentTabName();
 
+        gNotifyPanelSaveAvailabilityChanged = std::move(refreshKbPanelSaves);
+
+        std::function<void()> syncManualRotaryKb = [this]()
+            {
+                for (int i = 0; i < getNumTabs(); ++i)
+                    if (auto* k = dynamic_cast<KeyboardPanelPage*>(getTabContentComponent(i)))
+                        k->applyManualRotaryFromAppState();
+            };
+        gNotifyManualRotarySyncFromAppState = std::move(syncManualRotaryKb);
+
+        std::function<void()> syncPresetRotaryKb = [this]()
+            {
+                for (int i = 0; i < getNumTabs(); ++i)
+                    if (auto* k = dynamic_cast<KeyboardPanelPage*>(getTabContentComponent(i)))
+                        k->applyPresetRotaryUiFromStoredGroups();
+            };
+        gNotifyPresetRotarySyncFromButtonGroups = std::move(syncPresetRotaryKb);
+
         //this->grabKeyboardFocus();
+    }
+
+    ~MenuTabs() override
+    {
+        gNotifyPanelSaveAvailabilityChanged = {};
+        gNotifyManualRotarySyncFromAppState = {};
+        gNotifyPresetRotarySyncFromButtonGroups = {};
     }
 
     void mouseDown(const MouseEvent& e) override
@@ -7531,23 +7900,50 @@ public:
 
                             if (result == 1)
                             {
-                                auto* panel = InstrumentPanel::getInstance();
                                 auto& appState = getAppState();
-                                bool saved = false;
-                                if (panel != nullptr)
-                                    saved = panel->saveInstrumentPanel(appState.panelfullpathname);
+                                auto saveAndExit = [safeThis, closeApplication](bool allowMismatch)
+                                    {
+                                        if (safeThis == nullptr)
+                                            return;
 
-                                if (!saved)
+                                        auto* panel = InstrumentPanel::getInstance();
+                                        bool saved = false;
+                                        if (panel != nullptr)
+                                            saved = panel->saveInstrumentPanel(getAppState().panelfullpathname, allowMismatch);
+
+                                        if (!saved)
+                                        {
+                                            AlertWindow::showMessageBoxAsync(
+                                                AlertWindow::WarningIcon,
+                                                "Save Failed",
+                                                "Panel save failed. Please save manually before exiting.");
+                                            return;
+                                        }
+
+                                        clearPendingExitSavePrompt();
+                                        closeApplication();
+                                    };
+
+                                if (appState.configPanelPairingMismatchAcknowledged)
                                 {
-                                    AlertWindow::showMessageBoxAsync(
+                                    AlertWindow::showOkCancelBox(
                                         AlertWindow::WarningIcon,
-                                        "Save Failed",
-                                        "Panel save failed. Please save manually before exiting.");
-                                    return;
+                                        "Config / panel mismatch",
+                                        getPanelSavePairingMismatchMessage(),
+                                        "Save anyway",
+                                        "Cancel",
+                                        safeThis.getComponent(),
+                                        ModalCallbackFunction::create([safeThis, saveAndExit](int r2)
+                                            {
+                                                if (safeThis == nullptr || r2 != 1)
+                                                    return;
+                                                saveAndExit(true);
+                                            }));
                                 }
-
-                                clearPendingExitSavePrompt();
-                                closeApplication();
+                                else
+                                {
+                                    saveAndExit(false);
+                                }
                             }
                             else if (result == 2)
                             {
@@ -7565,6 +7961,14 @@ public:
 
         lastNonExitTabIndex = newCurrentTabIndex;
         TabbedComponent::currentTabChanged(newCurrentTabIndex, newCurrentTabName);
+
+        // Each keyboard tab is a separate KeyboardPanelPage with its own rotary widgets; refresh from
+        // AppState when switching Upper/Lower so Fast/Slow/Brake match the stored manual state.
+        if (newCurrentTabIndex == PTUpper || newCurrentTabIndex == PTLower || newCurrentTabIndex == PTBass)
+        {
+            if (auto* k = dynamic_cast<KeyboardPanelPage*>(getTabContentComponent(newCurrentTabIndex)))
+                k->applyManualRotaryFromAppState(false);
+        }
     }
 
     // Small star button that is put inside one of the tabs
