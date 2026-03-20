@@ -52,6 +52,7 @@ namespace
         String pnlconfigfname;
         int defaultEffectsVol = 100;
         bool configreload = false;
+        bool configPanelPairingMismatchAcknowledged = false;
     };
 
     AppStateSnapshot takeAppStateSnapshot()
@@ -65,6 +66,7 @@ namespace
         snapshot.pnlconfigfname = state.pnlconfigfname;
         snapshot.defaultEffectsVol = state.defaultEffectsVol;
         snapshot.configreload = state.configreload;
+        snapshot.configPanelPairingMismatchAcknowledged = state.configPanelPairingMismatchAcknowledged;
         return snapshot;
     }
 
@@ -78,6 +80,7 @@ namespace
         state.pnlconfigfname = snapshot.pnlconfigfname;
         state.defaultEffectsVol = snapshot.defaultEffectsVol;
         state.configreload = snapshot.configreload;
+        state.configPanelPairingMismatchAcknowledged = snapshot.configPanelPairingMismatchAcknowledged;
     }
 
     bool prepareTestInstrumentJson(const String& testDirName, const String& fileName, std::string& details)
@@ -795,6 +798,68 @@ namespace
         return true;
     }
 
+    bool runPanelSavePairingMismatchGuard(std::string& details)
+    {
+        auto* instrumentPanel = InstrumentPanel::getInstance();
+        if (instrumentPanel == nullptr)
+        {
+            details = "InstrumentPanel unavailable";
+            return false;
+        }
+
+        const auto snapshot = takeAppStateSnapshot();
+        auto& state = getAppState();
+
+        const String testDir = "AMidiOrganTestData";
+        const String panelFile = "pairing_gate_test.pnl";
+
+        state.panelfname = panelFile;
+        state.configfname = "pairing_test.cfg";
+        state.pnlconfigfname = "pairing_test.cfg";
+
+        if (!prepareTestInstrumentJson(testDir, "integration_test_instruments.json", details))
+        {
+            restoreAppState(snapshot);
+            return false;
+        }
+
+        if (!instrumentPanel->initInstrumentPanel(testDir, panelFile, false))
+        {
+            details = "initInstrumentPanel for pairing gate test failed";
+            restoreAppState(snapshot);
+            return false;
+        }
+
+        state.configPanelPairingMismatchAcknowledged = true;
+
+        if (instrumentPanel->saveInstrumentPanel(testDir, panelFile))
+        {
+            details = "saveInstrumentPanel should be blocked when pairing mismatch acknowledged";
+            state.configPanelPairingMismatchAcknowledged = false;
+            restoreAppState(snapshot);
+            return false;
+        }
+
+        state.configPanelPairingMismatchAcknowledged = false;
+        if (!instrumentPanel->saveInstrumentPanel(testDir, panelFile))
+        {
+            details = "saveInstrumentPanel should succeed after clearing pairing flag";
+            restoreAppState(snapshot);
+            return false;
+        }
+
+        state.configPanelPairingMismatchAcknowledged = true;
+        if (!instrumentPanel->saveInstrumentPanel(testDir, panelFile, true))
+        {
+            details = "saveInstrumentPanel with allowPairingMismatchSave should succeed";
+            restoreAppState(snapshot);
+            return false;
+        }
+
+        restoreAppState(snapshot);
+        return true;
+    }
+
     bool runMidiDeviceOpenCloseBounds(std::string& details)
     {
         auto* devices = MidiDevices::getInstance();
@@ -1234,6 +1299,11 @@ int main()
     {
         std::string details;
         results.push_back({ "Preset recall persists across groups/buttons", runPresetRecallPersistenceAcrossGroups(details), details });
+    }
+
+    {
+        std::string details;
+        results.push_back({ "Panel save blocked when pairing mismatch acknowledged", runPanelSavePairingMismatchGuard(details), details });
     }
 
     {

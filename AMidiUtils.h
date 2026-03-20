@@ -11,6 +11,7 @@
 #pragma once
 
 #include <array>
+#include <functional>
 
 //==============================================================================
 static void BubbleMessage(Component& targetComponent, const String& textToShow,
@@ -71,7 +72,7 @@ struct AppState final
     int defaultEffectsVol = 100;
     bool configchanged = false;
     bool configreload = false;
-    /** User chose "Load anyway" when cfg vs panel embedded name differed; for future panel-save gating. */
+    /** User chose "Load anyway" when cfg vs panel embedded name differed; gates panel Save until confirmed or realigned. */
     bool configPanelPairingMismatchAcknowledged = false;
 
     String modulefname = "amidimodules.mod";
@@ -223,6 +224,17 @@ inline void clearConfigPanelPairingMismatchIfAligned(AppState& state)
 {
     if (state.configfname == state.pnlconfigfname)
         state.configPanelPairingMismatchAcknowledged = false;
+}
+
+/** Optional: set from UI so keyboard Save buttons refresh after panel save clears pairing state. */
+inline std::function<void()> gNotifyPanelSaveAvailabilityChanged;
+
+/** User-facing text for Save / Save As / Save and Exit when pairing mismatch is acknowledged. */
+inline juce::String getPanelSavePairingMismatchMessage()
+{
+    return "Saving will embed the current active config name into the panel file.\n\n"
+           "Routing may not match this song/style until configs align.\n\n"
+           "Save anyway?";
 }
 
 // To do: Consider moving quick access static Midi in keyboard handler vars below directly 

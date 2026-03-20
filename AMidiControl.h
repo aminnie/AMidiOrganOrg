@@ -599,7 +599,7 @@ public:
         else {
             // When not loading from disk, we recreate the masterpanel file - for now
             // and until custom panels supported.
-            saveInstrumentPanel(instrumentDirectoryName, panelFileName);
+            saveInstrumentPanel(instrumentDirectoryName, panelFileName, true);
         }
 
         return true;
@@ -694,9 +694,15 @@ public:
     // https://forum.juce.com/t/example-for-creating-a-file-and-doing-something-with-it/31998
     // Save current Instrument Panel to Disk
     //-------------------------------------------------------------------------
-    bool saveInstrumentPanel(String instrumentDirectoryName, const String& panelFileName) {
+    bool saveInstrumentPanel(String instrumentDirectoryName, const String& panelFileName, bool allowPairingMismatchSave = false) {
 
         juce::Logger::writeToLog("*** saveInstrumentPanel(): Saving Instrument Panel " + panelFileName);
+
+        if (appState.configPanelPairingMismatchAcknowledged && !allowPairingMismatchSave)
+        {
+            juce::Logger::writeToLog("saveInstrumentPanel(): Blocked (config/panel pairing mismatch not confirmed for save)");
+            return false;
+        }
 
         {   // Scoping
             // Prepare to save Instrument Panel to Disk
@@ -727,13 +733,25 @@ public:
             }
         }
 
+        appState.pnlconfigfname = appState.configfname;
+        clearConfigPanelPairingMismatchIfAligned(appState);
+
+        if (gNotifyPanelSaveAvailabilityChanged)
+            gNotifyPanelSaveAvailabilityChanged();
+
         return true;
     }
 
     // Save Panel with Full Path Name
-    bool saveInstrumentPanel(const String& panelfullpathfname) {
+    bool saveInstrumentPanel(const String& panelfullpathfname, bool allowPairingMismatchSave = false) {
 
         juce::Logger::writeToLog("*** saveInstrumentPanel(): Saving Instrument Panel " + panelfullpathfname);
+
+        if (appState.configPanelPairingMismatchAcknowledged && !allowPairingMismatchSave)
+        {
+            juce::Logger::writeToLog("saveInstrumentPanel(): Blocked (config/panel pairing mismatch not confirmed for save)");
+            return false;
+        }
 
         {   // Scoping
             // Prepare to save Instrument Panel to Disk
@@ -760,6 +778,12 @@ public:
                 return false;
             }
         }
+
+        appState.pnlconfigfname = appState.configfname;
+        clearConfigPanelPairingMismatchIfAligned(appState);
+
+        if (gNotifyPanelSaveAvailabilityChanged)
+            gNotifyPanelSaveAvailabilityChanged();
 
         return true;
     }
@@ -3848,9 +3872,7 @@ struct KeyboardPanelPage final : public Component,
             gxtbchange->onClick = [=, &tabs, &voicespage]()
                 {
                     bpendingSoundEdit = true;
-                    if (cbSave != nullptr)
-                        cbSave->setEnabled(true);
-                    updatePanelSaveButtonsPendingStyle();
+                    refreshPanelSaveAvailability();
 
                     //String strstatus = "Change Sound Button";
                     //statusLabel->setText(strstatus, juce::dontSendNotification);
@@ -3885,9 +3907,7 @@ struct KeyboardPanelPage final : public Component,
             gxtbedit->onClick = [=, &tabs, &effectspage]()
                 {
                     bpendingEffectsEdit = true;
-                    if (cbSave != nullptr)
-                        cbSave->setEnabled(true);
-                    updatePanelSaveButtonsPendingStyle();
+                    refreshPanelSaveAvailability();
 
                     //String strstatus = "Edit Sound Button";
                     //statusLabel->setText(strstatus, juce::dontSendNotification);
@@ -3961,9 +3981,7 @@ struct KeyboardPanelPage final : public Component,
                     if (tbsetpreset->getToggleState()) {
                         bsetpreset = true;
                         bpendingPresetSet = true;
-                        if (cbSave != nullptr)
-                            cbSave->setEnabled(true);
-                        updatePanelSaveButtonsPendingStyle();
+                        refreshPanelSaveAvailability();
 
                         DBG("PresetButton.onClick(): Set");
                     }
@@ -4322,7 +4340,7 @@ struct KeyboardPanelPage final : public Component,
 
                     String msgloaded;
                     if (!bsaved) {
-                        msgloaded = "Saved failed: " + appState.panelfname;
+                        msgloaded = "Save failed: " + appState.panelfname;
                         juce::Logger::writeToLog("*** KeyboardManualPage(): Save failed! " + appState.panelfname);
                     }
                     else {
@@ -4335,9 +4353,7 @@ struct KeyboardPanelPage final : public Component,
 
                     if (bsaved)
                         clearPendingExitSavePrompt();
-                    updatePanelSaveButtonsPendingStyle();
-
-                    tbSave->setEnabled(false);
+                    refreshPanelSaveAvailability();
                 };
             tbSave->setEnabled(false);
 
@@ -4374,7 +4390,6 @@ struct KeyboardPanelPage final : public Component,
                         [=](const FileChooser& chooser)
                         {
                             String selectedfname;
-                            bool bsaved = false;
 
                             auto results = chooser.getURLResults();
 
@@ -4390,24 +4405,51 @@ struct KeyboardPanelPage final : public Component,
                                     selectedfname = selectedfname + ".pnl";
                                 }
 
-                                bsaved = instrumentpanel->saveInstrumentPanel(appState.instrumentdname, selectedfname);
+                                auto finishSaveAs = [this, tbSaveAs, selectedfname](bool allowMismatch)
+                                    {
+                                        const bool ok = instrumentpanel->saveInstrumentPanel(
+                                            appState.instrumentdname, selectedfname, allowMismatch);
 
-                                String msgloaded;
-                                if (!bsaved) {
-                                    msgloaded = "Save as failed: " + selectedfname;
-                                    juce::Logger::writeToLog("*** KeyboardManualPage(): Save as failed! " + selectedfname);
+                                        String msgloaded;
+                                        if (!ok) {
+                                            msgloaded = "Save as failed: " + selectedfname + "\nConfig: " + appState.configfname;
+                                            juce::Logger::writeToLog("*** KeyboardManualPage(): Save as failed! " + selectedfname);
+                                        }
+                                        else {
+                                            msgloaded = "Saved as: " + selectedfname + "\nConfig: " + appState.configfname;
+                                            juce::Logger::writeToLog("*** KeyboardManualPage(): Saved as " + selectedfname
+                                                + " (embedded config: " + appState.configfname + ")");
+                                        }
+
+                                        if (TextButton* focused = tbSaveAs)
+                                            BubbleMessage(*focused, msgloaded, this->bubbleMessage);
+
+                                        if (ok)
+                                            clearPendingExitSavePrompt();
+                                        refreshPanelSaveAvailability();
+                                    };
+
+                                if (appState.configPanelPairingMismatchAcknowledged)
+                                {
+                                    auto safeKb = juce::Component::SafePointer<KeyboardPanelPage>(this);
+                                    juce::AlertWindow::showOkCancelBox(
+                                        juce::AlertWindow::WarningIcon,
+                                        "Config / panel mismatch",
+                                        getPanelSavePairingMismatchMessage(),
+                                        "Save anyway",
+                                        "Cancel",
+                                        this,
+                                        juce::ModalCallbackFunction::create([safeKb, finishSaveAs](int r)
+                                            {
+                                                if (safeKb == nullptr || r != 1)
+                                                    return;
+                                                finishSaveAs(true);
+                                            }));
                                 }
-                                else {
-                                    msgloaded = "Saved as: " + selectedfname;
-                                    juce::Logger::writeToLog("*** KeyboardManualPage(): Saved as " + selectedfname);
+                                else
+                                {
+                                    finishSaveAs(false);
                                 }
-
-                                if (TextButton* focused = tbSaveAs)
-                                    BubbleMessage(*focused, msgloaded, this->bubbleMessage);
-
-                                if (bsaved)
-                                    clearPendingExitSavePrompt();
-                                updatePanelSaveButtonsPendingStyle();
                             }
                             else {
                                 statusLabel->setText("Empty file name save! " + selectedfname, juce::dontSendNotification);
@@ -4464,8 +4506,7 @@ struct KeyboardPanelPage final : public Component,
             instrumentpanel->panelpresets->setMuteStatus(pstidx, i, bmuted);
         }
 
-        cbSave->setEnabled(true);
-        updatePanelSaveButtonsPendingStyle();
+        refreshPanelSaveAvailability();
 
         // Read Rotary Status for every Button Group
     }
@@ -4624,8 +4665,7 @@ struct KeyboardPanelPage final : public Component,
 
             bvoiceupdated = false;
 
-            cbSave->setEnabled(true);
-            updatePanelSaveButtonsPendingStyle();
+            refreshPanelSaveAvailability();
 
             return;
         }
@@ -4634,8 +4674,7 @@ struct KeyboardPanelPage final : public Component,
         else if (beffectsupdated) {
             beffectsupdated = false;
 
-            cbSave->setEnabled(true);
-            updatePanelSaveButtonsPendingStyle();
+            refreshPanelSaveAvailability();
 
             return;
         }
@@ -4708,12 +4747,58 @@ struct KeyboardPanelPage final : public Component,
         }
 
         lblpanelfile->setText(appState.panelfname, {});
+        refreshPanelSaveAvailability();
     }
 
     //-----------------------------------------------------------------------------
     ~KeyboardPanelPage()
     {
         DBG("== KeyboardManualPage(): Destructor " + std::to_string(--zinstcntmanualpage));
+    }
+
+    void refreshPanelSaveAvailability()
+    {
+        if (cbSave != nullptr)
+        {
+            const bool pending = hasPendingExitSavePrompt();
+            const bool pairingOk = !appState.configPanelPairingMismatchAcknowledged;
+            const bool canSave = pending && pairingOk;
+            cbSave->setEnabled(canSave);
+
+            if (canSave)
+            {
+                cbSave->setTooltip("Save the instrument panel to the current .pnl file.");
+            }
+            else if (!pairingOk)
+            {
+                cbSave->setTooltip(
+                    "Config/panel mismatch (you chose Load anyway). Save is disabled here; use Save As, "
+                    "or load a config and panel that match.");
+            }
+            else if (!pending)
+            {
+                cbSave->setTooltip("Save appears when you change sounds, effects, or preset set on the panel.");
+            }
+            else
+            {
+                cbSave->setTooltip({});
+            }
+        }
+
+        if (cbSaveAs != nullptr)
+        {
+            if (appState.configPanelPairingMismatchAcknowledged)
+            {
+                cbSaveAs->setTooltip(
+                    "A dialog will ask you to confirm; the saved panel will embed the current config file name.");
+            }
+            else
+            {
+                cbSaveAs->setTooltip("Save the panel under a new or existing .pnl file name.");
+            }
+        }
+
+        updatePanelSaveButtonsPendingStyle();
     }
 
 private:
@@ -4975,7 +5060,10 @@ class MidiStartPage final : public Component,
     public ComponentListener
 {
 public:
-    MidiStartPage(TabbedComponent& tabs, std::function<bool(const juce::String&)> loadConfigFromBasenameFn) : midiKeyboard(keyboardState, MidiKeyboardComponent::horizontalKeyboard),
+    MidiStartPage(TabbedComponent& tabs,
+                  std::function<bool(const juce::String&)> loadConfigFromBasenameFn,
+                  std::function<void()> refreshKeyboardPanelSaveAvailabilityFn = {}) :
+        midiKeyboard(keyboardState, MidiKeyboardComponent::horizontalKeyboard),
         midiInputSelector(new MidiDeviceListBox("Midi Input Selector", *this, true)),
         midiOutputSelector(new MidiDeviceListBox("Midi Output Selector", *this, false)),
         instrumentmodules(InstrumentModules::getInstance()),
@@ -4983,7 +5071,8 @@ public:
         mididevices(MidiDevices::getInstance()),
         instrumentpanel(InstrumentPanel::getInstance()),
         appState(getAppState()),
-        loadConfigFromBasename(std::move(loadConfigFromBasenameFn))
+        loadConfigFromBasename(std::move(loadConfigFromBasenameFn)),
+        refreshKeyboardPanelSaveAvailability(std::move(refreshKeyboardPanelSaveAvailabilityFn))
     {
         juce::Logger::writeToLog("== MidiStartPage(): Constructor " + std::to_string(zinstcntMidiStartPage++));
 
@@ -5075,6 +5164,8 @@ public:
                                     : ("Load failed: " + selectedfname);
                                 if (TextButton* focused = &loadConfigButton)
                                     BubbleMessage(*focused, msgloaded, this->bubbleMessage);
+                                if (refreshKeyboardPanelSaveAvailability)
+                                    refreshKeyboardPanelSaveAvailability();
                             };
 
                         if (selectedfname == appState.pnlconfigfname)
@@ -5115,6 +5206,8 @@ public:
                                         : ("Load failed: " + selectedfname);
                                     if (juce::TextButton* focused = &safeStart->loadConfigButton)
                                         BubbleMessage(*focused, msgloaded, safeStart->bubbleMessage);
+                                    if (safeStart->refreshKeyboardPanelSaveAvailability)
+                                        safeStart->refreshKeyboardPanelSaveAvailability();
                                 }));
                     });
             };
@@ -5192,6 +5285,9 @@ public:
                                     configfileLabel.setColour(juce::Label::textColourId, juce::Colours::red.darker());
                                 else
                                     configfileLabel.setColour(juce::Label::textColourId, juce::Colours::grey);
+
+                                if (refreshKeyboardPanelSaveAvailability)
+                                    refreshKeyboardPanelSaveAvailability();
                             };
 
                         auto runPanelLoad = [this, selectedfname, selectedfullpathfname, finishPanelLoadUi]()
@@ -5246,6 +5342,8 @@ public:
                                         safeStart->configfileLabel.setColour(juce::Label::textColourId, juce::Colours::red.darker());
                                     else
                                         safeStart->configfileLabel.setColour(juce::Label::textColourId, juce::Colours::grey);
+                                    if (safeStart->refreshKeyboardPanelSaveAvailability)
+                                        safeStart->refreshKeyboardPanelSaveAvailability();
                                 }));
                     });
             };
@@ -5927,6 +6025,7 @@ private:
     InstrumentPanel* instrumentpanel = nullptr;
     MidiInstruments* midiInstruments = nullptr;
     std::function<bool(const juce::String&)> loadConfigFromBasename;
+    std::function<void()> refreshKeyboardPanelSaveAvailability;
     AppState& appState;
     bool shutdownRequested = false;
 
@@ -6126,11 +6225,12 @@ static int zinstcntvoicespage = 0;
 class ConfigPage final : public Component
 {
 public:
-    ConfigPage(TabbedComponent& tabs) :
+    ConfigPage(TabbedComponent& tabs, std::function<void()> refreshKeyboardPanelSaveAvailabilityFn = {}) :
         instrumentmodules(InstrumentModules::getInstance()),
         mididevices(MidiDevices::getInstance()), // Singleton if there isn't already one
         instrumentpanel(InstrumentPanel::getInstance()), // Singleton if there isn't already one
-        appState(getAppState())
+        appState(getAppState()),
+        refreshKeyboardPanelSaveAvailability(std::move(refreshKeyboardPanelSaveAvailabilityFn))
     {
         juce::Logger::writeToLog("== ConfigPage(): Constructor " + std::to_string(zinstcntvoicespage++));
 
@@ -6501,6 +6601,8 @@ public:
                             appState.configPanelPairingMismatchAcknowledged = false;
                             const bool bloaded = loadConfigFileBasename(selectedfname);
                             bubbleResult(bloaded);
+                            if (refreshKeyboardPanelSaveAvailability)
+                                refreshKeyboardPanelSaveAvailability();
                             return;
                         }
 
@@ -6527,6 +6629,8 @@ public:
                                         : ("Load failed:\n " + selectedfname);
                                     if (juce::TextButton* focused = &safeThis->loadConfigButton)
                                         BubbleMessage(*focused, msgloaded, safeThis->bubbleMessage);
+                                    if (safeThis->refreshKeyboardPanelSaveAvailability)
+                                        safeThis->refreshKeyboardPanelSaveAvailability();
                                 }));
                     });
             };
@@ -6763,6 +6867,7 @@ private:
     InstrumentPanel* instrumentpanel = nullptr;
     InstrumentModules* instrumentmodules = nullptr;
     AppState& appState;
+    std::function<void()> refreshKeyboardPanelSaveAvailability;
 
     ValueTree vtconfigs;
 
@@ -7416,7 +7521,14 @@ public:
 
         auto colour = findColour (ResizableWindow::backgroundColourId);
 
-        ConfigPage* configspage = new ConfigPage(*this);
+        std::function<void()> refreshKbPanelSaves = [this]()
+            {
+                for (int i = 0; i < getNumTabs(); ++i)
+                    if (auto* k = dynamic_cast<KeyboardPanelPage*>(getTabContentComponent(i)))
+                        k->refreshPanelSaveAvailability();
+            };
+
+        ConfigPage* configspage = new ConfigPage(*this, refreshKbPanelSaves);
         EffectsPage* effectspage = new EffectsPage(*this);
         VoicesPage* voicespage = new VoicesPage(*this);
 
@@ -7424,7 +7536,7 @@ public:
         addTab("Start",        colour, new MidiStartPage(*this, [configspage](const juce::String& b)
             {
                 return configspage->loadConfigFileBasename(b);
-            }), true);
+            }, refreshKbPanelSaves), true);
 
         // Create Upper, Lower and Bass&Drum Pages
         //KeyboardPanelPage* upperpanel = new KeyboardPanelPage(*this, PTUpper, *effectspage, *voicespage);
@@ -7449,7 +7561,14 @@ public:
         this->setCurrentTabIndex(PTStart, true);
         String sname = this->getCurrentTabName();
 
+        gNotifyPanelSaveAvailabilityChanged = std::move(refreshKbPanelSaves);
+
         //this->grabKeyboardFocus();
+    }
+
+    ~MenuTabs() override
+    {
+        gNotifyPanelSaveAvailabilityChanged = {};
     }
 
     void mouseDown(const MouseEvent& e) override
@@ -7531,23 +7650,50 @@ public:
 
                             if (result == 1)
                             {
-                                auto* panel = InstrumentPanel::getInstance();
                                 auto& appState = getAppState();
-                                bool saved = false;
-                                if (panel != nullptr)
-                                    saved = panel->saveInstrumentPanel(appState.panelfullpathname);
+                                auto saveAndExit = [safeThis, closeApplication](bool allowMismatch)
+                                    {
+                                        if (safeThis == nullptr)
+                                            return;
 
-                                if (!saved)
+                                        auto* panel = InstrumentPanel::getInstance();
+                                        bool saved = false;
+                                        if (panel != nullptr)
+                                            saved = panel->saveInstrumentPanel(getAppState().panelfullpathname, allowMismatch);
+
+                                        if (!saved)
+                                        {
+                                            AlertWindow::showMessageBoxAsync(
+                                                AlertWindow::WarningIcon,
+                                                "Save Failed",
+                                                "Panel save failed. Please save manually before exiting.");
+                                            return;
+                                        }
+
+                                        clearPendingExitSavePrompt();
+                                        closeApplication();
+                                    };
+
+                                if (appState.configPanelPairingMismatchAcknowledged)
                                 {
-                                    AlertWindow::showMessageBoxAsync(
+                                    AlertWindow::showOkCancelBox(
                                         AlertWindow::WarningIcon,
-                                        "Save Failed",
-                                        "Panel save failed. Please save manually before exiting.");
-                                    return;
+                                        "Config / panel mismatch",
+                                        getPanelSavePairingMismatchMessage(),
+                                        "Save anyway",
+                                        "Cancel",
+                                        safeThis.getComponent(),
+                                        ModalCallbackFunction::create([safeThis, saveAndExit](int r2)
+                                            {
+                                                if (safeThis == nullptr || r2 != 1)
+                                                    return;
+                                                saveAndExit(true);
+                                            }));
                                 }
-
-                                clearPendingExitSavePrompt();
-                                closeApplication();
+                                else
+                                {
+                                    saveAndExit(false);
+                                }
                             }
                             else if (result == 2)
                             {
