@@ -300,6 +300,7 @@ Supported MIDI hardware and software sound modules:
   - Useful when solo channel output conflicts with keyboard split behavior.
   - Block list recalculated on startup or Config save.
 - Config applies globally to the application, independent of loaded instrument panel.
+- **Save guard (sound module changes):** If you change the **MIDI sound module** assignment for any button group and then choose **Save** on the same `.cfg` file, the app scans all `*.pnl` files under `Documents/AMidiOrgan` for panels whose embedded `configfilename` matches that config. If any reference it, **Save is blocked** and a dialog explains why—use **Save As** with a **new** file name so existing song/style panels keep using the previous rig file. If nothing references the config, you get a short confirmation that the scan ran. **Save As** to a different file name is never blocked by this rule; choosing the **same** file name as the active config runs the same check as **Save**.
 - To do:
   - evaluate moving config scope into panel saves (per instrument panel),
   - add feature to load different instrument JSON files.
