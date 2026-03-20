@@ -244,11 +244,13 @@ Supported MIDI hardware and software sound modules:
   - 1 Manual preset (default on startup)
   - 6 programmable presets
 - Each preset stores active/selected voice button in each button group for all 3 keyboard panels.
+- Each preset also stores per-button-group **rotary** snapshot values (used with preset recall). Values are **0** = slow, **1** = fast, **2** = brake. Upper manual rotary updates groups 0–3; Lower updates groups 4–7.
 - Preset references reflect currently selected sound and effects.
 - Preset programming flow:
   - Select target preset.
   - Adjust active buttons as needed across panels.
   - Click `Preset Set`, then click preset button to update.
+- Changing the Upper/Lower **Rotary** controls also updates the **active** preset’s stored rotary (so **Save** on the panel writes non-zero `rotary` fields without an extra Set step). Use **Preset Set** to capture a full snapshot (all groups, including Bass) into the selected preset.
 - Preset button group is shared by all keyboard panels.
   - Selection on any panel captures all three panels into the preset.
 - Save instrument panel to persist preset selections to disk.
@@ -256,7 +258,9 @@ Supported MIDI hardware and software sound modules:
 ### 5. Rotary Button Group
 
 - Available on Upper and Lower keyboard panels.
+- Switching the main **Upper** / **Lower** / **Bass&Drums** tabs refreshes the rotary control labels/toggles from saved manual state (no extra MIDI on tab change).
 - Controls rotor speed (Fast/Slow) and Brake On/Off.
+- **Upper** and **Lower** manual Fast/Slow and Brake positions are saved on the **instrument panel** root (with **Save** / **Save As**) and restored on panel load—separate from the per-group **rotary** field stored **inside each preset** (see Presets).
 - Uses internal ramp list at 100 ms intervals for speed transitions.
 - To do: improve synchronization of voice startup fast/slow state.
 

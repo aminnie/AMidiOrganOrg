@@ -53,6 +53,10 @@ namespace
         int defaultEffectsVol = 100;
         bool configreload = false;
         bool configPanelPairingMismatchAcknowledged = false;
+        bool upperManualRotaryFast = true;
+        bool upperManualRotaryBrake = false;
+        bool lowerManualRotaryFast = true;
+        bool lowerManualRotaryBrake = false;
     };
 
     AppStateSnapshot takeAppStateSnapshot()
@@ -67,6 +71,10 @@ namespace
         snapshot.defaultEffectsVol = state.defaultEffectsVol;
         snapshot.configreload = state.configreload;
         snapshot.configPanelPairingMismatchAcknowledged = state.configPanelPairingMismatchAcknowledged;
+        snapshot.upperManualRotaryFast = state.upperManualRotaryFast;
+        snapshot.upperManualRotaryBrake = state.upperManualRotaryBrake;
+        snapshot.lowerManualRotaryFast = state.lowerManualRotaryFast;
+        snapshot.lowerManualRotaryBrake = state.lowerManualRotaryBrake;
         return snapshot;
     }
 
@@ -81,6 +89,10 @@ namespace
         state.defaultEffectsVol = snapshot.defaultEffectsVol;
         state.configreload = snapshot.configreload;
         state.configPanelPairingMismatchAcknowledged = snapshot.configPanelPairingMismatchAcknowledged;
+        state.upperManualRotaryFast = snapshot.upperManualRotaryFast;
+        state.upperManualRotaryBrake = snapshot.upperManualRotaryBrake;
+        state.lowerManualRotaryFast = snapshot.lowerManualRotaryFast;
+        state.lowerManualRotaryBrake = snapshot.lowerManualRotaryBrake;
     }
 
     bool prepareTestInstrumentJson(const String& testDirName, const String& fileName, std::string& details)

@@ -90,6 +90,13 @@ struct AppState final
     bool isrotary = true;
     bool iszerobased = true;
 
+    /** Manual Leslie Fast/Slow + Brake UI on Upper keyboard tab (saved on panel root). */
+    bool upperManualRotaryFast = true;
+    bool upperManualRotaryBrake = false;
+    /** Manual Leslie Fast/Slow + Brake UI on Lower keyboard tab (saved on panel root). */
+    bool lowerManualRotaryFast = true;
+    bool lowerManualRotaryBrake = false;
+
     // Static voice from the 1st voice in selected Midi module. Used to create new panel file.
     String sdefVoice;
     int sdefMSB = 0;
@@ -228,6 +235,27 @@ inline void clearConfigPanelPairingMismatchIfAligned(AppState& state)
 
 /** Optional: set from UI so keyboard Save buttons refresh after panel save clears pairing state. */
 inline std::function<void()> gNotifyPanelSaveAvailabilityChanged;
+
+/** Optional: after panel load, sync Upper/Lower manual rotary buttons from AppState. */
+inline std::function<void()> gNotifyManualRotarySyncFromAppState;
+
+/** Optional: after preset recall, sync Upper/Lower rotary UI from ButtonGroup::rotary. */
+inline std::function<void()> gNotifyPresetRotarySyncFromButtonGroups;
+
+/** Preset rotary encoding in .pnl per ButtonGroup: 0=slow, 1=fast, 2=brake (see tests). */
+inline int encodePresetRotaryFromManual(bool isFast, bool brake) noexcept
+{
+    if (brake)
+        return 2;
+    return isFast ? 1 : 0;
+}
+
+inline void decodePresetRotary(int r, bool& isFast, bool& brake) noexcept
+{
+    const int rr = juce::jlimit(0, 2, r);
+    brake = (rr == 2);
+    isFast = (rr == 1);
+}
 
 /** User-facing text for Save / Save As / Save and Exit when pairing mismatch is acknowledged. */
 inline juce::String getPanelSavePairingMismatchMessage()

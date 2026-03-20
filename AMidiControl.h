@@ -468,6 +468,50 @@ public:
         return bgroup;
     }
 
+    /** Copy active preset rotary snapshot into each ButtonGroup::rotary (used before Save / after panel load). */
+    void syncButtonGroupRotaryFromActivePreset()
+    {
+        if (panelpresets == nullptr)
+            return;
+
+        const int pst = juce::jlimit(0, numberpresets - 1, panelpresets->getActivePresetIdx());
+        for (int i = 0; i < numberbuttongroups; ++i)
+        {
+            const int r = juce::jlimit(0, 2, panelpresets->getRotaryStatus(pst, i));
+            getButtonGroup(i)->rotary = r;
+        }
+    }
+
+    /** Send rotor CC for each button group from current ButtonGroup::rotary (e.g. after preset recall). */
+    void sendMidiForStoredButtonGroupRotaryState()
+    {
+        auto* mod = InstrumentModules::getInstance();
+        auto* dev = MidiDevices::getInstance();
+        if (mod == nullptr || dev == nullptr)
+            return;
+
+        for (int i = 0; i < numberbuttongroups; ++i)
+        {
+            ButtonGroup* bg = getButtonGroup(i);
+            const int r = juce::jlimit(0, 2, bg->rotary);
+            const int midx = bg->moduleidx;
+            if (mod->getRotorType(midx) < 1)
+                continue;
+
+            const int mout = bg->midiout;
+            const int cc = mod->getRotorCC(midx);
+            int val = mod->getRotorSlow(midx);
+            if (r == 2)
+                val = mod->getRotorOff(midx);
+            else if (r == 1)
+                val = mod->getRotorFast(midx);
+
+            auto ccMessage = juce::MidiMessage::controllerEvent(mout, cc, val);
+            ccMessage.setTimeStamp(juce::Time::getMillisecondCounterHiRes() * 0.001);
+            dev->sendToOutputs(ccMessage);
+        }
+    }
+
     //-------------------------------------------------------------------------
     bool initInstrumentPanel(String instrumentDirectoryName, const String& panelFileName, bool fromdisk) 
     {
@@ -682,6 +726,11 @@ public:
                 //int instrumentcount = vtinstrumentpanel.getNumChildren();
 
                 loadVTInstrumentPanel();
+
+                syncButtonGroupRotaryFromActivePreset();
+
+                if (gNotifyManualRotarySyncFromAppState)
+                    gNotifyManualRotarySyncFromAppState();
             }
         }
 
@@ -895,6 +944,15 @@ private:
         panelTree.setProperty(vendorType, vendorname, nullptr);
         panelTree.setProperty(configfilenameType, appState.configfname, nullptr);
 
+        static const juce::Identifier manualRotaryUpperFastId("manualRotaryUpperFast");
+        static const juce::Identifier manualRotaryUpperBrakeId("manualRotaryUpperBrake");
+        static const juce::Identifier manualRotaryLowerFastId("manualRotaryLowerFast");
+        static const juce::Identifier manualRotaryLowerBrakeId("manualRotaryLowerBrake");
+        panelTree.setProperty(manualRotaryUpperFastId, appState.upperManualRotaryFast, nullptr);
+        panelTree.setProperty(manualRotaryUpperBrakeId, appState.upperManualRotaryBrake, nullptr);
+        panelTree.setProperty(manualRotaryLowerFastId, appState.lowerManualRotaryFast, nullptr);
+        panelTree.setProperty(manualRotaryLowerBrakeId, appState.lowerManualRotaryBrake, nullptr);
+
         // Add VoiceButton Instruments from Panel to ValueTree
         for (int i = 0; i < numbervoicebuttons; i++)
         {
@@ -1039,6 +1097,15 @@ private:
         appState.pnlconfigfname = vtinstrumentpanel.getProperty(configfilenameType);
         // Flag a Config reload needed based on config paramter in Panel File
         appState.configreload = (appState.configfname.compare(appState.pnlconfigfname) != 0);
+
+        static const juce::Identifier manualRotaryUpperFastId("manualRotaryUpperFast");
+        static const juce::Identifier manualRotaryUpperBrakeId("manualRotaryUpperBrake");
+        static const juce::Identifier manualRotaryLowerFastId("manualRotaryLowerFast");
+        static const juce::Identifier manualRotaryLowerBrakeId("manualRotaryLowerBrake");
+        appState.upperManualRotaryFast = (bool) vtinstrumentpanel.getProperty(manualRotaryUpperFastId, true);
+        appState.upperManualRotaryBrake = (bool) vtinstrumentpanel.getProperty(manualRotaryUpperBrakeId, false);
+        appState.lowerManualRotaryFast = (bool) vtinstrumentpanel.getProperty(manualRotaryLowerFastId, true);
+        appState.lowerManualRotaryBrake = (bool) vtinstrumentpanel.getProperty(manualRotaryLowerBrakeId, false);
 
         panelbuttonidx = 0;
 
@@ -4163,16 +4230,25 @@ struct KeyboardPanelPage final : public Component,
                         tbrotslow->setButtonText("Slow");
                         isFastUpper = false;
                     }
-                };
 
-            // Preset rotary change control value to slow
-            RotaryFastSlow(gmidichan, 
-                instrumentmodules->getRotorCC(buttongroupmoduleidx),        //74
-                instrumentmodules->getRotorSlow(buttongroupmoduleidx)
-            );
-            //// Check slow/fast startup as organ rotary seems to be out of sync at startp
-            //// If we keep, then is the above redundant?
-            tbrotslow->onClick();
+                    commitManualRotaryToAppState();
+                    {
+                        const int enc = encodePresetRotaryFromManual(isFastUpper, rotarybrake);
+                        const int pst = juce::jlimit(0, numberpresets - 1, instrumentpanel->panelpresets->getActivePresetIdx());
+                        if (tabidx == PTUpper) {
+                            for (int gg = 0; gg <= 3; ++gg) {
+                                instrumentpanel->getButtonGroup(gg)->rotary = enc;
+                                instrumentpanel->panelpresets->setRotaryStatus(pst, gg, enc);
+                            }
+                        }
+                        else if (tabidx == PTLower) {
+                            for (int gg = 4; gg <= 7; ++gg) {
+                                instrumentpanel->getButtonGroup(gg)->rotary = enc;
+                                instrumentpanel->panelpresets->setRotaryStatus(pst, gg, enc);
+                            }
+                        }
+                    }
+                };
 
             tbrotbrake = addToList(new CommandButton());
             tbrotbrake->setButtonText("Brake Off");
@@ -4230,9 +4306,29 @@ struct KeyboardPanelPage final : public Component,
                         tbrotbrake->setButtonText("Brake Off");
                         rotarybrake = false;
 
-                        tbrotslow->setEnabled(true);     // Enable rotor fast/slow changes
+                        tbrotslow->setEnabled(isrotary);     // Enable rotor fast/slow changes when module supports it
+                    }
+
+                    commitManualRotaryToAppState();
+                    {
+                        const int enc = encodePresetRotaryFromManual(isFastUpper, rotarybrake);
+                        const int pst = juce::jlimit(0, numberpresets - 1, instrumentpanel->panelpresets->getActivePresetIdx());
+                        if (tabidx == PTUpper) {
+                            for (int gg = 0; gg <= 3; ++gg) {
+                                instrumentpanel->getButtonGroup(gg)->rotary = enc;
+                                instrumentpanel->panelpresets->setRotaryStatus(pst, gg, enc);
+                            }
+                        }
+                        else if (tabidx == PTLower) {
+                            for (int gg = 4; gg <= 7; ++gg) {
+                                instrumentpanel->getButtonGroup(gg)->rotary = enc;
+                                instrumentpanel->panelpresets->setRotaryStatus(pst, gg, enc);
+                            }
+                        }
                     }
                 };
+
+            applyManualRotaryFromAppState();
         }   // End - Rotary Group
 
         // Quick Access Keyboard Buttons
@@ -4506,9 +4602,13 @@ struct KeyboardPanelPage final : public Component,
             instrumentpanel->panelpresets->setMuteStatus(pstidx, i, bmuted);
         }
 
-        refreshPanelSaveAvailability();
+        // Read Rotary Status for every Button Group (0=slow, 1=fast, 2=brake — matches .pnl preset field)
+        for (int i = 0; i < numberbuttongroups; i++) {
+            ButtonGroup* ptrbuttongroup = instrumentpanel->getButtonGroup(i);
+            instrumentpanel->panelpresets->setRotaryStatus(pstidx, i, ptrbuttongroup->rotary);
+        }
 
-        // Read Rotary Status for every Button Group
+        refreshPanelSaveAvailability();
     }
 
     // Preset Keyboard Panel Voice Buttons with selected Preset (all 3 keyboards)
@@ -4543,7 +4643,16 @@ struct KeyboardPanelPage final : public Component,
             }
         }
 
-        // Activate Rotary for every Button Group
+        // Activate Rotary for every Button Group (snapshot + MIDI + Upper/Lower UI)
+        for (int i = 0; i < numberbuttongroups; i++) {
+            const int irotary = instrumentpanel->panelpresets->getRotaryStatus(pstidx, i);
+            instrumentpanel->getButtonGroup(i)->rotary = juce::jlimit(0, 2, irotary);
+        }
+
+        instrumentpanel->sendMidiForStoredButtonGroupRotaryState();
+
+        if (gNotifyPresetRotarySyncFromButtonGroups)
+            gNotifyPresetRotarySyncFromButtonGroups();
     }
 
     // After Panel Load, update all the Buttons by triggering a click on every first button in a Group
@@ -4801,7 +4910,113 @@ struct KeyboardPanelPage final : public Component,
         updatePanelSaveButtonsPendingStyle();
     }
 
+    /** After preset recall: update this tab's rotary controls from ButtonGroup::rotary (Upper=0, Lower=4). */
+    void applyPresetRotaryUiFromStoredGroups()
+    {
+        if (currenttabidx == PTBass || tbrotslow == nullptr || tbrotbrake == nullptr)
+            return;
+
+        const int g = (currenttabidx == PTLower) ? 4 : 0;
+        bool wantFast = false;
+        bool wantBrake = false;
+        decodePresetRotary(instrumentpanel->getButtonGroup(g)->rotary, wantFast, wantBrake);
+        applyRotaryUiSnapshot(wantFast, wantBrake, true);
+    }
+
+    /** When sendMidi is false, only syncs widget state from AppState (e.g. main tab Upper/Lower switch). */
+    void applyManualRotaryFromAppState(bool sendMidi = true)
+    {
+        if (currenttabidx == PTBass || tbrotslow == nullptr || tbrotbrake == nullptr)
+            return;
+
+        const bool wantFast = (currenttabidx == PTUpper) ? appState.upperManualRotaryFast : appState.lowerManualRotaryFast;
+        const bool wantBrake = (currenttabidx == PTUpper) ? appState.upperManualRotaryBrake : appState.lowerManualRotaryBrake;
+
+        applyRotaryUiSnapshot(wantFast, wantBrake, sendMidi);
+
+        // Align ButtonGroup::rotary with manual Leslie (panel root) for Save + per-preset rotary in .pnl
+        const int eU = encodePresetRotaryFromManual(appState.upperManualRotaryFast, appState.upperManualRotaryBrake);
+        for (int g = 0; g <= 3; ++g)
+            instrumentpanel->getButtonGroup(g)->rotary = eU;
+        const int eL = encodePresetRotaryFromManual(appState.lowerManualRotaryFast, appState.lowerManualRotaryBrake);
+        for (int g = 4; g <= 7; ++g)
+            instrumentpanel->getButtonGroup(g)->rotary = eL;
+    }
+
 private:
+    void applyRotaryUiSnapshot(bool wantFast, bool wantBrake, bool sendMidi)
+    {
+        if (currenttabidx == PTBass || tbrotslow == nullptr || tbrotbrake == nullptr)
+            return;
+
+        const int buttongroupidx = (currenttabidx == PTLower) ? 4 : 0;
+        ButtonGroup* ptrbuttongroup = instrumentpanel->getButtonGroup(buttongroupidx);
+        const int buttongroupmoduleidx = ptrbuttongroup->moduleidx;
+        const int buttongroupmidiout = ptrbuttongroup->midiout;
+        const int rotorType = instrumentmodules->getRotorType(buttongroupmoduleidx);
+
+        if (wantBrake)
+        {
+            if (sendMidi)
+            {
+                RotaryFastSlow(buttongroupmidiout,
+                    instrumentmodules->getRotorCC(buttongroupmoduleidx),
+                    instrumentmodules->getRotorOff(buttongroupmoduleidx)
+                );
+            }
+            tbrotbrake->setToggleState(true, dontSendNotification);
+            tbrotbrake->setButtonText("Brake On");
+            rotarybrake = true;
+            tbrotslow->setEnabled(false);
+            isFastUpper = wantFast;
+        }
+        else
+        {
+            tbrotbrake->setToggleState(false, dontSendNotification);
+            tbrotbrake->setButtonText("Brake Off");
+            rotarybrake = false;
+            const bool rotaryUiEnabled = (isrotary == true) && ((currenttabidx == PTUpper) || (currenttabidx == PTLower));
+            tbrotslow->setEnabled(rotaryUiEnabled);
+
+            if (wantFast)
+            {
+                if (sendMidi)
+                {
+                    if (rotorType == 1) {
+                        RotaryFastSlow(buttongroupmidiout,
+                            instrumentmodules->getRotorCC(buttongroupmoduleidx),
+                            instrumentmodules->getRotorFast(buttongroupmoduleidx)
+                        );
+                    }
+                    else if (rotorType == 2) {
+                        rotorsarray.add(new RotaryFastThread(*this, buttongroupmidiout));
+                    }
+                }
+                tbrotslow->setToggleState(false, dontSendNotification);
+                tbrotslow->setButtonText("Fast");
+                isFastUpper = true;
+            }
+            else
+            {
+                if (sendMidi)
+                {
+                    if (rotorType == 1) {
+                        RotaryFastSlow(buttongroupmidiout,
+                            instrumentmodules->getRotorCC(buttongroupmoduleidx),
+                            instrumentmodules->getRotorSlow(buttongroupmoduleidx)
+                        );
+                    }
+                    else if (rotorType == 2) {
+                        rotorsarray.add(new RotarySlowThread(*this, buttongroupmidiout));
+                    }
+                }
+                tbrotslow->setToggleState(true, dontSendNotification);
+                tbrotslow->setButtonText("Slow");
+                isFastUpper = false;
+            }
+        }
+    }
+
     OwnedArray<Component> components;
 
     double startTime;
@@ -5032,6 +5247,23 @@ private:
         );
         ccMessage.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
         mididevices->sendToOutputs(ccMessage);
+    }
+
+    void commitManualRotaryToAppState()
+    {
+        if (currenttabidx == PTBass || tbrotslow == nullptr)
+            return;
+
+        if (currenttabidx == PTUpper)
+        {
+            appState.upperManualRotaryFast = isFastUpper;
+            appState.upperManualRotaryBrake = rotarybrake;
+        }
+        else if (currenttabidx == PTLower)
+        {
+            appState.lowerManualRotaryFast = isFastUpper;
+            appState.lowerManualRotaryBrake = rotarybrake;
+        }
     }
 
 
@@ -7563,12 +7795,30 @@ public:
 
         gNotifyPanelSaveAvailabilityChanged = std::move(refreshKbPanelSaves);
 
+        std::function<void()> syncManualRotaryKb = [this]()
+            {
+                for (int i = 0; i < getNumTabs(); ++i)
+                    if (auto* k = dynamic_cast<KeyboardPanelPage*>(getTabContentComponent(i)))
+                        k->applyManualRotaryFromAppState();
+            };
+        gNotifyManualRotarySyncFromAppState = std::move(syncManualRotaryKb);
+
+        std::function<void()> syncPresetRotaryKb = [this]()
+            {
+                for (int i = 0; i < getNumTabs(); ++i)
+                    if (auto* k = dynamic_cast<KeyboardPanelPage*>(getTabContentComponent(i)))
+                        k->applyPresetRotaryUiFromStoredGroups();
+            };
+        gNotifyPresetRotarySyncFromButtonGroups = std::move(syncPresetRotaryKb);
+
         //this->grabKeyboardFocus();
     }
 
     ~MenuTabs() override
     {
         gNotifyPanelSaveAvailabilityChanged = {};
+        gNotifyManualRotarySyncFromAppState = {};
+        gNotifyPresetRotarySyncFromButtonGroups = {};
     }
 
     void mouseDown(const MouseEvent& e) override
@@ -7711,6 +7961,14 @@ public:
 
         lastNonExitTabIndex = newCurrentTabIndex;
         TabbedComponent::currentTabChanged(newCurrentTabIndex, newCurrentTabName);
+
+        // Each keyboard tab is a separate KeyboardPanelPage with its own rotary widgets; refresh from
+        // AppState when switching Upper/Lower so Fast/Slow/Brake match the stored manual state.
+        if (newCurrentTabIndex == PTUpper || newCurrentTabIndex == PTLower || newCurrentTabIndex == PTBass)
+        {
+            if (auto* k = dynamic_cast<KeyboardPanelPage*>(getTabContentComponent(newCurrentTabIndex)))
+                k->applyManualRotaryFromAppState(false);
+        }
     }
 
     // Small star button that is put inside one of the tabs
