@@ -672,15 +672,25 @@ public:
             File inputFile;
 
             if (!bfullpath) {
-                // Compile Panel File name from components and remember as full path for future saves
-                inputFile = File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
-                    .getChildFile(organdir)
-                    .getChildFile(instrumentDirectoryName)
-                    .getChildFile(panelFileName);
+                const auto organRoot = File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
+                    .getChildFile(organdir);
+                const auto canonicalPanelDir = organRoot.getChildFile(appState.instrumentdir);
+                const auto canonicalPath = canonicalPanelDir.getChildFile(panelFileName);
 
-                appState.panelfullpathname = inputFile.getFullPathName();
-            }
-            else {
+                // Prefer canonical panel location under Documents/AMidiOrgan/instruments.
+                inputFile = canonicalPath;
+
+                // Legacy fallback: module-named folder under org root.
+                if (!inputFile.existsAsFile() && instrumentDirectoryName.isNotEmpty())
+                    inputFile = organRoot.getChildFile(instrumentDirectoryName).getChildFile(panelFileName);
+
+                // Legacy fallback: panel file directly under org root.
+                if (!inputFile.existsAsFile())
+                    inputFile = organRoot.getChildFile(panelFileName);
+
+                // Keep future saves on the canonical path regardless of where we loaded from.
+                appState.panelfullpathname = canonicalPath.getFullPathName();
+            } else {
                 inputFile = File(panelFileName);
             }
 
@@ -688,10 +698,10 @@ public:
             {
                 juce::Logger::writeToLog("loadInstrumentPanel(): Panel file " + panelFileName + " does not exists! We will revert to the Master Panel File");
 
-                // To do: Add some other error handling
-                ///return false;
+                // Final fallback for master panel in canonical panel directory.
                 inputFile = File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
                     .getChildFile(organdir)
+                    .getChildFile(appState.instrumentdir)
                     .getChildFile(panelFileName);
             }
 
@@ -755,10 +765,17 @@ public:
 
         {   // Scoping
             // Prepare to save Instrument Panel to Disk
+            juce::ignoreUnused(instrumentDirectoryName);
             File outputFile = File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
                 .getChildFile(organdir)
-                .getChildFile(instrumentDirectoryName)
+                .getChildFile(appState.instrumentdir)
                 .getChildFile(panelFileName);
+
+            if (!outputFile.getParentDirectory().exists() && !outputFile.getParentDirectory().createDirectory())
+            {
+                juce::Logger::writeToLog("saveInstrumentPanel(): Failed to create panel directory " + outputFile.getParentDirectory().getFullPathName());
+                return false;
+            }
 
             if (outputFile.existsAsFile())
             {
@@ -782,6 +799,12 @@ public:
             }
         }
 
+        appState.panelfullpathname = File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
+            .getChildFile(organdir)
+            .getChildFile(appState.instrumentdir)
+            .getChildFile(panelFileName)
+            .getFullPathName();
+
         appState.pnlconfigfname = appState.configfname;
         clearConfigPanelPairingMismatchIfAligned(appState);
 
@@ -802,9 +825,23 @@ public:
             return false;
         }
 
+        File outputFile;
         {   // Scoping
             // Prepare to save Instrument Panel to Disk
-            File outputFile = File(panelfullpathfname);
+            outputFile = File(panelfullpathfname);
+            if (panelfullpathfname.isEmpty())
+            {
+                outputFile = File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
+                    .getChildFile(organdir)
+                    .getChildFile(appState.instrumentdir)
+                    .getChildFile(appState.panelfname);
+            }
+
+            if (!outputFile.getParentDirectory().exists() && !outputFile.getParentDirectory().createDirectory())
+            {
+                juce::Logger::writeToLog("saveInstrumentPanel(): Failed to create panel directory " + outputFile.getParentDirectory().getFullPathName());
+                return false;
+            }
 
             if (outputFile.existsAsFile())
             {
@@ -827,6 +864,8 @@ public:
                 return false;
             }
         }
+
+        appState.panelfullpathname = outputFile.getFullPathName();
 
         appState.pnlconfigfname = appState.configfname;
         clearConfigPanelPairingMismatchIfAligned(appState);
