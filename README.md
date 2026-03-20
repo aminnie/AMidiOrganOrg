@@ -300,6 +300,7 @@ Supported MIDI hardware and software sound modules:
   - Useful when solo channel output conflicts with keyboard split behavior.
   - Block list recalculated on startup or Config save.
 - Config applies globally to the application, independent of loaded instrument panel.
+- **Load pairing:** The **Load** button uses the same cfg-vs-panel embedded-name check as the Start tab: if the chosen `.cfg` does not match the panel’s embedded `configfilename`, you get **Abort** or **Load anyway** (JUCE dialog); **Load anyway** records `configPanelPairingMismatchAcknowledged`.
 - **Save guard (sound module changes):** If you change the **MIDI sound module** assignment for any button group and then choose **Save** on the same `.cfg` file, the app scans all `*.pnl` files under `Documents/AMidiOrgan` for panels whose embedded `configfilename` matches that config. If any reference it, **Save is blocked** and a dialog explains why—use **Save As** with a **new** file name so existing song/style panels keep using the previous rig file. If nothing references the config, you get a short confirmation that the scan ran. **Save As** to a different file name is never blocked by this rule; choosing the **same** file name as the active config runs the same check as **Save**.
 - To do:
   - evaluate moving config scope into panel saves (per instrument panel),
@@ -307,6 +308,7 @@ Supported MIDI hardware and software sound modules:
 
 ### 10. MIDI Start Page
 
+- **Load pairing:** **Load Config** and **Load Panel** compare the selected file to the current pairing: the active `.cfg` basename vs the `configfilename` embedded in the instrument panel ValueTree (and for **Load Panel**, the embedded name read from the file you picked). If they differ, a JUCE dialog offers **Abort** or **Load anyway**. **Load anyway** sets `configPanelPairingMismatchAcknowledged` in application state (reserved for a future panel-save gate). **Load Config** on this tab applies the full configuration from disk, consistent with the Config tab **Load** button.
 - MIDI input/output devices are dynamically listed on connect/disconnect.
 - Supports multiple MIDI input keyboards and output devices.
 - Current design assumes one active MIDI sound device at a time.

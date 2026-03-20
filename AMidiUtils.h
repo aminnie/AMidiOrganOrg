@@ -71,6 +71,8 @@ struct AppState final
     int defaultEffectsVol = 100;
     bool configchanged = false;
     bool configreload = false;
+    /** User chose "Load anyway" when cfg vs panel embedded name differed; for future panel-save gating. */
+    bool configPanelPairingMismatchAcknowledged = false;
 
     String modulefname = "amidimodules.mod";
     String defmodulefname = "mastermodules.mod";
@@ -109,6 +111,7 @@ inline String& configdir = getAppState().configdir;
 inline int& defaultEffectsVol = getAppState().defaultEffectsVol;
 inline bool& configchanged = getAppState().configchanged;
 inline bool& configreload = getAppState().configreload;
+inline bool& configPanelPairingMismatchAcknowledged = getAppState().configPanelPairingMismatchAcknowledged;
 inline String& modulefname = getAppState().modulefname;
 inline String& userdata = getAppState().userdata;
 inline int& moduleidx = getAppState().moduleidx;
@@ -193,6 +196,33 @@ inline PanelScanResult countPanelsReferencingConfigFile(const juce::File& organR
     }
 
     return r;
+}
+
+/** Read root `configfilename` from a .pnl ValueTree on disk; empty string if unreadable or missing. */
+inline juce::String readEmbeddedConfigFilenameFromPanelFile(const juce::File& pnlFile)
+{
+    static const juce::Identifier instrumentPanelType("InstrumentPanel");
+    static const juce::Identifier configfilenameType("configfilename");
+
+    if (!pnlFile.existsAsFile())
+        return {};
+
+    juce::FileInputStream in(pnlFile);
+    if (!in.openedOk())
+        return {};
+
+    juce::ValueTree vt = juce::ValueTree::readFromStream(in);
+    if (!vt.isValid() || !vt.hasType(instrumentPanelType))
+        return {};
+
+    return vt.getProperty(configfilenameType).toString();
+}
+
+/** Clear acknowledged pairing drift once active cfg basename matches panel-embedded basename. */
+inline void clearConfigPanelPairingMismatchIfAligned(AppState& state)
+{
+    if (state.configfname == state.pnlconfigfname)
+        state.configPanelPairingMismatchAcknowledged = false;
 }
 
 // To do: Consider moving quick access static Midi in keyboard handler vars below directly 

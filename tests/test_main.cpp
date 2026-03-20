@@ -242,6 +242,48 @@ namespace
         return true;
     }
 
+    bool runReadEmbeddedConfigFilenameFromPanelFile(std::string& details)
+    {
+        const File tempRoot = File::getSpecialLocation(File::tempDirectory)
+            .getChildFile("AMidiOrgan_read_embed_cfg_test");
+
+        if (tempRoot.exists())
+            tempRoot.deleteRecursively();
+
+        if (!tempRoot.createDirectory())
+        {
+            details = "failed to create temp directory for read embed test";
+            return false;
+        }
+
+        struct Cleanup { File f; ~Cleanup() { f.deleteRecursively(); } } cleanup{ tempRoot };
+
+        static const Identifier instrumentPanelType("InstrumentPanel");
+        static const Identifier configfilenameType("configfilename");
+
+        ValueTree vt(instrumentPanelType);
+        vt.setProperty(configfilenameType, "my_embedded_rig.cfg", nullptr);
+
+        const File panelFile = tempRoot.getChildFile("panel_embed_test.pnl");
+        FileOutputStream out(panelFile);
+        if (!out.openedOk())
+        {
+            details = "failed to open output stream for test panel";
+            return false;
+        }
+        vt.writeToStream(out);
+        out.flush();
+
+        if (!out.getStatus().wasOk())
+        {
+            details = "failed to write test panel file";
+            return false;
+        }
+
+        const String got = readEmbeddedConfigFilenameFromPanelFile(panelFile);
+        return expectEqualStr(got, "my_embedded_rig.cfg", "readEmbeddedConfigFilenameFromPanelFile", details);
+    }
+
     bool runAppStateAliasBackcompat(std::string& details)
     {
         auto& state = getAppState();
@@ -1122,6 +1164,11 @@ int main()
     {
         std::string details;
         results.push_back({ "Panel scan counts configfilename references under AMidiOrgan tree", runPanelConfigReferencingScan(details), details });
+    }
+
+    {
+        std::string details;
+        results.push_back({ "readEmbeddedConfigFilenameFromPanelFile reads root configfilename", runReadEmbeddedConfigFilenameFromPanelFile(details), details });
     }
 
     {

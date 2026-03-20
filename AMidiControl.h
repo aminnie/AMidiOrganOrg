@@ -56,6 +56,7 @@
 #include "AMidiButtons.h"
 #include "AMidiRotors.h"
 
+#include <functional>
 #include<iostream>
 #include<fstream>
 
@@ -4974,14 +4975,15 @@ class MidiStartPage final : public Component,
     public ComponentListener
 {
 public:
-    MidiStartPage(TabbedComponent& tabs) : midiKeyboard(keyboardState, MidiKeyboardComponent::horizontalKeyboard),
+    MidiStartPage(TabbedComponent& tabs, std::function<bool(const juce::String&)> loadConfigFromBasenameFn) : midiKeyboard(keyboardState, MidiKeyboardComponent::horizontalKeyboard),
         midiInputSelector(new MidiDeviceListBox("Midi Input Selector", *this, true)),
         midiOutputSelector(new MidiDeviceListBox("Midi Output Selector", *this, false)),
         instrumentmodules(InstrumentModules::getInstance()),
         midiInstruments(MidiInstruments::getInstance()),
         mididevices(MidiDevices::getInstance()),
         instrumentpanel(InstrumentPanel::getInstance()),
-        appState(getAppState())
+        appState(getAppState()),
+        loadConfigFromBasename(std::move(loadConfigFromBasenameFn))
     {
         juce::Logger::writeToLog("== MidiStartPage(): Constructor " + std::to_string(zinstcntMidiStartPage++));
 
@@ -5014,7 +5016,7 @@ public:
         loadConfigButton.setColour(TextButton::buttonColourId, Colours::black);
         loadConfigButton.setColour(TextButton::buttonOnColourId, Colours::black);
         loadConfigButton.setToggleState(true, dontSendNotification);
-        loadConfigButton.onClick = [=]()
+        loadConfigButton.onClick = [this]()
             {
                 File fileToSave = File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
                     .getChildFile(organdir)
@@ -5037,10 +5039,6 @@ public:
                         String selectedfullpathfname;
                         auto results = chooser.getURLResults();
 
-                        //for (auto result : results)
-                        //    selectedfname << (result.isLocalFile() ? result.getLocalFile().getFileName() //.getFullPathName()
-                        //        : result.toString(false));
-
                         for (auto result : results) {
                             if (result.isLocalFile()) {
                                 selectedfname = result.getLocalFile().getFileName();
@@ -5052,31 +5050,72 @@ public:
 
                         if (selectedfname == "") return;
 
-                        juce::Logger::writeToLog("*** MidiStartPage(): Loading Config Panel: " + selectedfname);
+                        juce::Logger::writeToLog("*** MidiStartPage(): Loading Config: " + selectedfname);
 
-                        // Replace with Load Config functionality
-                        //bool bloaded = instrumentpanel->loadInstrumentPanel(instrumentdname, selectedfname, true);
-                        //bool bloaded = instrumentpanel->loadInstrumentPanel(instrumentdname, selectedfullpathfname, true);
-                        bool bloaded = true;
+                        auto refreshConfigLabel = [this]()
+                            {
+                                appState.configreload = (appState.configfname.compare(appState.pnlconfigfname) != 0);
+                                configfileLabel.setText(appState.configfname, {});
+                                if (appState.configreload == true)
+                                    configfileLabel.setColour(juce::Label::textColourId, juce::Colours::red.darker());
+                                else
+                                    configfileLabel.setColour(juce::Label::textColourId, juce::Colours::grey);
+                            };
 
-                        appState.configfname = selectedfname;
-                        configfileLabel.setText(appState.configfname, {});
+                        auto performLoad = [this, selectedfname, refreshConfigLabel]()
+                            {
+                                if (!loadConfigFromBasename)
+                                {
+                                    juce::Logger::writeToLog("*** MidiStartPage(): Load Config: loader not available");
+                                    return;
+                                }
+                                const bool bloaded = loadConfigFromBasename(selectedfname);
+                                refreshConfigLabel();
+                                const String msgloaded = bloaded ? ("Loaded: " + appState.configfname)
+                                    : ("Load failed: " + selectedfname);
+                                if (TextButton* focused = &loadConfigButton)
+                                    BubbleMessage(*focused, msgloaded, this->bubbleMessage);
+                            };
 
-                        String msgloaded;
-                        if (bloaded == true) {
-                            // Successful explicit config load becomes the new active baseline.
-                            appState.pnlconfigfname = appState.configfname;
-                            appState.configreload = false;
-                            configfileLabel.setColour(juce::Label::textColourId, juce::Colours::grey);
-                            msgloaded = "Loaded: " + appState.configfname;
+                        if (selectedfname == appState.pnlconfigfname)
+                        {
+                            appState.configPanelPairingMismatchAcknowledged = false;
+                            performLoad();
+                            return;
                         }
-                        else {
-                            configfileLabel.setColour(juce::Label::textColourId, juce::Colours::red.darker());
-                            msgloaded = "Load failed: " + appState.configfname;
-                        }
 
-                        if (TextButton* focused = &loadConfigButton)
-                            BubbleMessage(*focused, msgloaded, this->bubbleMessage);
+                        const String msg = juce::String("The current instrument panel was saved with \"") + appState.pnlconfigfname
+                            + "\".\nYou selected \"" + selectedfname + "\".\n\n"
+                            "Routing may not match this song/style until configs align.\n\n"
+                            "Load anyway?";
+
+                        auto safeStart = juce::Component::SafePointer<MidiStartPage>(this);
+                        juce::AlertWindow::showOkCancelBox(
+                            juce::AlertWindow::WarningIcon,
+                            "Config / panel mismatch",
+                            msg,
+                            "Load anyway",
+                            "Abort",
+                            this,
+                            juce::ModalCallbackFunction::create([safeStart, selectedfname](int result)
+                                {
+                                    if (safeStart == nullptr || result != 1)
+                                        return;
+                                    safeStart->appState.configPanelPairingMismatchAcknowledged = true;
+                                    if (!safeStart->loadConfigFromBasename)
+                                        return;
+                                    const bool bloaded = safeStart->loadConfigFromBasename(selectedfname);
+                                    safeStart->appState.configreload = (safeStart->appState.configfname.compare(safeStart->appState.pnlconfigfname) != 0);
+                                    safeStart->configfileLabel.setText(safeStart->appState.configfname, {});
+                                    if (safeStart->appState.configreload == true)
+                                        safeStart->configfileLabel.setColour(juce::Label::textColourId, juce::Colours::red.darker());
+                                    else
+                                        safeStart->configfileLabel.setColour(juce::Label::textColourId, juce::Colours::grey);
+                                    const juce::String msgloaded = bloaded ? ("Loaded: " + safeStart->appState.configfname)
+                                        : ("Load failed: " + selectedfname);
+                                    if (juce::TextButton* focused = &safeStart->loadConfigButton)
+                                        BubbleMessage(*focused, msgloaded, safeStart->bubbleMessage);
+                                }));
                     });
             };
 
@@ -5126,34 +5165,88 @@ public:
 
                         if (selectedfname == "") return;
 
-                        juce::Logger::writeToLog("*** MidiStartPage(): Loading Instrument Panel: " + selectedfname);
+                        const juce::File pnlFile(selectedfullpathfname);
+                        const juce::String embeddedCfg = readEmbeddedConfigFilenameFromPanelFile(pnlFile);
 
-                        bool bloaded = instrumentpanel->loadInstrumentPanel(appState.instrumentdname, selectedfullpathfname, true);
+                        auto finishPanelLoadUi = [this, selectedfname, selectedfullpathfname](bool bloaded)
+                            {
+                                appState.panelfname = selectedfname;
+                                appState.panelfullpathname = selectedfullpathfname;
 
-                        // Save Panel File globally
-                        appState.panelfname = selectedfname;
-                        appState.panelfullpathname = selectedfullpathfname; 
+                                juce::String msgloaded;
+                                if (bloaded == true)
+                                    msgloaded = "Loaded panel:\n " + appState.panelfname;
+                                else
+                                    msgloaded = "Panel load failed: " + appState.panelfname;
 
-                        String msgloaded;
-                        if (bloaded == true) {
-                            msgloaded = "Loaded panel:\n " + appState.panelfname;
+                                if (TextButton* focused = &loadPanelButton)
+                                    BubbleMessage(*focused, msgloaded, this->bubbleMessage);
+
+                                panelfileLabel.setText(appState.panelfname, {});
+
+                                clearConfigPanelPairingMismatchIfAligned(appState);
+
+                                appState.configreload = (appState.configfname.compare(appState.pnlconfigfname) != 0);
+
+                                if (appState.configreload == true)
+                                    configfileLabel.setColour(juce::Label::textColourId, juce::Colours::red.darker());
+                                else
+                                    configfileLabel.setColour(juce::Label::textColourId, juce::Colours::grey);
+                            };
+
+                        auto runPanelLoad = [this, selectedfname, selectedfullpathfname, finishPanelLoadUi]()
+                            {
+                                juce::Logger::writeToLog("*** MidiStartPage(): Loading Instrument Panel: " + selectedfname);
+                                const bool bloaded = instrumentpanel->loadInstrumentPanel(appState.instrumentdname, selectedfullpathfname, true);
+                                finishPanelLoadUi(bloaded);
+                            };
+
+                        if (embeddedCfg.isEmpty() || embeddedCfg == appState.configfname)
+                        {
+                            if (embeddedCfg == appState.configfname)
+                                appState.configPanelPairingMismatchAcknowledged = false;
+                            runPanelLoad();
+                            return;
                         }
-                        else {
-                            msgloaded = "Panel load failed: " + appState.panelfname;
-                        }
 
-                        if (TextButton* focused = &loadPanelButton)
-                            BubbleMessage(*focused, msgloaded, this->bubbleMessage);
+                        const juce::String msg = juce::String("This panel file was saved with config \"") + embeddedCfg
+                            + "\".\nThe active config is \"" + appState.configfname + "\".\n\n"
+                            "Routing may not match this song/style until configs align.\n\n"
+                            "Load anyway?";
 
-                        panelfileLabel.setText(appState.panelfname, {});
-
-                        // Flag mismatch between panel file and incorrect config file in red
-                        appState.configreload = (appState.configfname.compare(appState.pnlconfigfname) != 0);
-
-                        if (appState.configreload == true)
-                            configfileLabel.setColour(juce::Label::textColourId, juce::Colours::red.darker());
-                        else
-                            configfileLabel.setColour(juce::Label::textColourId, juce::Colours::grey);
+                        auto safeStart = juce::Component::SafePointer<MidiStartPage>(this);
+                        juce::AlertWindow::showOkCancelBox(
+                            juce::AlertWindow::WarningIcon,
+                            "Config / panel mismatch",
+                            msg,
+                            "Load anyway",
+                            "Abort",
+                            this,
+                            juce::ModalCallbackFunction::create([safeStart, selectedfname, selectedfullpathfname](int result)
+                                {
+                                    if (safeStart == nullptr || result != 1)
+                                        return;
+                                    safeStart->appState.configPanelPairingMismatchAcknowledged = true;
+                                    juce::Logger::writeToLog("*** MidiStartPage(): Loading Instrument Panel: " + selectedfname);
+                                    const bool bloaded = safeStart->instrumentpanel->loadInstrumentPanel(
+                                        safeStart->appState.instrumentdname, selectedfullpathfname, true);
+                                    safeStart->appState.panelfname = selectedfname;
+                                    safeStart->appState.panelfullpathname = selectedfullpathfname;
+                                    juce::String msgloaded;
+                                    if (bloaded == true)
+                                        msgloaded = "Loaded panel:\n " + safeStart->appState.panelfname;
+                                    else
+                                        msgloaded = "Panel load failed: " + safeStart->appState.panelfname;
+                                    if (juce::TextButton* focused = &safeStart->loadPanelButton)
+                                        BubbleMessage(*focused, msgloaded, safeStart->bubbleMessage);
+                                    safeStart->panelfileLabel.setText(safeStart->appState.panelfname, {});
+                                    clearConfigPanelPairingMismatchIfAligned(safeStart->appState);
+                                    safeStart->appState.configreload = (safeStart->appState.configfname.compare(safeStart->appState.pnlconfigfname) != 0);
+                                    if (safeStart->appState.configreload == true)
+                                        safeStart->configfileLabel.setColour(juce::Label::textColourId, juce::Colours::red.darker());
+                                    else
+                                        safeStart->configfileLabel.setColour(juce::Label::textColourId, juce::Colours::grey);
+                                }));
                     });
             };
 
@@ -5833,6 +5926,7 @@ private:
     MidiDevices* mididevices = nullptr;
     InstrumentPanel* instrumentpanel = nullptr;
     MidiInstruments* midiInstruments = nullptr;
+    std::function<bool(const juce::String&)> loadConfigFromBasename;
     AppState& appState;
     bool shutdownRequested = false;
 
@@ -6388,31 +6482,52 @@ public:
 
                         if (selectedfname == "") return;
 
-                        juce::Logger::writeToLog("*** MidiStartPage(): Loading Config Panel: " + selectedfname);
+                        juce::Logger::writeToLog("*** ConfigPage(): Loading Config file: " + selectedfname);
 
-                        // Replace with Load Config functionality
-                        bool bloaded = loadConfigs(selectedfname);
+                        auto bubbleResult = [this](bool bloaded)
+                            {
+                                String msgloaded;
+                                if (bloaded == true)
+                                    msgloaded = "Loading:\n " + appState.configfname;
+                                else
+                                    msgloaded = "Load failed:\n " + appState.configfname;
 
-                        appState.configfname = selectedfname;
+                                if (TextButton* focused = &loadConfigButton)
+                                    BubbleMessage(*focused, msgloaded, this->bubbleMessage);
+                            };
 
-                        lblconfigfile.setText(appState.configfname, {});
-
-                        appState.configchanged = true;
-
-                        // Select first itemin dropdown on creation
-                        comboConfig.setSelectedId(1);
-
-                        String msgloaded;
-                        if (bloaded == true) {
-                            msgloaded = "Loading:\n " + appState.configfname;
-                            captureModuleIdxBaselineFromPanel();
+                        if (selectedfname == appState.pnlconfigfname)
+                        {
+                            appState.configPanelPairingMismatchAcknowledged = false;
+                            const bool bloaded = loadConfigFileBasename(selectedfname);
+                            bubbleResult(bloaded);
+                            return;
                         }
-                        else {
-                            msgloaded = "Load failed:\n " + appState.configfname;
-                        }
 
-                        if (TextButton* focused = &loadConfigButton)
-                            BubbleMessage(*focused, msgloaded, this->bubbleMessage);
+                        const String msg = juce::String("The current instrument panel was saved with \"") + appState.pnlconfigfname
+                            + "\".\nYou selected \"" + selectedfname + "\".\n\n"
+                            "Routing may not match this song/style until configs align.\n\n"
+                            "Load anyway?";
+
+                        auto safeThis = juce::Component::SafePointer<ConfigPage>(this);
+                        juce::AlertWindow::showOkCancelBox(
+                            juce::AlertWindow::WarningIcon,
+                            "Config / panel mismatch",
+                            msg,
+                            "Load anyway",
+                            "Abort",
+                            this,
+                            juce::ModalCallbackFunction::create([safeThis, selectedfname](int result)
+                                {
+                                    if (safeThis == nullptr || result != 1)
+                                        return;
+                                    safeThis->appState.configPanelPairingMismatchAcknowledged = true;
+                                    const bool bloaded = safeThis->loadConfigFileBasename(selectedfname);
+                                    const juce::String msgloaded = bloaded ? ("Loading:\n " + safeThis->appState.configfname)
+                                        : ("Load failed:\n " + selectedfname);
+                                    if (juce::TextButton* focused = &safeThis->loadConfigButton)
+                                        BubbleMessage(*focused, msgloaded, safeThis->bubbleMessage);
+                                }));
                     });
             };
 
@@ -6621,6 +6736,22 @@ public:
     void lookAndFeelChanged() override
     {
         txtGroupName.applyFontToAllText(txtGroupName.getFont());
+    }
+
+    /** Load cfg from `configs/` by basename; updates `appState.configfname`, labels, and module baseline when successful. */
+    bool loadConfigFileBasename(const String& basename)
+    {
+        const bool ok = loadConfigs(basename);
+        if (!ok)
+            return false;
+
+        appState.configfname = basename;
+        lblconfigfile.setText(appState.configfname, {});
+        appState.configchanged = true;
+        comboConfig.setSelectedId(1);
+        captureModuleIdxBaselineFromPanel();
+        clearConfigPanelPairingMismatchIfAligned(appState);
+        return true;
     }
 
     ~ConfigPage() override {
@@ -7290,7 +7421,10 @@ public:
         VoicesPage* voicespage = new VoicesPage(*this);
 
         // Create MidiStart Page
-        addTab("Start",        colour, new MidiStartPage(*this), true);
+        addTab("Start",        colour, new MidiStartPage(*this, [configspage](const juce::String& b)
+            {
+                return configspage->loadConfigFileBasename(b);
+            }), true);
 
         // Create Upper, Lower and Bass&Drum Pages
         //KeyboardPanelPage* upperpanel = new KeyboardPanelPage(*this, PTUpper, *effectspage, *voicespage);
