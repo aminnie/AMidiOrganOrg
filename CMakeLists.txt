@@ -32,16 +32,30 @@ else()
     find_package(JUCE CONFIG REQUIRED)
 endif()
 
-juce_add_gui_app(AMidiOrgan
-    PRODUCT_NAME "AMidiOrgan"
-)
+if(WIN32)
+    juce_add_gui_app(AMidiOrgan
+        PRODUCT_NAME "AMidiOrgan"
+        ICON_BIG "${CMAKE_CURRENT_SOURCE_DIR}/assets/icons/AMidiOrgan.ico"
+        ICON_SMALL "${CMAKE_CURRENT_SOURCE_DIR}/assets/icons/AMidiOrgan.ico"
+    )
+else()
+    juce_add_gui_app(AMidiOrgan
+        PRODUCT_NAME "AMidiOrgan"
+    )
+endif()
 
 if(APPLE)
+    set(AMIDIORGAN_MACOS_ICON "${CMAKE_CURRENT_SOURCE_DIR}/assets/icons/AMidiOrgan.icns")
+    set_source_files_properties("${AMIDIORGAN_MACOS_ICON}" PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
+    target_sources(AMidiOrgan PRIVATE "${AMIDIORGAN_MACOS_ICON}")
+
     set_target_properties(AMidiOrgan PROPERTIES
         MACOSX_BUNDLE_GUI_IDENTIFIER "${AMIDIORGAN_MACOS_BUNDLE_ID}"
         MACOSX_BUNDLE_BUNDLE_NAME "AMidiOrgan"
         MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
         MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
+        MACOSX_BUNDLE_ICON_FILE "AMidiOrgan.icns"
+        XCODE_ATTRIBUTE_INFOPLIST_KEY_CFBundleIconFile "AMidiOrgan.icns"
     )
 
     # Keep runtime seed files available inside the .app bundle.
