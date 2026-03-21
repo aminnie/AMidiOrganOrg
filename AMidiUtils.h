@@ -452,6 +452,8 @@ enum KeyPressCommandIDs {
     btnTabUpper = 1,
     btnTabLower = 2,
     btnTabBass = 3,
+    btnTabSounds = 4,
+    btnTabEffects = 5,
     btnPreset0 = 10,
     btnPreset1 = 11,
     btnPreset2 = 12,
@@ -481,6 +483,8 @@ public:
             KeyPressCommandIDs::btnTabUpper,
             KeyPressCommandIDs::btnTabLower,
             KeyPressCommandIDs::btnTabBass,
+            KeyPressCommandIDs::btnTabSounds,
+            KeyPressCommandIDs::btnTabEffects,
             KeyPressCommandIDs::btnPreset0,
             KeyPressCommandIDs::btnPreset1,
             KeyPressCommandIDs::btnPreset2,
@@ -514,6 +518,12 @@ public:
                 break;
             case KeyPressCommandIDs::btnTabBass:
                 add("Bass tab", "Show Bass & Drums keyboard", 'd');
+                break;
+            case KeyPressCommandIDs::btnTabSounds:
+                add("Sounds tab", "Show Sounds tab", 'q');
+                break;
+            case KeyPressCommandIDs::btnTabEffects:
+                add("Effects tab", "Show Effects tab", 'w');
                 break;
             case KeyPressCommandIDs::btnPreset0:
                 add("Manual preset", "Recall Manual preset", '0');
@@ -567,6 +577,14 @@ public:
                 break;
             case KeyPressCommandIDs::btnTabBass:
                 if (onTabBass) onTabBass();
+                else return false;
+                break;
+            case KeyPressCommandIDs::btnTabSounds:
+                if (onTabSounds) onTabSounds();
+                else return false;
+                break;
+            case KeyPressCommandIDs::btnTabEffects:
+                if (onTabEffects) onTabEffects();
                 else return false;
                 break;
             case KeyPressCommandIDs::btnPreset0:
@@ -623,6 +641,8 @@ public:
     std::function<void()> onTabUpper;
     std::function<void()> onTabLower;
     std::function<void()> onTabBass;
+    std::function<void()> onTabSounds;
+    std::function<void()> onTabEffects;
     std::function<void(int)> onPresetRecall;
     std::function<void()> onUpperRotaryFastSlow;
     std::function<void()> onUpperRotaryBrake;

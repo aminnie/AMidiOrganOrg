@@ -8141,6 +8141,8 @@ public:
         keyTarget.onTabUpper = [this] { tabs.setCurrentTabIndex(PTUpper, true); };
         keyTarget.onTabLower = [this] { tabs.setCurrentTabIndex(PTLower, true); };
         keyTarget.onTabBass = [this] { tabs.setCurrentTabIndex(PTBass, true); };
+        keyTarget.onTabSounds = [this] { tabs.setCurrentTabIndex(PTVoices, true); };
+        keyTarget.onTabEffects = [this] { tabs.setCurrentTabIndex(PTEffects, true); };
         keyTarget.onPresetRecall = [this](int idx) { tabs.recallPresetFromHotkey(idx); };
         keyTarget.onUpperRotaryFastSlow = [this] { tabs.triggerUpperRotaryFastSlowHotkey(); };
         keyTarget.onUpperRotaryBrake = [this] { tabs.triggerUpperRotaryBrakeHotkey(); };

@@ -9,6 +9,8 @@ When the main window has focus:
 | Preset 1–6 | `1`–`6` |
 | Manual preset | `0` |
 | Upper / Lower / Bass tab | A / S / D |
+| Sounds tab | Q |
+| Effects tab | W |
 | Upper rotary Fast/Slow | F |
 | Upper rotary Brake | B |
 | Lower rotary Fast/Slow | G |
