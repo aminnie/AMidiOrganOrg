@@ -8151,21 +8151,45 @@ public:
         keyTarget.onLowerRotaryBrake = [this] { tabs.triggerLowerRotaryBrakeHotkey(); };
 
         setOpaque (true);
+        setWantsKeyboardFocus (true);
+        setMouseClickGrabsKeyboardFocus (true);
         addAndMakeVisible (tabs);
+        addKeyListener (&shortcutKeyListener);
+        tabs.addKeyListener (&shortcutKeyListener);
 
         setSize (1480, 320);
+    }
+
+    ~AMidiControl() override
+    {
+        tabs.removeKeyListener (&shortcutKeyListener);
+        removeKeyListener (&shortcutKeyListener);
+
+        if (topLevelWithAttachedKeyListener != nullptr)
+            topLevelWithAttachedKeyListener->removeKeyListener (&shortcutKeyListener);
     }
 
     void parentHierarchyChanged() override
     {
         Component::parentHierarchyChanged();
-        if (keyListenerAttached)
-            return;
-        if (auto* top = getTopLevelComponent())
+        auto* top = getTopLevelComponent();
+        if (top != nullptr && top != topLevelWithAttachedKeyListener)
         {
+            if (topLevelWithAttachedKeyListener != nullptr)
+                topLevelWithAttachedKeyListener->removeKeyListener (&shortcutKeyListener);
+
             top->addKeyListener (&shortcutKeyListener);
+            topLevelWithAttachedKeyListener = top;
             keyListenerAttached = true;
         }
+
+        if (!hasKeyboardFocus (true))
+            grabKeyboardFocus();
+    }
+
+    bool keyPressed (const KeyPress& key) override
+    {
+        return shortcutKeyListener.keyPressed (key, this);
     }
 
     void paint (Graphics& g) override
@@ -8188,6 +8212,7 @@ private:
 
     KeyPressTarget keyTarget;
     bool keyListenerAttached = false;
+    Component* topLevelWithAttachedKeyListener = nullptr;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AMidiControl)
 };
