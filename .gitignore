@@ -366,5 +366,8 @@ FodyWeavers.xsd
 .deps/
 build-mac/
 
+# Windows (and generic) CMake out-of-tree build — regenerate with: cmake -B build ...
+build/
+
 # Local editor settings
 .vscode/
