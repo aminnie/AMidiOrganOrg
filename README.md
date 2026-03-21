@@ -1,181 +1,5 @@
 # AMidiOrgan Features
 
-## Keyboard shortcuts (Phase 1)
-
-When the main window has focus:
-
-| Action | Key |
-|--------|-----|
-| Preset 1–6 | `1`–`6` |
-| Manual preset | `0` |
-| Upper / Lower / Bass tab | A / S / D |
-| Sounds tab | Q |
-| Effects tab | W |
-| Upper rotary Fast/Slow | F |
-| Upper rotary Brake | B |
-| Lower rotary Fast/Slow | G |
-| Lower rotary Brake | N |
-
-Upper and Lower rotary keys always target their respective manuals, even when another tab is selected (same behavior as the on-screen rotary buttons, resolved from the Upper and Lower keyboard tabs).
-
-While a **TextEditor** or **ComboBox** has keyboard focus (including inside modal dialogs), global shortcuts are **not** invoked so normal typing and selection work.
-
-Letter shortcuts may still fire when focus is on other controls (for example a plain button).
-
-## Build
-
-### Prerequisites
-
-- CMake 3.22 or newer
-- JUCE source checkout (for example: `C:/JUCE` on Windows or `./.deps/JUCE` in this repo on macOS)
-- macOS builds: Xcode + Command Line Tools
-
-### Windows (Visual Studio generator)
-
-From the repository root:
-
-```powershell
-cmake -S . -B build -DJUCE_ROOT="C:/JUCE"
-cmake --build build --config Debug --target AMidiOrgan
-```
-
-Output executable:
-
-- `build/AMidiOrgan_artefacts/Debug/AMidiOrgan.exe`
-
-### Run (Windows)
-
-From the repository root:
-
-```powershell
-# Run Debug build in a new process
-Start-Process "build/AMidiOrgan_artefacts/Debug/AMidiOrgan.exe"
-
-# Optional: run in the current terminal (foreground)
-& "build/AMidiOrgan_artefacts/Debug/AMidiOrgan.exe"
-```
-
-To run Release:
-
-```powershell
-cmake --build build --config Release --target AMidiOrgan
-Start-Process "build/AMidiOrgan_artefacts/Release/AMidiOrgan.exe"
-```
-
-### Test (Windows)
-
-From the repository root:
-
-```powershell
-# Build the test executable
-cmake --build build --config Debug --target AMidiOrganTests
-
-# Run tests
-ctest --test-dir build -C Debug --output-on-failure
-```
-
-### Continuous Integration (GitHub Actions)
-
-- Workflow file: `.github/workflows/ci.yml`
-- Triggers: push to `main`, pull requests targeting `main`, and manual dispatch.
-- Platforms: `windows-latest` and `macos-latest`.
-- Pipeline steps:
-  - Configure CMake using a checked-out JUCE source tree.
-  - Build `AMidiOrganTests`.
-  - Run `ctest`.
-  - Build `AMidiOrgan` (Debug build on both platforms).
-- Current regression tests cover utility bounds, MIDI split/layer routing, preset/config persistence roundtrips, MIDI controller reset emission, shutdown-ownership crash paths, and shortcut focus deferral (text fields vs global hotkeys).
-
-### Recommended Manual UI Smoke Test
-
-After a successful build, run this quick checklist (5-10 minutes):
-
-1. Launch the app and open each tab once:
-  - `Start`, `Upper`, `Lower`, `Bass&Drums`, `Sounds`, `Effects`, `Config`, `Help`.
-2. On `Start`:
-  - Load a config file.
-  - Load a panel file.
-  - Confirm panel/config labels update and mismatch coloring behaves as expected.
-3. On `Upper`, `Lower`, and `Bass&Drums`:
-  - Click several voice buttons and confirm active-state behavior.
-  - Use panel `Save` and `Save As`, then reload the saved panel.
-4. On `Sounds` and `Effects`:
-  - Change a voice and a few effect values.
-  - Return to a keyboard tab and confirm state is preserved.
-5. On `Config`:
-  - Change one mapping value, save, reload, and confirm it persists.
-  - Click into a text field and type digits/letters; confirm **global shortcuts do not** change tabs or presets while typing. Click the tab bar or an empty area, then confirm shortcuts work again.
-6. If MIDI hardware is connected:
-  - Open/close MIDI input and output devices and confirm no crash/hang.
-
-### macOS (Xcode generator)
-
-From the repository root:
-
-```bash
-# Optional one-time JUCE checkout (matches CI source-based flow)
-mkdir -p .deps
-git clone --depth 1 https://github.com/juce-framework/JUCE.git .deps/JUCE
-
-# Configure, build tests, run ctest, and build app
-cmake -S . -B build-mac -G Xcode -DJUCE_ROOT="$PWD/.deps/JUCE"
-cmake --build build-mac --config Debug --target AMidiOrganTests
-ctest --test-dir build-mac -C Debug --output-on-failure
-cmake --build build-mac --config Debug --target AMidiOrgan
-```
-
-Typical output app bundle:
-
-- `build-mac/Debug/AMidiOrgan.app`
-
-### macOS Quick Start (Mac mini)
-
-Use this as the repeatable baseline on a dedicated macOS build machine:
-
-```bash
-# 1) Clone and enter repo
-git clone https://github.com/aminnie/AMidiOrganOrg.git
-cd AMidiOrganOrg
-
-# 2) (One time) Get JUCE source locally
-mkdir -p .deps
-git clone --depth 1 https://github.com/juce-framework/JUCE.git .deps/JUCE
-
-# 3) Configure + build
-cmake -S . -B build-mac -G Xcode -DJUCE_ROOT="$PWD/.deps/JUCE"
-cmake --build build-mac --config Debug --target AMidiOrgan
-
-# 4) Optional tests
-cmake --build build-mac --config Debug --target AMidiOrganTests
-ctest --test-dir build-mac -C Debug --output-on-failure
-
-# 5) Run app bundle
-open build-mac/AMidiOrgan_artefacts/Debug/AMidiOrgan.app
-```
-
-Recommended upkeep on a Mac mini:
-
-- Run `git fetch --prune` periodically.
-- Keep builds in `build-mac` only (avoid mixing generators in one build dir).
-- If something looks stale, remove `build-mac` and reconfigure from scratch.
-
-### Notes
-
-- UI images are packaged from `assets/*.png` via `juce_add_binary_data(...)` in `CMakeLists.txt`.
-- On macOS, `docs/` is copied into `AMidiOrgan.app/Contents/Resources/docs` during build so first-run data seeding works when launching the bundle outside the repo tree.
-- On startup, the app seeds `Documents/AMidiOrgan` from `docs/` on first run, then ensures missing files under `configs/`, `instruments/` (JSON instrument catalogs), and `panels/` (`.pnl` panel files) are restored on subsequent runs (without overwriting existing user-edited files).
-- On macOS, the current test executable is compiled but runtime execution is temporarily disabled in CTest due a shutdown-time crash; app build validation remains fully enabled.
-
-### Asset Naming Contract
-
-The following asset filenames are referenced by code through `BinaryData` symbols and should remain stable unless code and CMake are updated together:
-
-- `assets/keyboard.png`
-- `assets/icons8arrowdown32.png`
-- `assets/icons8arrowup32.png`
-- `assets/icons8arrowdown32click.png`
-- `assets/icons8arrowup32click.png`
-
 ## UI Screenshots
 
 ### Start Tab
@@ -348,14 +172,194 @@ Supported MIDI hardware and software sound modules:
   - Validate JSON before use, e.g. [jsonlint.com](https://jsonlint.com/).
 - To do: test Bluetooth connectivity support through JUCE.
 
-### 11. General
+
+## 11. Keyboard shortcuts (Phase 1)
+
+When the main window has focus:
+
+| Action | Key |
+|--------|-----|
+| Preset 1–6 | `1`–`6` |
+| Manual preset | `0` |
+| Upper / Lower / Bass tab | A / S / D |
+| Sounds tab | Q |
+| Effects tab | W |
+| Upper rotary Fast/Slow | F |
+| Upper rotary Brake | B |
+| Lower rotary Fast/Slow | G |
+| Lower rotary Brake | N |
+
+Upper and Lower rotary keys always target their respective manuals, even when another tab is selected (same behavior as the on-screen rotary buttons, resolved from the Upper and Lower keyboard tabs).
+
+While a **TextEditor** or **ComboBox** has keyboard focus (including inside modal dialogs), global shortcuts are **not** invoked so normal typing and selection work.
+
+Letter shortcuts may still fire when focus is on other controls (for example a plain button).
+
+
+
+## 12. Build
+
+### Prerequisites
+
+- CMake 3.22 or newer
+- JUCE source checkout (for example: `C:/JUCE` on Windows or `./.deps/JUCE` in this repo on macOS)
+- macOS builds: Xcode + Command Line Tools
+
+### Windows (Visual Studio generator)
+
+From the repository root:
+
+```powershell
+cmake -S . -B build -DJUCE_ROOT="C:/JUCE"
+cmake --build build --config Debug --target AMidiOrgan
+```
+
+Output executable:
+
+- `build/AMidiOrgan_artefacts/Debug/AMidiOrgan.exe`
+
+### Run (Windows)
+
+From the repository root:
+
+```powershell
+# Run Debug build in a new process
+Start-Process "build/AMidiOrgan_artefacts/Debug/AMidiOrgan.exe"
+
+# Optional: run in the current terminal (foreground)
+& "build/AMidiOrgan_artefacts/Debug/AMidiOrgan.exe"
+```
+
+To run Release:
+
+```powershell
+cmake --build build --config Release --target AMidiOrgan
+Start-Process "build/AMidiOrgan_artefacts/Release/AMidiOrgan.exe"
+```
+
+### Test (Windows)
+
+From the repository root:
+
+```powershell
+# Build the test executable
+cmake --build build --config Debug --target AMidiOrganTests
+
+# Run tests
+ctest --test-dir build -C Debug --output-on-failure
+```
+
+### Continuous Integration (GitHub Actions)
+
+- Workflow file: `.github/workflows/ci.yml`
+- Triggers: push to `main`, pull requests targeting `main`, and manual dispatch.
+- Platforms: `windows-latest` and `macos-latest`.
+- Pipeline steps:
+  - Configure CMake using a checked-out JUCE source tree.
+  - Build `AMidiOrganTests`.
+  - Run `ctest`.
+  - Build `AMidiOrgan` (Debug build on both platforms).
+- Current regression tests cover utility bounds, MIDI split/layer routing, preset/config persistence roundtrips, MIDI controller reset emission, shutdown-ownership crash paths, and shortcut focus deferral (text fields vs global hotkeys).
+
+### Recommended Manual UI Smoke Test
+
+After a successful build, run this quick checklist (5-10 minutes):
+
+1. Launch the app and open each tab once:
+  - `Start`, `Upper`, `Lower`, `Bass&Drums`, `Sounds`, `Effects`, `Config`, `Help`.
+2. On `Start`:
+  - Load a config file.
+  - Load a panel file.
+  - Confirm panel/config labels update and mismatch coloring behaves as expected.
+3. On `Upper`, `Lower`, and `Bass&Drums`:
+  - Click several voice buttons and confirm active-state behavior.
+  - Use panel `Save` and `Save As`, then reload the saved panel.
+4. On `Sounds` and `Effects`:
+  - Change a voice and a few effect values.
+  - Return to a keyboard tab and confirm state is preserved.
+5. On `Config`:
+  - Change one mapping value, save, reload, and confirm it persists.
+  - Click into a text field and type digits/letters; confirm **global shortcuts do not** change tabs or presets while typing. Click the tab bar or an empty area, then confirm shortcuts work again.
+6. If MIDI hardware is connected:
+  - Open/close MIDI input and output devices and confirm no crash/hang.
+
+### macOS (Xcode generator)
+
+From the repository root:
+
+```bash
+# Optional one-time JUCE checkout (matches CI source-based flow)
+mkdir -p .deps
+git clone --depth 1 https://github.com/juce-framework/JUCE.git .deps/JUCE
+
+# Configure, build tests, run ctest, and build app
+cmake -S . -B build-mac -G Xcode -DJUCE_ROOT="$PWD/.deps/JUCE"
+cmake --build build-mac --config Debug --target AMidiOrganTests
+ctest --test-dir build-mac -C Debug --output-on-failure
+cmake --build build-mac --config Debug --target AMidiOrgan
+```
+
+Typical output app bundle:
+
+- `build-mac/Debug/AMidiOrgan.app`
+
+### macOS Quick Start (Mac mini)
+
+Use this as the repeatable baseline on a dedicated macOS build machine:
+
+```bash
+# 1) Clone and enter repo
+git clone https://github.com/aminnie/AMidiOrganOrg.git
+cd AMidiOrganOrg
+
+# 2) (One time) Get JUCE source locally
+mkdir -p .deps
+git clone --depth 1 https://github.com/juce-framework/JUCE.git .deps/JUCE
+
+# 3) Configure + build
+cmake -S . -B build-mac -G Xcode -DJUCE_ROOT="$PWD/.deps/JUCE"
+cmake --build build-mac --config Debug --target AMidiOrgan
+
+# 4) Optional tests
+cmake --build build-mac --config Debug --target AMidiOrganTests
+ctest --test-dir build-mac -C Debug --output-on-failure
+
+# 5) Run app bundle
+open build-mac/AMidiOrgan_artefacts/Debug/AMidiOrgan.app
+```
+
+Recommended upkeep on a Mac mini:
+
+- Run `git fetch --prune` periodically.
+- Keep builds in `build-mac` only (avoid mixing generators in one build dir).
+- If something looks stale, remove `build-mac` and reconfigure from scratch.
+
+### Notes
+
+- UI images are packaged from `assets/*.png` via `juce_add_binary_data(...)` in `CMakeLists.txt`.
+- On macOS, `docs/` is copied into `AMidiOrgan.app/Contents/Resources/docs` during build so first-run data seeding works when launching the bundle outside the repo tree.
+- On startup, the app seeds `Documents/AMidiOrgan` from `docs/` on first run, then ensures missing files under `configs/`, `instruments/` (JSON instrument catalogs), and `panels/` (`.pnl` panel files) are restored on subsequent runs (without overwriting existing user-edited files).
+- On macOS, the current test executable is compiled but runtime execution is temporarily disabled in CTest due a shutdown-time crash; app build validation remains fully enabled.
+
+### Asset Naming Contract
+
+The following asset filenames are referenced by code through `BinaryData` symbols and should remain stable unless code and CMake are updated together:
+
+- `assets/keyboard.png`
+- `assets/icons8arrowdown32.png`
+- `assets/icons8arrowup32.png`
+- `assets/icons8arrowdown32click.png`
+- `assets/icons8arrowup32click.png`
+
+
+### 13. General
 
 - Built using JUCE and C++.
 - Application can be compiled for multiple operating systems and devices.
-- Current CI validates Windows and macOS builds.
+- Current CI validates Windows and MacOS builds.
 - Touch panel is supported; mouse/keyboard navigation is optional.
 
-### 12. Device Support
+### 14. Device Support
 
 - MIDI keyboards:
   - Every button group supports MIDI keyboard input and/or shared MIDI In.
@@ -369,7 +373,7 @@ Supported MIDI hardware and software sound modules:
   - Application auto-centers on typical HD 15.6" displays.
   - Contact the developer for additional display requests.
 
-### 13. Up Next
+### 15. Up Next
 
 - Use JUCE to compile/test controller with Raspberry Pi
   - Goal: cost-effective standalone controller + display without requiring a PC.
