@@ -449,7 +449,7 @@ ApplicationCommandTarget that can handle it, executing the associated action.
 https://forum.juce.com/t/keylistener-documentation-request/27360
 */
 
-//Keyboard Shorcut Command IDs (Phase 1 — see docs/hotkeys-shortcuts-plan.md)
+// Keyboard shortcut command IDs (Phase 1 — see README “Keyboard shortcuts”)
 enum KeyPressCommandIDs {
     btnTabUpper = 1,
     btnTabLower = 2,

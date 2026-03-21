@@ -16,7 +16,7 @@ When the main window has focus:
 | Lower rotary Fast/Slow | G |
 | Lower rotary Brake | N |
 
-Upper and Lower rotary keys always target their respective manuals, even when another tab is selected. Details: [docs/hotkeys-shortcuts-plan.md](docs/hotkeys-shortcuts-plan.md).
+Upper and Lower rotary keys always target their respective manuals, even when another tab is selected (same behavior as the on-screen rotary buttons, resolved from the Upper and Lower keyboard tabs).
 
 While a **TextEditor** or **ComboBox** has keyboard focus (including inside modal dialogs), global shortcuts are **not** invoked so normal typing and selection work.
 
