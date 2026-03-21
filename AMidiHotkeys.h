@@ -322,29 +322,26 @@ public:
         const int rowH = 28;
         const int labelW = 220;
         const int comboW = 100;
-        const int pad = 8;
-        const int contentW = labelW + comboW + pad * 3;
 
         for (int i = 0; i < kNumHotkeyCommands; ++i)
         {
             auto* lab = new juce::Label({}, hotkeyUiDetail::hotkeyRowLabels[i]);
             lab->setJustificationType(juce::Justification::centredLeft);
             hotkeyUiDetail::styleLabelLikeConfig(*lab);
-            lab->setBounds(pad, pad + i * rowH, labelW, rowH - 2);
+            lab->setBounds(0, 0, labelW, rowH - 2);
             content.addAndMakeVisible(lab);
             labels.push_back(std::unique_ptr<juce::Label>(lab));
 
             auto* cb = new juce::ComboBox();
             hotkeyUiDetail::populateHotkeyComboBox(*cb);
             hotkeyUiDetail::styleComboLikeConfig(*cb, tabBg);
-            cb->setBounds(pad + labelW + pad, pad + i * rowH, comboW, rowH - 2);
+            cb->setBounds(0, 0, comboW, rowH - 2);
             cb->onChange = [this] { updateSaveButtonState(); };
             content.addAndMakeVisible(cb);
             combos.push_back(std::unique_ptr<juce::ComboBox>(cb));
         }
 
-        const int contentH = pad * 2 + kNumHotkeyCommands * rowH;
-        content.setSize(contentW, contentH);
+        content.setSize(320, 320);
 
         syncCombosFromWorking();
 
@@ -392,6 +389,8 @@ public:
                            titleInset,
                            juce::jmax(0, mainGroup.getWidth() - 2 * sidePad),
                            juce::jmax(0, mainGroup.getHeight() - titleInset - sidePad));
+
+        layoutHotkeyGrid();
     }
 
     void visibilityChanged() override
@@ -444,6 +443,62 @@ private:
     void updateSaveButtonState()
     {
         saveButton.setEnabled(!currentCombosMatchSnapshot());
+    }
+
+    /** Column-major grid: fill top-to-bottom, then next column. Chooses the widest column count that still fits the viewport to reduce scrolling. */
+    void layoutHotkeyGrid()
+    {
+        const int titleInset = 28;
+        const int sidePad = 10;
+        const int rowH = 28;
+        const int labelW = 220;
+        const int comboW = 100;
+        const int pad = 8;
+        const int colGap = 12;
+        const int labelToComboGap = 4; // tighter than outer pad — keeps label + dropdown visually paired
+        const int minColW = pad + labelW + labelToComboGap + comboW + pad;
+
+        const int vpW = juce::jmax(0, mainGroup.getWidth() - 2 * sidePad);
+        const int vpH = juce::jmax(0, mainGroup.getHeight() - titleInset - sidePad);
+
+        if (vpW <= 0 || vpH <= 0)
+            return;
+
+        int numCols = 1;
+
+        for (int c = 1; c <= kNumHotkeyCommands; ++c)
+        {
+            const int r = (kNumHotkeyCommands + c - 1) / c;
+            const int h = pad * 2 + r * rowH;
+            const int w = pad * 2 + c * minColW + (c - 1) * colGap;
+
+            if (h <= vpH && w <= vpW)
+                numCols = c;
+        }
+
+        const int numRows = (kNumHotkeyCommands + numCols - 1) / numCols;
+
+        for (int i = 0; i < kNumHotkeyCommands; ++i)
+        {
+            const int col = i / numRows;
+            const int row = i % numRows;
+            const int x = pad + col * (minColW + colGap);
+            const int y = pad + row * rowH;
+
+            if (labels[(size_t) i] != nullptr)
+                labels[(size_t) i]->setBounds(x, y, labelW, rowH - 2);
+
+            if (combos[(size_t) i] != nullptr)
+                combos[(size_t) i]->setBounds(x + pad + labelW + labelToComboGap, y, comboW, rowH - 2);
+        }
+
+        const int contentW = pad * 2 + numCols * minColW + (numCols - 1) * colGap;
+        const int contentH = pad * 2 + numRows * rowH;
+        content.setSize(contentW, contentH);
+
+        const bool needV = contentH > vpH;
+        const bool needH = contentW > vpW;
+        viewport.setScrollBarsShown(needV, needH);
     }
 
     void syncCombosFromWorking()
