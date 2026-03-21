@@ -4982,6 +4982,31 @@ struct KeyboardPanelPage final : public Component,
             instrumentpanel->getButtonGroup(g)->rotary = eL;
     }
 
+    /** Phase 1 hotkeys: sync preset radio UI only (no MIDI). */
+    void setPresetRadioSelection(int pstidx)
+    {
+        if (pstidx < 0 || pstidx >= presetbuttons.size()) return;
+        if (auto* p = presetbuttons[pstidx])
+            p->setToggleState(true, dontSendNotification);
+    }
+
+    /** Upper/Lower manual rotary from global hotkeys (works regardless of selected tab). */
+    void triggerRotaryFastSlowHotkey()
+    {
+        if (currenttabidx == PTBass || tbrotslow == nullptr) return;
+        if (!getAppState().isrotary) return;
+        if (!tbrotslow->isEnabled()) return;
+        tbrotslow->triggerClick();
+    }
+
+    void triggerRotaryBrakeHotkey()
+    {
+        if (currenttabidx == PTBass || tbrotbrake == nullptr) return;
+        if (!getAppState().isrotary) return;
+        if (!tbrotbrake->isEnabled()) return;
+        tbrotbrake->triggerClick();
+    }
+
 private:
     void applyRotaryUiSnapshot(bool wantFast, bool wantBrake, bool sendMidi)
     {
@@ -7863,6 +7888,55 @@ public:
         gNotifyPresetRotarySyncFromButtonGroups = {};
     }
 
+    /** Phase 1 hotkeys: recall preset on all keyboard pages (single loadPreset + radio sync). */
+    void recallPresetFromHotkey(int pstidx)
+    {
+        if (pstidx < 0 || pstidx >= numberpresets) return;
+
+        auto* ip = InstrumentPanel::getInstance();
+        if (ip == nullptr) return;
+
+        ip->panelpresets->setActivePresetIdx(pstidx);
+
+        KeyboardPanelPage* kbForLoad = nullptr;
+        for (int i = 0; i < getNumTabs(); ++i)
+        {
+            if (auto* k = dynamic_cast<KeyboardPanelPage*>(getTabContentComponent(i)))
+            {
+                if (kbForLoad == nullptr)
+                    kbForLoad = k;
+                k->setPresetRadioSelection(pstidx);
+            }
+        }
+
+        if (kbForLoad != nullptr)
+            kbForLoad->loadPreset(pstidx);
+    }
+
+    void triggerUpperRotaryFastSlowHotkey()
+    {
+        if (auto* k = dynamic_cast<KeyboardPanelPage*>(getTabContentComponent(PTUpper)))
+            k->triggerRotaryFastSlowHotkey();
+    }
+
+    void triggerUpperRotaryBrakeHotkey()
+    {
+        if (auto* k = dynamic_cast<KeyboardPanelPage*>(getTabContentComponent(PTUpper)))
+            k->triggerRotaryBrakeHotkey();
+    }
+
+    void triggerLowerRotaryFastSlowHotkey()
+    {
+        if (auto* k = dynamic_cast<KeyboardPanelPage*>(getTabContentComponent(PTLower)))
+            k->triggerRotaryFastSlowHotkey();
+    }
+
+    void triggerLowerRotaryBrakeHotkey()
+    {
+        if (auto* k = dynamic_cast<KeyboardPanelPage*>(getTabContentComponent(PTLower)))
+            k->triggerRotaryBrakeHotkey();
+    }
+
     void mouseDown(const MouseEvent& e) override
     {
         draggingFromTabBarBackground = false;
@@ -8060,17 +8134,37 @@ public:
     AMidiControl(bool isRunningComponenTransforms = false)
         : tabs (isRunningComponenTransforms)
     {
-        // Register the commands that the target component can perform
         commandManager.registerAllCommandsForTarget(&keyTarget);
+        // Required: otherwise getTargetForCommand() never resolves to KeyPressTarget (it is not in the component tree).
+        commandManager.setFirstCommandTarget(&keyTarget);
 
-        // Then add command manager key mappings as a KeyListener to the top-level component
-        // so it is notified of key presses
-        getTopLevelComponent()->addKeyListener(commandManager.getKeyMappings());
+        keyTarget.onTabUpper = [this] { tabs.setCurrentTabIndex(PTUpper, true); };
+        keyTarget.onTabLower = [this] { tabs.setCurrentTabIndex(PTLower, true); };
+        keyTarget.onTabBass = [this] { tabs.setCurrentTabIndex(PTBass, true); };
+        keyTarget.onTabSounds = [this] { tabs.setCurrentTabIndex(PTVoices, true); };
+        keyTarget.onTabEffects = [this] { tabs.setCurrentTabIndex(PTEffects, true); };
+        keyTarget.onPresetRecall = [this](int idx) { tabs.recallPresetFromHotkey(idx); };
+        keyTarget.onUpperRotaryFastSlow = [this] { tabs.triggerUpperRotaryFastSlowHotkey(); };
+        keyTarget.onUpperRotaryBrake = [this] { tabs.triggerUpperRotaryBrakeHotkey(); };
+        keyTarget.onLowerRotaryFastSlow = [this] { tabs.triggerLowerRotaryFastSlowHotkey(); };
+        keyTarget.onLowerRotaryBrake = [this] { tabs.triggerLowerRotaryBrakeHotkey(); };
 
         setOpaque (true);
         addAndMakeVisible (tabs);
 
         setSize (1480, 320);
+    }
+
+    void parentHierarchyChanged() override
+    {
+        Component::parentHierarchyChanged();
+        if (keyListenerAttached)
+            return;
+        if (auto* top = getTopLevelComponent())
+        {
+            top->addKeyListener(commandManager.getKeyMappings());
+            keyListenerAttached = true;
+        }
     }
 
     void paint (Graphics& g) override
@@ -8091,6 +8185,7 @@ private:
     ApplicationCommandManager commandManager;
 
     KeyPressTarget keyTarget;
+    bool keyListenerAttached = false;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AMidiControl)
 };

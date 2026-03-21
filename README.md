@@ -1,5 +1,25 @@
 # AMidiOrgan Features
 
+## Keyboard shortcuts (Phase 1)
+
+When the main window has focus:
+
+| Action | Key |
+|--------|-----|
+| Preset 1–6 | `1`–`6` |
+| Manual preset | `0` |
+| Upper / Lower / Bass tab | A / S / D |
+| Sounds tab | Q |
+| Effects tab | W |
+| Upper rotary Fast/Slow | F |
+| Upper rotary Brake | B |
+| Lower rotary Fast/Slow | G |
+| Lower rotary Brake | N |
+
+Upper and Lower rotary keys always target their respective manuals, even when another tab is selected. Details: [docs/hotkeys-shortcuts-plan.md](docs/hotkeys-shortcuts-plan.md).
+
+Letter shortcuts may also fire while typing in text fields (for example on the Config tab).
+
 ## Build
 
 ### Prerequisites

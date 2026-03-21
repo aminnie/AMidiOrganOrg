@@ -1,163 +1,84 @@
 <!--
-  Implementation plan snapshot — configurable hotkeys (presets, tabs, rotary, mute).
-  Last synced from Cursor plan: preset_f-key_hotkeys (March 2026).
+  Implementation plan — keyboard shortcuts (phased).
+  Phase 1: fixed bindings below — implemented on branch feature/phase1-keyboard-shortcuts (see AMidiUtils.h KeyPressTarget, AMidiControl parentHierarchyChanged, MenuTabs::recallPresetFromHotkey).
+  Later phases: optional user config file, mute, other tabs, etc.
 -->
 ---
-name: Preset F-key hotkeys
-overview: Add **user-configurable** shortcuts for **presets**, **menu tabs**, **Upper/Lower rotary** (4 actions), and **per–button-group mute toggles** (`numberbuttongroups` = 12), via `ApplicationCommandManager` + top-level `KeyListener`, persisted under `Documents/AMidiOrgan`. Ship **built-in defaults** when no shortcut file exists; delegate to existing UI (`triggerClick` / preset recall) so MIDI behavior stays identical.
+name: AMidiOrgan keyboard shortcuts
+overview: **Phase 1** — Hardcoded shortcuts for presets (Manual + 1–6), three keyboard tabs (Upper/Lower/Bass), and four rotary actions (Upper F/B, Lower G/N), using existing `ApplicationCommandManager` + top-level `KeyListener`. Defer full configurability, persistence UI, mute, and remaining menu tabs to later phases.
 todos:
-  - id: default-shortcut-table
-    content: "Define `getDefaultShortcuts()` (or equivalent) in code—non-conflicting KeyPress set; apply on first run when file missing; optionally write file immediately so defaults appear in JSON and user can edit."
+  - id: phase1-commands
+    content: "Register command IDs + KeyMappings for Phase 1 table only; KeyPressTarget::perform routes to callbacks."
     status: pending
-  - id: keybind-model-persist
-    content: "Binding model: presets 0–6, tabs 0–8, rotary×4, mute×12; single file; global conflict check; stable names; command ID ranges to avoid collisions (e.g. dedicated block for mute groups)."
+  - id: phase1-presets
+    content: "Preset recall: 1–6 → preset indices 1–6; 0 → Manual (index 0); use single loadPreset + sync preset radios on Upper/Lower/Bass pages; never trigger Set/save."
     status: pending
-  - id: apply-keymappings
-    content: Register all command IDs; apply KeyMappings from file; perform() routes to preset + tab + rotary + mute handlers.
+  - id: phase1-tabs
+    content: "A/S/D → Upper / Lower / Bass tab indices (setCurrentTabIndex); match MenuTabs order."
     status: pending
-  - id: recall-helper
-    content: "MenuTabs/KeyboardPanelPage: single loadPreset + sync preset radios; wire callback."
+  - id: phase1-rotary
+    content: "F/B → Upper KeyboardPanelPage tbrotslow/tbrotbrake; G/N → Lower same; always resolve pages via tab indices 1/2 — works on ANY selected tab (Start, Config, etc.); triggerClick with guards (isrotary, enabled, non-null)."
     status: pending
-  - id: tab-switch-commands
-    content: Tab indices 0–8 → setCurrentTabIndex; document Exit tab (quit flow).
+  - id: phase1-docs-test
+    content: "README short table; manual test all keys."
     status: pending
-  - id: rotary-commands
-    content: Four rotary commands via KeyboardPanelPage helpers (same as button onClick).
-    status: pending
-  - id: mute-commands
-    content: "For each button group index 0..11: command toggles InstrumentPanel::getButtonGroup(i)->getMuteButtonPtr()->triggerClick() with nullptr/enabled guards; bounds-check i; same path as clicking Mute on the keyboard page."
-    status: pending
-  - id: ui-rebind
-    content: Config UI—presets, tabs, rotary, and 12 mute rows (label with group name if available); Assign/Clear/Reset; consider collapsible “Mute” section due to row count.
-    status: pending
-  - id: docs-test
-    content: Document shortcuts; test persistence, conflicts, mute from any tab, rotary/mute edge cases.
+  - id: future-phases
+    content: "Deferred: JSON persistence, Config UI rebind, mute×12, other tabs, Exit, global conflict editor — see bottom section."
     status: pending
 isProject: false
 ---
 
-# Preset + tab + rotary + mute hotkeys — user-configurable keys
+# Keyboard shortcuts — Phase 1 (initial scope)
 
-## Feasibility (including “any key”)
+## Phase 1 — Fixed bindings (approved)
 
-**Yes** for **presets**, **menu tabs**, **rotary**, and **mute**. Same JUCE stack: `KeyPress` serialization, `KeyPressMappingSet`, top-level key listener in [`AMidiControl`](AMidiControl.h) (~8063–8068).
+| Action | Key | Notes |
+|--------|-----|--------|
+| Preset 1 | `1` | Preset **index** 1 in UI (“Preset 1”) |
+| Preset 2 | `2` | Index 2 |
+| Preset 3 | `3` | Index 3 |
+| Preset 4 | `4` | Index 4 |
+| Preset 5 | `5` | Index 5 |
+| Preset 6 | `6` | Index 6 |
+| Manual | `0` | Preset index **0** (“Manual”) |
+| Tab Upper | `A` | `MenuTabs` tab index **1** |
+| Tab Lower | `S` | Tab index **2** |
+| Tab Bass&Drums | `D` | Tab index **3** |
+| Upper rotary Fast/Slow | `F` | **Upper** [`KeyboardPanelPage`](AMidiControl.h) only — `tbrotslow` |
+| Upper rotary Brake | `B` | **Upper** page — `tbrotbrake` |
+| Lower rotary Fast/Slow | `G` | **Lower** [`KeyboardPanelPage`](AMidiControl.h) only — `tbrotslow` |
+| Lower rotary Brake | `N` | **Lower** page — `tbrotbrake` |
 
-One shortcut file, **global** conflict checking across **all** bound actions (presets + tabs + rotary + mutes).
+**Rotary semantics (required):** `F` / `B` always drive the **Upper** manual’s rotary widgets; `G` / `N` always drive the **Lower** manual’s rotary widgets. **These keys must work regardless of which main tab is visible** (e.g. Start, Sounds, Config, Bass) — resolve `KeyboardPanelPage` instances from fixed tab indices **1** (Upper) and **2** (Lower) and invoke the same control path as clicking the on-screen buttons. If `isrotary` is false or the target buttons are disabled, no-op (same as UI). This is intentional for live use without switching tabs.
 
-## Mute — UI and scope
+**Preset semantics:** Same as mouse recall when **Set** is off; hotkeys must **not** save presets.
 
-The model has **`numberbuttongroups` = 12** ([`AMidiUtils.h`](AMidiUtils.h)). Each [`ButtonGroup`](AMidiControl.h) holds a pointer to a [`MuteButton`](AMidiControl.h) (`getMuteButtonPtr()` / `setMuteButtonPtr()`, ~363–370) wired when each [`KeyboardPanelPage`](AMidiControl.h) builds its groups (e.g. `g1tbmute` ~2743+).
+## Technical approach (Phase 1)
 
-**Hotkey behavior**: For group index `i` in `0 .. numberbuttongroups - 1`, the command should mirror **clicking that group’s Mute control**:
+- Reuse [`ApplicationCommandManager`](AMidiUtils.h) + [`KeyPressTarget`](AMidiUtils.h) + top-level `addKeyListener` in [`AMidiControl`](AMidiControl.h) (~8063–8068).
+- Implement **hardcoded** `addDefaultKeypress` / mapping setup after `registerAllCommandsForTarget` — **no** JSON file required for Phase 1.
+- [`MenuTabs`](AMidiControl.h): for rotary, **always** resolve Upper/Lower `KeyboardPanelPage` via `getTabContentComponent(1)` and `(2)` — do **not** gate on `getCurrentTabIndex()`. Preset recall uses the same `recallPreset` helper (one `loadPreset`, sync radios ×3).
 
-- Resolve `InstrumentPanel::getInstance()->getButtonGroup(i)` (or equivalent accessor already used elsewhere).
-- If `getMuteButtonPtr()` is non-null and the button should accept input (same rules as UI—respect `isEnabled()` if relevant), call **`triggerClick()`** on that `MuteButton` so the existing `onClick` lambda runs (CC7, mute text, slider state, etc.)—**no duplicated MIDI**.
+## Caveats
 
-**Optional bindings**: Each of the 12 groups can have **zero or one** key; most users will bind only a subset.
+- **Letter keys** (`A` `S` `D` `F` `B` `G` `N`): may fire when a **text field** has focus (Config, etc.). Phase 1 can accept this; later: consume keys only when appropriate or add “shortcuts enabled” toggle.
+## Future phases (deferred — not Phase 1)
 
-**UX / Config UI**: Twelve rows is heavy; use a **collapsible “Mute (per group)”** section and show **group name** (`ButtonGroup::groupname`) next to each index so the mapping is understandable.
+- User-editable bindings + `Documents/AMidiOrgan` shortcut file (JSON).
+- Config UI (Assign / Clear / Restore).
+- Remaining menu tabs (Start, Sounds, Effects, Config, Help); **Exit** tab hotkey policy.
+- Per–button-group **mute** (12 groups).
+- Global conflict validation across all commands.
 
-**Threading**: Hotkeys arrive on the message thread via `KeyListener`; `triggerClick()` stays UI-safe like other shortcuts in this plan.
+## Files to touch (Phase 1)
 
-## Rotary — (summary)
+| File | Role |
+|------|------|
+| [`AMidiUtils.h`](AMidiUtils.h) | `KeyPressCommandIDs` for Phase 1 only; `KeyPressTarget::getAllCommands`, `getCommandInfo`, `perform`; optional `std::function` callbacks set from `AMidiControl`. |
+| [`AMidiControl.h`](AMidiControl.h) | Wire callbacks: `MenuTabs::setCurrentTabIndex`, preset recall, rotary `triggerClick` on correct `KeyboardPanelPage`. |
 
-Four actions: Upper Fast/Slow, Upper Brake, Lower Fast/Slow, Lower Brake; Bass has no rotary widgets; respect `isrotary` / disabled state. See previous plan text in repo history if needed; full detail unchanged in spirit.
+## Validation (Phase 1)
 
-## Menu tabs — (summary)
-
-Indices 0–8 including Exit (quit flow). Prefer cautious defaults for Exit.
-
-## Recommended architecture
-
-```mermaid
-flowchart TB
-  persist[(shortcut file)]
-  keyMappings[KeyPressMappingSet]
-  mgr[ApplicationCommandManager]
-  target[KeyPressTarget perform]
-  recall[recallPreset]
-  tabs[setCurrentTabIndex]
-  rotary[rotary helpers]
-  mute[mute triggerClick per group]
-
-  persist --> keyMappings
-  mgr --> keyMappings --> target
-  target --> recall
-  target --> tabs
-  target --> rotary
-  target --> mute
-```
-
-### 1. Binding model
-
-- **Presets**: optional `0..6`.
-- **Tabs**: optional `0..8`.
-- **Rotary**: optional ×4.
-- **Mute**: optional per **button group** `0 .. numberbuttongroups - 1` (12).
-- **Conflicts**: validate across **all** categories.
-
-### 2. Persistence
-
-- Single file under `getOrganUserDocumentsRoot()` with sections e.g. `presets`, `tabs`, `rotary`, `mute` (object keyed by group index string), without altering `configs/` / `panels/` ([AGENTS.md](AGENTS.md)).
-
-### 3. `perform()` routing
-
-- Presets → recall helper.
-- Tabs → `setCurrentTabIndex`.
-- Rotary → `KeyboardPanelPage` helpers (Upper/Lower).
-- Mute → `getButtonGroup(i)` + `getMuteButtonPtr()->triggerClick()` with guards.
-
-### 4. UI
-
-- Presets + tabs + rotary rows + **12 mute rows** (collapsible section recommended).
-
-## Design constraints
-
-1. **Presets** — Recall only when “Set” is off; never `savePreset` via hotkey.
-
-2. **Exit tab** — Document powerful default.
-
-3. **Rotary / mute** — Always delegate to existing controls; bounded indices for mute.
-
-## Default bindings (first run)
-
-**Yes — you can assign defaults for everything the feature exposes**, with two practical rules:
-
-1. **Implementation** — Keep a **single in-code table** (e.g. `getDefaultShortcuts()`) that returns command ID → `KeyPress` (or description string). On startup: if the shortcut file is **missing or invalid**, apply defaults to `KeyPressMappingSet`, then **optionally write** the file so users see the same values on disk and can edit them. A **“Restore defaults”** button in Config reuses this same table.
-
-2. **Design** — Defaults must be **pairwise non-conflicting** and should avoid high-risk keys (e.g. **no default** for the **Exit** tab unless you use a deliberate chord like Ctrl+Shift+Q). Twelve mute defaults plus presets + tabs + rotary fill the keyboard quickly; it is reasonable to default **mute to unbound** and document “assign in Config,” or use **numpad**-based defaults where a full set is desired (not all keyboards have a numpad).
-
-**Example starting set (illustrative — tune during implementation):**
-
-| Category | Suggested defaults | Notes |
-|----------|--------------------|--------|
-| **Presets 0–6** | `F1` … `F7` | Common, 7 distinct keys, no modifiers |
-| **Tabs** | `Up` / `Left` / `Down` → Upper / Lower / Bass (tabs 1–3) | Matches existing [`KeyPressTarget`](AMidiUtils.h) intent for those three; add e.g. `Ctrl+1`…`Ctrl+6` for Start/Sounds/Effects/Config/Help only if they don’t clash with OS/editor |
-| **Exit (tab 8)** | *None* | Avoid accidental quit |
-| **Rotary ×4** | e.g. two-modifier chords (Ctrl+Shift+…) or **unbound** | F-keys already used by presets |
-| **Mute ×12** | **Unbound** *or* numpad `1`…`9`, `0`, `+`, `-` if you want a full grid | Unbound is safest for first-time users |
-
-Final defaults should be validated in-app with the **same global conflict check** used for user edits.
-
-## Command ID allocation note
-
-Existing small numeric IDs (`btnTabUpper` = 1, `btnUpperRotary` = 5, etc.) are tight. For **12 mute commands** plus other features, use a **dedicated ID range** (e.g. base + index) in [`KeyPressCommandIDs`](AMidiUtils.h) to avoid collisions and keep `perform()` switch/dispatch maintainable.
-
-## Files to touch (summary)
-
-| Area | File | Change |
-|------|------|--------|
-| Commands | [`AMidiUtils.h`](AMidiUtils.h) | Extended IDs + `KeyPressTarget` dispatch. |
-| Persistence | helper | Sections include `mute`. |
-| Wiring | [`AMidiControl.h`](AMidiControl.h) | Callbacks; mute via `InstrumentPanel` + `ButtonGroup`. |
-
-## Validation
-
-- Global duplicate-key rules across presets, tabs, rotary, mute.
-- Mute hotkey with null mute pointer: no-op / log once in debug.
 - Build per README.
-
-## Open choices
-
-- **Final** default table: confirm F1–F7 for presets, which chords for remaining tabs / rotary, and whether mutes ship unbound vs numpad.
-- Whether to support a **single** “mute focused group only” shortcut later (not in initial scope unless requested).
+- All keys above trigger the same behavior as the corresponding UI control.
+- Preset “Set” mode + hotkey → recall only, never save.
