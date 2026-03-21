@@ -259,6 +259,9 @@ namespace hotkeyUiDetail
         "Lower rotary Brake"
     };
 
+    /** Label column width (~one-third narrower than 220px); shorter columns pull each dropdown closer to its label. */
+    inline constexpr int kHotkeyLabelWidth = 220 - (220 / 3);
+
     /** Match ConfigPage `comboConfig` text/arrow colours; field fill uses `fieldBackground` (tab colour). */
     inline void styleComboLikeConfig(juce::ComboBox& cb, juce::Colour fieldBackground)
     {
@@ -320,7 +323,7 @@ public:
         content.setOpaque(true);
 
         const int rowH = 28;
-        const int labelW = 220;
+        const int labelW = hotkeyUiDetail::kHotkeyLabelWidth;
         const int comboW = 100;
 
         for (int i = 0; i < kNumHotkeyCommands; ++i)
@@ -451,10 +454,10 @@ private:
         const int titleInset = 28;
         const int sidePad = 10;
         const int rowH = 28;
-        const int labelW = 220;
+        const int labelW = hotkeyUiDetail::kHotkeyLabelWidth;
         const int comboW = 100;
         const int pad = 8;
-        const int colGap = 12;
+        const int colGap = 36; // horizontal gap between columns (combo of col N → label of col N+1)
         const int labelToComboGap = 4; // tighter than outer pad — keeps label + dropdown visually paired
         const int minColW = pad + labelW + labelToComboGap + comboW + pad;
 
