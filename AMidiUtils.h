@@ -447,20 +447,22 @@ ApplicationCommandTarget that can handle it, executing the associated action.
 https://forum.juce.com/t/keylistener-documentation-request/27360
 */
 
-//Keyboard Shorcut Command IDs
+//Keyboard Shorcut Command IDs (Phase 1 — see docs/hotkeys-shortcuts-plan.md)
 enum KeyPressCommandIDs {
     btnTabUpper = 1,
     btnTabLower = 2,
     btnTabBass = 3,
-    btnUpperRotary = 5,
-    btnLowerRotary = 6,
     btnPreset0 = 10,
     btnPreset1 = 11,
     btnPreset2 = 12,
     btnPreset3 = 13,
     btnPreset4 = 14,
     btnPreset5 = 15,
-    btnPreset6 = 16
+    btnPreset6 = 16,
+    btnUpperRotaryFastSlow = 20,
+    btnUpperRotaryBrake = 21,
+    btnLowerRotaryFastSlow = 22,
+    btnLowerRotaryBrake = 23
 };
 
 
@@ -468,45 +470,83 @@ class KeyPressTarget final : public Component,
     public ApplicationCommandTarget
 {
 public:
-    KeyPressTarget() { 
-        DBG("*** KeyPressTarget(): Constructing Shortcut Keys");
-    }
+    KeyPressTarget() = default;
 
     //==============================================================================
-    // No other command targets in this simple example so just return nullptr
     ApplicationCommandTarget* getNextCommandTarget() override { return nullptr; }
 
-    void getAllCommands(Array<CommandID>& commands) override {
-
-        Array<CommandID> ids { 
+    void getAllCommands(Array<CommandID>& commands) override
+    {
+        const CommandID ids[] = {
             KeyPressCommandIDs::btnTabUpper,
             KeyPressCommandIDs::btnTabLower,
-            KeyPressCommandIDs::btnTabBass 
+            KeyPressCommandIDs::btnTabBass,
+            KeyPressCommandIDs::btnPreset0,
+            KeyPressCommandIDs::btnPreset1,
+            KeyPressCommandIDs::btnPreset2,
+            KeyPressCommandIDs::btnPreset3,
+            KeyPressCommandIDs::btnPreset4,
+            KeyPressCommandIDs::btnPreset5,
+            KeyPressCommandIDs::btnPreset6,
+            KeyPressCommandIDs::btnUpperRotaryFastSlow,
+            KeyPressCommandIDs::btnUpperRotaryBrake,
+            KeyPressCommandIDs::btnLowerRotaryFastSlow,
+            KeyPressCommandIDs::btnLowerRotaryBrake
         };
-
-        commands.addArray(ids);
+        commands.addArray(ids, (int) (sizeof(ids) / sizeof(ids[0])));
     }
 
     void getCommandInfo(CommandID commandID, ApplicationCommandInfo& result) override
     {
-        DBG("=== getCommandInfo() called");
+        auto add = [&result](const char* name, const char* desc, int keyCode)
+        {
+            result.setInfo(name, desc, "Shortcuts", 0);
+            result.addDefaultKeypress(keyCode, ModifierKeys::noModifiers);
+        };
 
         switch (commandID)
         {
             case KeyPressCommandIDs::btnTabUpper:
-                DBG("*** getCommandInfo(): btnTabUpper");
-                result.setInfo("To Upper", "Go to Upper", "Other", 0);
-                result.addDefaultKeypress(KeyPress::upKey, ModifierKeys::noModifiers);
+                add("Upper tab", "Show Upper keyboard", 'a');
                 break;
             case KeyPressCommandIDs::btnTabLower:
-                DBG("*** getCommandInfo(): btnTabLower");
-                result.setInfo("To Lower", "Go to Lower", "Other", 0);
-                result.addDefaultKeypress(KeyPress::leftKey, ModifierKeys::noModifiers);
+                add("Lower tab", "Show Lower keyboard", 's');
                 break;
             case KeyPressCommandIDs::btnTabBass:
-                DBG("*** getCommandInfo(): btnTabBass");
-                result.setInfo("To Bass&Drums", "Go to Bass&Drums", "Other", 0);
-                result.addDefaultKeypress(KeyPress::downKey, ModifierKeys::noModifiers);
+                add("Bass tab", "Show Bass & Drums keyboard", 'd');
+                break;
+            case KeyPressCommandIDs::btnPreset0:
+                add("Manual preset", "Recall Manual preset", KeyPress::F10Key);
+                break;
+            case KeyPressCommandIDs::btnPreset1:
+                add("Preset 1", "Recall Preset 1", KeyPress::F1Key);
+                break;
+            case KeyPressCommandIDs::btnPreset2:
+                add("Preset 2", "Recall Preset 2", KeyPress::F2Key);
+                break;
+            case KeyPressCommandIDs::btnPreset3:
+                add("Preset 3", "Recall Preset 3", KeyPress::F3Key);
+                break;
+            case KeyPressCommandIDs::btnPreset4:
+                add("Preset 4", "Recall Preset 4", KeyPress::F4Key);
+                break;
+            case KeyPressCommandIDs::btnPreset5:
+                add("Preset 5", "Recall Preset 5", KeyPress::F5Key);
+                break;
+            case KeyPressCommandIDs::btnPreset6:
+                add("Preset 6", "Recall Preset 6", KeyPress::F6Key);
+                break;
+            case KeyPressCommandIDs::btnUpperRotaryFastSlow:
+                add("Upper rotary Fast/Slow", "Upper manual rotary Fast/Slow", 'f');
+                break;
+            case KeyPressCommandIDs::btnUpperRotaryBrake:
+                add("Upper rotary Brake", "Upper manual rotary Brake", 'b');
+                break;
+            case KeyPressCommandIDs::btnLowerRotaryFastSlow:
+                add("Lower rotary Fast/Slow", "Lower manual rotary Fast/Slow", 'g');
+                break;
+            case KeyPressCommandIDs::btnLowerRotaryBrake:
+                add("Lower rotary Brake", "Lower manual rotary Brake", 'n');
                 break;
             default:
                 break;
@@ -518,13 +558,60 @@ public:
         switch (info.commandID)
         {
             case KeyPressCommandIDs::btnTabUpper:
-                DBG("*** perform() : btnTabUpper");
+                if (onTabUpper) onTabUpper();
+                else return false;
                 break;
             case KeyPressCommandIDs::btnTabLower:
-                DBG("*** perform(): btnTabLower");
+                if (onTabLower) onTabLower();
+                else return false;
                 break;
             case KeyPressCommandIDs::btnTabBass:
-                DBG("*** perform(): btnTabBass");
+                if (onTabBass) onTabBass();
+                else return false;
+                break;
+            case KeyPressCommandIDs::btnPreset0:
+                if (onPresetRecall) onPresetRecall(0);
+                else return false;
+                break;
+            case KeyPressCommandIDs::btnPreset1:
+                if (onPresetRecall) onPresetRecall(1);
+                else return false;
+                break;
+            case KeyPressCommandIDs::btnPreset2:
+                if (onPresetRecall) onPresetRecall(2);
+                else return false;
+                break;
+            case KeyPressCommandIDs::btnPreset3:
+                if (onPresetRecall) onPresetRecall(3);
+                else return false;
+                break;
+            case KeyPressCommandIDs::btnPreset4:
+                if (onPresetRecall) onPresetRecall(4);
+                else return false;
+                break;
+            case KeyPressCommandIDs::btnPreset5:
+                if (onPresetRecall) onPresetRecall(5);
+                else return false;
+                break;
+            case KeyPressCommandIDs::btnPreset6:
+                if (onPresetRecall) onPresetRecall(6);
+                else return false;
+                break;
+            case KeyPressCommandIDs::btnUpperRotaryFastSlow:
+                if (onUpperRotaryFastSlow) onUpperRotaryFastSlow();
+                else return false;
+                break;
+            case KeyPressCommandIDs::btnUpperRotaryBrake:
+                if (onUpperRotaryBrake) onUpperRotaryBrake();
+                else return false;
+                break;
+            case KeyPressCommandIDs::btnLowerRotaryFastSlow:
+                if (onLowerRotaryFastSlow) onLowerRotaryFastSlow();
+                else return false;
+                break;
+            case KeyPressCommandIDs::btnLowerRotaryBrake:
+                if (onLowerRotaryBrake) onLowerRotaryBrake();
+                else return false;
                 break;
             default:
                 return false;
@@ -533,6 +620,17 @@ public:
         return true;
     }
 
+    std::function<void()> onTabUpper;
+    std::function<void()> onTabLower;
+    std::function<void()> onTabBass;
+    std::function<void(int)> onPresetRecall;
+    std::function<void()> onUpperRotaryFastSlow;
+    std::function<void()> onUpperRotaryBrake;
+    std::function<void()> onLowerRotaryFastSlow;
+    std::function<void()> onLowerRotaryBrake;
+
+private:
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(KeyPressTarget)
 };
 
 
