@@ -63,3 +63,13 @@
 - [x] Build on Windows using local JUCE at `c:\JUCE`.
 - [x] Run manual smoke test across tabs (Start, Upper, Lower, Bass, Voices, Effects, Config, Help).
 - [x] Exercise MIDI routing/layering and preset recall after fixes.
+
+## Keyboard shortcuts (future)
+
+Phase 1 bindings and focus behavior are documented in `README.md`. Optional later work:
+
+- [ ] User-editable bindings and a shortcut map file under `Documents/AMidiOrgan` (e.g. JSON).
+- [ ] Config UI: assign, clear, restore defaults; validate conflicts across commands.
+- [ ] Hotkeys for tabs not yet covered (e.g. Start, Config, Help) and policy for Exit / app quit.
+- [ ] Per–button-group mute shortcuts (12 groups).
+- [ ] Broader “shortcuts enabled” toggle or conflict editor if global vs. control focus remains awkward.

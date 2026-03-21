@@ -90,7 +90,6 @@ target_sources(AMidiOrgan
         AMidiButtons.h
         AMidiRotors.h
         AMidiUtils.h
-        DemoUtilities.h
 )
 
 target_include_directories(AMidiOrgan
