@@ -2526,7 +2526,6 @@ struct KeyboardPanelPage final : public Component,
                         int panelgroup = lookupPanelGroup(panelbuttonidx);
                         ButtonGroup* ptrbuttongroup = instrumentpanel->getButtonGroup(panelgroup);
                         int buttongroupmidiout = ptrbuttongroup->midiout;
-                        int buttongroupismuted = ptrbuttongroup->muted;
 
                         // Remember active Voice Button in Group
                         ptrbuttongroup->setActiveVoiceButton(panelbuttonidx);
@@ -2910,7 +2909,6 @@ struct KeyboardPanelPage final : public Component,
                         int panelgroup = lookupPanelGroup(panelbuttonidx);
                         ButtonGroup* ptrbuttongroup = instrumentpanel->getButtonGroup(panelgroup);
                         int buttongroupmidiout = ptrbuttongroup->midiout;
-                        int buttongroupismuted = ptrbuttongroup->muted;
 
                         // Remember active Voice Button in Group
                         ptrbuttongroup->setActiveVoiceButton(panelbuttonidx);
@@ -3290,7 +3288,6 @@ struct KeyboardPanelPage final : public Component,
                         int panelgroup = lookupPanelGroup(panelbuttonidx);
                         ButtonGroup* ptrbuttongroup = instrumentpanel->getButtonGroup(panelgroup);
                         int buttongroupmidiout = ptrbuttongroup->midiout;
-                        int buttongroupismuted = ptrbuttongroup->muted;
 
                         // Remember active Voice Button in Group
                         ptrbuttongroup->setActiveVoiceButton(panelbuttonidx);
@@ -3678,7 +3675,6 @@ struct KeyboardPanelPage final : public Component,
                         int panelgroup = lookupPanelGroup(panelbuttonidx);
                         ButtonGroup* selectedButtonGroup = instrumentpanel->getButtonGroup(panelgroup);
                         int buttongroupmidiout = selectedButtonGroup->midiout;
-                        int buttongroupismuted = selectedButtonGroup->muted;
 
                         // Remember active Voice Button in Group
                         selectedButtonGroup->setActiveVoiceButton(panelbuttonidx);
@@ -4200,7 +4196,6 @@ struct KeyboardPanelPage final : public Component,
             ButtonGroup* ptrbuttongroup = instrumentpanel->getButtonGroup(buttongroupidx);
             int buttongroupmidiin = ptrbuttongroup->midiin;
             int buttongroupmidiout = ptrbuttongroup->midiout;
-            int buttongroupmoduleidx = ptrbuttongroup->moduleidx;
             String buttongrouptitle = "Rotary   [In:" + std::to_string(buttongroupmidiin) + " | Out:" + std::to_string(buttongroupmidiout) + "]";
 
             int g5xoffset = mgroup;
