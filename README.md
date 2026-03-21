@@ -1,5 +1,11 @@
 # AMidiOrgan Features
 
+AMidiOrgan is a MIDI controller solution built on the [JUCE](https://juce.com) open source framework. [JUCE](https://juce.com) supports building audiovisual applications and is portable across multiple operating systems. It is often used by software and hardware vendors to build user interfaces for their solutions, and also used as the basis for audio synthesis.
+
+AMidiOrgan supports connecting multiple MIDI input and output device configurations and enables dynamic routing of MIDI messages between these devices supporting cross-device overlays on the output, keyboard split points, configuration presets with instant recall, etc.
+
+When you have multiple MIDI keyboards and sound modules in your rig, AMidiOrgan gives you a single configuration setup that manages all devices in one user interface, with instant preset recall across the rig during performances.
+
 ## UI Screenshots
 
 ### Start Tab
