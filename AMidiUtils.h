@@ -10,6 +10,8 @@
 
 #pragma once
 
+#include <JuceHeader.h>
+
 #include <array>
 #include <functional>
 
@@ -651,6 +653,47 @@ public:
 
 private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(KeyPressTarget)
+};
+
+/** When true, skip ApplicationCommandManager shortcut handling so keys reach text fields and modal dialogs. */
+inline bool shouldDeferKeyboardShortcutsForFocusedComponent (Component* focused) noexcept
+{
+    if (focused == nullptr) return false;
+    if (dynamic_cast<TextEditor*> (focused) != nullptr) return true;
+    if (dynamic_cast<ComboBox*> (focused) != nullptr) return true;
+    if (focused->findParentComponentOfClass<AlertWindow>() != nullptr) return true;
+    return false;
+}
+
+inline bool shouldDeferKeyboardShortcutsForFocusedComponent() noexcept
+{
+    return shouldDeferKeyboardShortcutsForFocusedComponent (Component::getCurrentlyFocusedComponent());
+}
+
+/** Wraps KeyPressMappingSet so global shortcuts do not fire while typing in editors or system dialogs. */
+class ShortcutRoutingKeyListener final : public KeyListener
+{
+public:
+    explicit ShortcutRoutingKeyListener (KeyPressMappingSet* mappingSetIn) noexcept : mappings (mappingSetIn) {}
+
+    bool keyPressed (const KeyPress& key, Component* originatingComponent) override
+    {
+        if (mappings == nullptr) return false;
+        if (shouldDeferKeyboardShortcutsForFocusedComponent()) return false;
+        return mappings->keyPressed (key, originatingComponent);
+    }
+
+    bool keyStateChanged (bool isKeyDown, Component* originatingComponent) override
+    {
+        if (mappings == nullptr) return false;
+        if (shouldDeferKeyboardShortcutsForFocusedComponent()) return false;
+        return mappings->keyStateChanged (isKeyDown, originatingComponent);
+    }
+
+private:
+    KeyPressMappingSet* mappings = nullptr;
+
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ShortcutRoutingKeyListener)
 };
 
 

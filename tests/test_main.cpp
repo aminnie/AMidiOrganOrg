@@ -1215,6 +1215,39 @@ namespace
                            "rewrite/send accepts solo output", details);
     }
 
+    bool runShortcutFocusDeferralGuard(std::string& details)
+    {
+        TextEditor editor;
+        ComboBox combo;
+        TextButton button ("btn");
+
+        if (!shouldDeferKeyboardShortcutsForFocusedComponent (&editor))
+        {
+            details = "TextEditor should defer shortcuts";
+            return false;
+        }
+
+        if (!shouldDeferKeyboardShortcutsForFocusedComponent (&combo))
+        {
+            details = "ComboBox should defer shortcuts";
+            return false;
+        }
+
+        if (shouldDeferKeyboardShortcutsForFocusedComponent (&button))
+        {
+            details = "TextButton should not defer shortcuts";
+            return false;
+        }
+
+        if (shouldDeferKeyboardShortcutsForFocusedComponent (nullptr))
+        {
+            details = "nullptr focus should not defer shortcuts";
+            return false;
+        }
+
+        return true;
+    }
+
 }
 
 int main()
@@ -1264,6 +1297,11 @@ int main()
     {
         std::string details;
         results.push_back({ "lookupPanelGroup maps ranges", runLookupPanelGroup(details), details });
+    }
+
+    {
+        std::string details;
+        results.push_back({ "Shortcut focus deferral (TextEditor/ComboBox vs controls)", runShortcutFocusDeferralGuard(details), details });
     }
 
     {

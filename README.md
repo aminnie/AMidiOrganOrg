@@ -18,7 +18,9 @@ When the main window has focus:
 
 Upper and Lower rotary keys always target their respective manuals, even when another tab is selected. Details: [docs/hotkeys-shortcuts-plan.md](docs/hotkeys-shortcuts-plan.md).
 
-Letter shortcuts may also fire while typing in text fields (for example on the Config tab).
+While a **TextEditor** or **ComboBox** has keyboard focus (including inside modal dialogs), global shortcuts are **not** invoked so normal typing and selection work.
+
+Letter shortcuts may still fire when focus is on other controls (for example a plain button).
 
 ## Build
 
@@ -82,7 +84,7 @@ ctest --test-dir build -C Debug --output-on-failure
   - Build `AMidiOrganTests`.
   - Run `ctest`.
   - Build `AMidiOrgan` (Debug build on both platforms).
-- Current regression tests cover utility bounds, MIDI split/layer routing, preset/config persistence roundtrips, MIDI controller reset emission, and shutdown-ownership crash paths.
+- Current regression tests cover utility bounds, MIDI split/layer routing, preset/config persistence roundtrips, MIDI controller reset emission, shutdown-ownership crash paths, and shortcut focus deferral (text fields vs global hotkeys).
 
 ### Recommended Manual UI Smoke Test
 
@@ -102,6 +104,7 @@ After a successful build, run this quick checklist (5-10 minutes):
   - Return to a keyboard tab and confirm state is preserved.
 5. On `Config`:
   - Change one mapping value, save, reload, and confirm it persists.
+  - Click into a text field and type digits/letters; confirm **global shortcuts do not** change tabs or presets while typing. Click the tab bar or an empty area, then confirm shortcuts work again.
 6. If MIDI hardware is connected:
   - Open/close MIDI input and output devices and confirm no crash/hang.
 

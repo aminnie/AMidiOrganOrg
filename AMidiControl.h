@@ -8132,7 +8132,8 @@ class AMidiControl final : public Component
 {
 public:
     AMidiControl(bool isRunningComponenTransforms = false)
-        : tabs (isRunningComponenTransforms)
+        : tabs (isRunningComponenTransforms),
+          shortcutKeyListener (commandManager.getKeyMappings())
     {
         commandManager.registerAllCommandsForTarget(&keyTarget);
         // Required: otherwise getTargetForCommand() never resolves to KeyPressTarget (it is not in the component tree).
@@ -8162,7 +8163,7 @@ public:
             return;
         if (auto* top = getTopLevelComponent())
         {
-            top->addKeyListener(commandManager.getKeyMappings());
+            top->addKeyListener (&shortcutKeyListener);
             keyListenerAttached = true;
         }
     }
@@ -8183,6 +8184,7 @@ private:
     // Keyboard Command Manager
     //ApplicationCommandManager& commandManager = getGlobalCommandManager();
     ApplicationCommandManager commandManager;
+    ShortcutRoutingKeyListener shortcutKeyListener;
 
     KeyPressTarget keyTarget;
     bool keyListenerAttached = false;
