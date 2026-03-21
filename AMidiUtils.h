@@ -516,25 +516,25 @@ public:
                 add("Bass tab", "Show Bass & Drums keyboard", 'd');
                 break;
             case KeyPressCommandIDs::btnPreset0:
-                add("Manual preset", "Recall Manual preset", KeyPress::F10Key);
+                add("Manual preset", "Recall Manual preset", '0');
                 break;
             case KeyPressCommandIDs::btnPreset1:
-                add("Preset 1", "Recall Preset 1", KeyPress::F1Key);
+                add("Preset 1", "Recall Preset 1", '1');
                 break;
             case KeyPressCommandIDs::btnPreset2:
-                add("Preset 2", "Recall Preset 2", KeyPress::F2Key);
+                add("Preset 2", "Recall Preset 2", '2');
                 break;
             case KeyPressCommandIDs::btnPreset3:
-                add("Preset 3", "Recall Preset 3", KeyPress::F3Key);
+                add("Preset 3", "Recall Preset 3", '3');
                 break;
             case KeyPressCommandIDs::btnPreset4:
-                add("Preset 4", "Recall Preset 4", KeyPress::F4Key);
+                add("Preset 4", "Recall Preset 4", '4');
                 break;
             case KeyPressCommandIDs::btnPreset5:
-                add("Preset 5", "Recall Preset 5", KeyPress::F5Key);
+                add("Preset 5", "Recall Preset 5", '5');
                 break;
             case KeyPressCommandIDs::btnPreset6:
-                add("Preset 6", "Recall Preset 6", KeyPress::F6Key);
+                add("Preset 6", "Recall Preset 6", '6');
                 break;
             case KeyPressCommandIDs::btnUpperRotaryFastSlow:
                 add("Upper rotary Fast/Slow", "Upper manual rotary Fast/Slow", 'f');

@@ -11,7 +11,7 @@ todos:
     content: "Register command IDs + KeyMappings for Phase 1 table only; KeyPressTarget::perform routes to callbacks."
     status: pending
   - id: phase1-presets
-    content: "Preset recall: F1–F6 → preset indices 1–6; F10 → Manual (index 0); use single loadPreset + sync preset radios on Upper/Lower/Bass pages; never trigger Set/save."
+    content: "Preset recall: 1–6 → preset indices 1–6; 0 → Manual (index 0); use single loadPreset + sync preset radios on Upper/Lower/Bass pages; never trigger Set/save."
     status: pending
   - id: phase1-tabs
     content: "A/S/D → Upper / Lower / Bass tab indices (setCurrentTabIndex); match MenuTabs order."
@@ -20,7 +20,7 @@ todos:
     content: "F/B → Upper KeyboardPanelPage tbrotslow/tbrotbrake; G/N → Lower same; always resolve pages via tab indices 1/2 — works on ANY selected tab (Start, Config, etc.); triggerClick with guards (isrotary, enabled, non-null)."
     status: pending
   - id: phase1-docs-test
-    content: "README short table; manual test all keys; note F10 may interact with OS menu bar on some Windows apps (document if observed)."
+    content: "README short table; manual test all keys."
     status: pending
   - id: future-phases
     content: "Deferred: JSON persistence, Config UI rebind, mute×12, other tabs, Exit, global conflict editor — see bottom section."
@@ -34,13 +34,13 @@ isProject: false
 
 | Action | Key | Notes |
 |--------|-----|--------|
-| Preset 1 | `F1` | Preset **index** 1 in UI (“Preset 1”) |
-| Preset 2 | `F2` | Index 2 |
-| Preset 3 | `F3` | Index 3 |
-| Preset 4 | `F4` | Index 4 |
-| Preset 5 | `F5` | Index 5 |
-| Preset 6 | `F6` | Index 6 |
-| Manual | `F10` | Preset index **0** (“Manual”) |
+| Preset 1 | `1` | Preset **index** 1 in UI (“Preset 1”) |
+| Preset 2 | `2` | Index 2 |
+| Preset 3 | `3` | Index 3 |
+| Preset 4 | `4` | Index 4 |
+| Preset 5 | `5` | Index 5 |
+| Preset 6 | `6` | Index 6 |
+| Manual | `0` | Preset index **0** (“Manual”) |
 | Tab Upper | `A` | `MenuTabs` tab index **1** |
 | Tab Lower | `S` | Tab index **2** |
 | Tab Bass&Drums | `D` | Tab index **3** |
@@ -62,8 +62,6 @@ isProject: false
 ## Caveats
 
 - **Letter keys** (`A` `S` `D` `F` `B` `G` `N`): may fire when a **text field** has focus (Config, etc.). Phase 1 can accept this; later: consume keys only when appropriate or add “shortcuts enabled” toggle.
-- **`F10`**: On some Windows setups `F10` focuses the menu bar; verify on target machines and document or remap if problematic.
-
 ## Future phases (deferred — not Phase 1)
 
 - User-editable bindings + `Documents/AMidiOrgan` shortcut file (JSON).

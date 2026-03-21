@@ -6,8 +6,8 @@ When the main window has focus:
 
 | Action | Key |
 |--------|-----|
-| Preset 1–6 | F1–F6 |
-| Manual preset | F10 |
+| Preset 1–6 | `1`–`6` |
+| Manual preset | `0` |
 | Upper / Lower / Bass tab | A / S / D |
 | Upper rotary Fast/Slow | F |
 | Upper rotary Brake | B |
