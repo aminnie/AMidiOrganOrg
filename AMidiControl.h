@@ -8135,6 +8135,8 @@ public:
         : tabs (isRunningComponenTransforms)
     {
         commandManager.registerAllCommandsForTarget(&keyTarget);
+        // Required: otherwise getTargetForCommand() never resolves to KeyPressTarget (it is not in the component tree).
+        commandManager.setFirstCommandTarget(&keyTarget);
 
         keyTarget.onTabUpper = [this] { tabs.setCurrentTabIndex(PTUpper, true); };
         keyTarget.onTabLower = [this] { tabs.setCurrentTabIndex(PTLower, true); };
