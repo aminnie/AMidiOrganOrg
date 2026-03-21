@@ -1248,6 +1248,37 @@ namespace
         return true;
     }
 
+    bool runHotkeyDuplicateAssignmentGuard(std::string& details)
+    {
+        HotkeyBindings b = HotkeyBindings::withDefaults();
+
+        if (hasDuplicateHotkeyAssignments(b))
+        {
+            details = "built-in defaults must not contain duplicates";
+            return false;
+        }
+
+        b.keys[0] = L'x';
+        b.keys[1] = L'x';
+
+        if (!hasDuplicateHotkeyAssignments(b))
+        {
+            details = "duplicate keys should be detected";
+            return false;
+        }
+
+        b.keys[0] = std::nullopt;
+        b.keys[1] = std::nullopt;
+
+        if (hasDuplicateHotkeyAssignments(b))
+        {
+            details = "multiple (None) assignments should not count as duplicates";
+            return false;
+        }
+
+        return true;
+    }
+
 }
 
 int main()
@@ -1302,6 +1333,11 @@ int main()
     {
         std::string details;
         results.push_back({ "Shortcut focus deferral (TextEditor/ComboBox vs controls)", runShortcutFocusDeferralGuard(details), details });
+    }
+
+    {
+        std::string details;
+        results.push_back({ "Hotkey duplicate detection (non-empty vs (None))", runHotkeyDuplicateAssignmentGuard(details), details });
     }
 
     {

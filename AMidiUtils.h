@@ -14,6 +14,7 @@
 
 #include <array>
 #include <functional>
+#include <optional>
 
 //==============================================================================
 static void BubbleMessage(Component& targetComponent, const String& textToShow,
@@ -344,7 +345,9 @@ enum PanelTabsType {
     PTVoices = 4,
     PTEffects = 5,
     PTConfig = 6,
-    PTHelp = 7
+    PTHotkeys = 7,
+    PTHelp = 8,
+    PTExit = 9
 };
 
 enum EffectsMap {
@@ -469,12 +472,93 @@ enum KeyPressCommandIDs {
     btnLowerRotaryBrake = 23
 };
 
+constexpr int kNumHotkeyCommands = 16;
+
+inline constexpr std::array<KeyPressCommandIDs, kNumHotkeyCommands> kHotkeyCommandOrder = {
+    KeyPressCommandIDs::btnTabUpper,
+    KeyPressCommandIDs::btnTabLower,
+    KeyPressCommandIDs::btnTabBass,
+    KeyPressCommandIDs::btnTabSounds,
+    KeyPressCommandIDs::btnTabEffects,
+    KeyPressCommandIDs::btnPreset0,
+    KeyPressCommandIDs::btnPreset1,
+    KeyPressCommandIDs::btnPreset2,
+    KeyPressCommandIDs::btnPreset3,
+    KeyPressCommandIDs::btnPreset4,
+    KeyPressCommandIDs::btnPreset5,
+    KeyPressCommandIDs::btnPreset6,
+    KeyPressCommandIDs::btnUpperRotaryFastSlow,
+    KeyPressCommandIDs::btnUpperRotaryBrake,
+    KeyPressCommandIDs::btnLowerRotaryFastSlow,
+    KeyPressCommandIDs::btnLowerRotaryBrake
+};
+
+struct HotkeyBindings
+{
+    std::array<std::optional<juce_wchar>, kNumHotkeyCommands> keys;
+
+    static HotkeyBindings withDefaults();
+
+    std::optional<juce_wchar> keyFor(CommandID commandID) const;
+    void setKeyFor(CommandID commandID, std::optional<juce_wchar> k);
+};
+
+inline int indexOfHotkeyCommand(CommandID id) noexcept
+{
+    for (int i = 0; i < kNumHotkeyCommands; ++i)
+        if (static_cast<CommandID>(kHotkeyCommandOrder[(size_t) i]) == id)
+            return i;
+
+    return -1;
+}
+
+inline HotkeyBindings HotkeyBindings::withDefaults()
+{
+    HotkeyBindings b;
+    b.keys[0] = L'a';
+    b.keys[1] = L's';
+    b.keys[2] = L'd';
+    b.keys[3] = L'q';
+    b.keys[4] = L'w';
+    b.keys[5] = L'0';
+    b.keys[6] = L'1';
+    b.keys[7] = L'2';
+    b.keys[8] = L'3';
+    b.keys[9] = L'4';
+    b.keys[10] = L'5';
+    b.keys[11] = L'6';
+    b.keys[12] = L'f';
+    b.keys[13] = L'b';
+    b.keys[14] = L'g';
+    b.keys[15] = L'n';
+    return b;
+}
+
+inline std::optional<juce_wchar> HotkeyBindings::keyFor(CommandID commandID) const
+{
+    const int idx = indexOfHotkeyCommand(commandID);
+    if (idx < 0 || idx >= kNumHotkeyCommands)
+        return std::nullopt;
+    return keys[(size_t) idx];
+}
+
+inline void HotkeyBindings::setKeyFor(CommandID commandID, std::optional<juce_wchar> k)
+{
+    const int idx = indexOfHotkeyCommand(commandID);
+    if (idx < 0 || idx >= kNumHotkeyCommands)
+        return;
+    keys[(size_t) idx] = k;
+}
+
 
 class KeyPressTarget final : public Component,
     public ApplicationCommandTarget
 {
 public:
     KeyPressTarget() = default;
+
+    void setHotkeyBindings(const HotkeyBindings& b) { hotkeyBindings = b; }
+    const HotkeyBindings& getHotkeyBindings() const { return hotkeyBindings; }
 
     //==============================================================================
     ApplicationCommandTarget* getNextCommandTarget() override { return nullptr; }
@@ -504,61 +588,62 @@ public:
 
     void getCommandInfo(CommandID commandID, ApplicationCommandInfo& result) override
     {
-        auto add = [&result](const char* name, const char* desc, int keyCode)
+        auto addShortcutInfo = [this, commandID, &result](const char* name, const char* desc)
         {
             result.setInfo(name, desc, "Shortcuts", 0);
-            result.addDefaultKeypress(keyCode, ModifierKeys::noModifiers);
+            if (auto k = hotkeyBindings.keyFor(commandID))
+                result.addDefaultKeypress((int) *k, ModifierKeys::noModifiers);
         };
 
         switch (commandID)
         {
             case KeyPressCommandIDs::btnTabUpper:
-                add("Upper tab", "Show Upper keyboard", 'a');
+                addShortcutInfo("Upper tab", "Show Upper keyboard");
                 break;
             case KeyPressCommandIDs::btnTabLower:
-                add("Lower tab", "Show Lower keyboard", 's');
+                addShortcutInfo("Lower tab", "Show Lower keyboard");
                 break;
             case KeyPressCommandIDs::btnTabBass:
-                add("Bass tab", "Show Bass & Drums keyboard", 'd');
+                addShortcutInfo("Bass tab", "Show Bass & Drums keyboard");
                 break;
             case KeyPressCommandIDs::btnTabSounds:
-                add("Sounds tab", "Show Sounds tab", 'q');
+                addShortcutInfo("Sounds tab", "Show Sounds tab");
                 break;
             case KeyPressCommandIDs::btnTabEffects:
-                add("Effects tab", "Show Effects tab", 'w');
+                addShortcutInfo("Effects tab", "Show Effects tab");
                 break;
             case KeyPressCommandIDs::btnPreset0:
-                add("Manual preset", "Recall Manual preset", '0');
+                addShortcutInfo("Manual preset", "Recall Manual preset");
                 break;
             case KeyPressCommandIDs::btnPreset1:
-                add("Preset 1", "Recall Preset 1", '1');
+                addShortcutInfo("Preset 1", "Recall Preset 1");
                 break;
             case KeyPressCommandIDs::btnPreset2:
-                add("Preset 2", "Recall Preset 2", '2');
+                addShortcutInfo("Preset 2", "Recall Preset 2");
                 break;
             case KeyPressCommandIDs::btnPreset3:
-                add("Preset 3", "Recall Preset 3", '3');
+                addShortcutInfo("Preset 3", "Recall Preset 3");
                 break;
             case KeyPressCommandIDs::btnPreset4:
-                add("Preset 4", "Recall Preset 4", '4');
+                addShortcutInfo("Preset 4", "Recall Preset 4");
                 break;
             case KeyPressCommandIDs::btnPreset5:
-                add("Preset 5", "Recall Preset 5", '5');
+                addShortcutInfo("Preset 5", "Recall Preset 5");
                 break;
             case KeyPressCommandIDs::btnPreset6:
-                add("Preset 6", "Recall Preset 6", '6');
+                addShortcutInfo("Preset 6", "Recall Preset 6");
                 break;
             case KeyPressCommandIDs::btnUpperRotaryFastSlow:
-                add("Upper rotary Fast/Slow", "Upper manual rotary Fast/Slow", 'f');
+                addShortcutInfo("Upper rotary Fast/Slow", "Upper manual rotary Fast/Slow");
                 break;
             case KeyPressCommandIDs::btnUpperRotaryBrake:
-                add("Upper rotary Brake", "Upper manual rotary Brake", 'b');
+                addShortcutInfo("Upper rotary Brake", "Upper manual rotary Brake");
                 break;
             case KeyPressCommandIDs::btnLowerRotaryFastSlow:
-                add("Lower rotary Fast/Slow", "Lower manual rotary Fast/Slow", 'g');
+                addShortcutInfo("Lower rotary Fast/Slow", "Lower manual rotary Fast/Slow");
                 break;
             case KeyPressCommandIDs::btnLowerRotaryBrake:
-                add("Lower rotary Brake", "Lower manual rotary Brake", 'n');
+                addShortcutInfo("Lower rotary Brake", "Lower manual rotary Brake");
                 break;
             default:
                 break;
@@ -652,6 +737,8 @@ public:
     std::function<void()> onLowerRotaryBrake;
 
 private:
+    HotkeyBindings hotkeyBindings { HotkeyBindings::withDefaults() };
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(KeyPressTarget)
 };
 

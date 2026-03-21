@@ -13,6 +13,7 @@ For canonical build/run commands, use the `Build` section in `README.md`.
 - `AMidiButtons.h`: custom button types holding panel/instrument metadata.
 - `AMidiRotors.h`: rotary speed ramp threads and MIDI CC emission.
 - `AMidiUtils.h`: shared constants, globals, enums, and utility helpers.
+- `AMidiHotkeys.h`: hotkey binding persistence (`configs/hotkeys.json`) and Hotkeys tab UI.
 - `README.md`: product behavior/features and user-facing notes.
 - `assets/`: PNG UI images bundled at build time via `juce_add_binary_data(...)`; keep required filenames stable unless code/CMake are updated together.
 
@@ -29,7 +30,7 @@ For canonical build/run commands, use the `Build` section in `README.md`.
 - Do not silently change on-disk locations under user Documents (`AMidiOrgan/...`).
 
 ## User Documents layout (`Documents/AMidiOrgan`)
-- **`configs/`** — `.cfg` configuration files (see `AppState::configdir`).
+- **`configs/`** — `.cfg` configuration files (see `AppState::configdir`); also **`hotkeys.json`** (keyboard shortcut map) written by the Hotkeys tab.
 - **`panels/`** — `.pnl` instrument panel files (see `AppState::paneldir`); canonical read/write target; older installs may still load from legacy `instruments/` or module-named folders via fallbacks.
 - **`instruments/`** — JSON instrument catalogs only (not `.pnl`).
 
@@ -64,6 +65,9 @@ For canonical build/run commands, use the `Build` section in `README.md`.
 - Voice selection sends MSB/LSB/PC correctly.
 - Effects sliders emit expected CC values.
 - Save/reload of config and panel files remains functional.
+
+## UI controls
+- Prefer **JUCE** components (`juce::` / modules such as `juce_gui_basics`) for UI where they offer a suitable control—cross-platform behavior and theming stay consistent. Do not reach for OS-native widgets when a JUCE equivalent exists unless there is a clear, documented reason.
 
 ## Style Notes
 - Match existing naming and formatting style in touched files.

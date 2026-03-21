@@ -8,6 +8,7 @@
 #pragma once
 
 #include "AMidiUtils.h"
+#include "AMidiHotkeys.h"
 #include "AMidiDevices.h"
 #include "AMidiInstruments.h"
 #include "AMidiButtons.h"
@@ -7765,7 +7766,9 @@ private:
 class MenuTabs final : public TabbedComponent
 {
 public:
-    MenuTabs ([[maybe_unused]] bool isRunningComponenTransforms)
+    MenuTabs ([[maybe_unused]] bool isRunningComponenTransforms,
+              juce::ApplicationCommandManager& commandManager,
+              KeyPressTarget& keyPressTarget)
         : TabbedComponent (TabbedButtonBar::TabsAtTop)
     {
         juce::Logger::writeToLog("== MenuTabs(): Constructor ");
@@ -7801,8 +7804,9 @@ public:
         addTab("Sounds",       colour, voicespage, true);
         addTab("Effects",      colour, effectspage, true);
 
-        // Create Config and Help Pages
+        // Create Config, Hotkeys, Help, Exit
         addTab("Config",       colour, configspage, true);
+        addTab("Hotkeys",      colour, new HotkeysPage(commandManager, keyPressTarget), true);
         addTab("Help",         colour, new HelpPage(), true);
         addTab("Exit",         colour, new Component(), true);
 
@@ -8084,9 +8088,24 @@ class AMidiControl final : public Component
 {
 public:
     AMidiControl(bool isRunningComponenTransforms = false)
-        : tabs (isRunningComponenTransforms),
-          shortcutKeyListener (commandManager.getKeyMappings())
+        : commandManager(),
+          keyTarget(),
+          shortcutKeyListener(commandManager.getKeyMappings()),
+          tabs(isRunningComponenTransforms, commandManager, keyTarget)
     {
+        {
+            juce::String hotkeyLoadErr;
+            HotkeyBindings loaded = HotkeyBindings::withDefaults();
+
+            if (getHotkeysFile().existsAsFile())
+            {
+                if (!loadHotkeyBindingsFromFile(loaded, hotkeyLoadErr))
+                    juce::Logger::writeToLog("Hotkeys load failed: " + hotkeyLoadErr);
+            }
+
+            keyTarget.setHotkeyBindings(loaded);
+        }
+
         commandManager.registerAllCommandsForTarget(&keyTarget);
         // Required: otherwise getTargetForCommand() never resolves to KeyPressTarget (it is not in the component tree).
         commandManager.setFirstCommandTarget(&keyTarget);
@@ -8154,17 +8173,16 @@ public:
         tabs.setBounds (getLocalBounds().reduced (3));
     }
 
-    MenuTabs tabs;
-
 private:
-    // Keyboard Command Manager
-    //ApplicationCommandManager& commandManager = getGlobalCommandManager();
+    // Keyboard Command Manager (must precede MenuTabs — tabs reference commandManager / keyTarget)
     ApplicationCommandManager commandManager;
-    ShortcutRoutingKeyListener shortcutKeyListener;
-
     KeyPressTarget keyTarget;
+    ShortcutRoutingKeyListener shortcutKeyListener;
     bool keyListenerAttached = false;
     Component* topLevelWithAttachedKeyListener = nullptr;
+
+public:
+    MenuTabs tabs;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AMidiControl)
 };

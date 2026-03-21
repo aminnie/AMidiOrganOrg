@@ -90,6 +90,7 @@ target_sources(AMidiOrgan
         AMidiButtons.h
         AMidiRotors.h
         AMidiUtils.h
+        AMidiHotkeys.h
 )
 
 target_include_directories(AMidiOrgan

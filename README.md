@@ -199,6 +199,10 @@ When the main window has focus:
 
 Upper and Lower rotary keys always target their respective manuals, even when another tab is selected (same behavior as the on-screen rotary buttons, resolved from the Upper and Lower keyboard tabs).
 
+### Editing shortcuts
+
+Use the **Hotkeys** tab (between **Config** and **Help**) to assign each command to a key from **A–Z** or **0–9**, or **(None)** for no mapping. **Save** writes `Documents/AMidiOrgan/configs/hotkeys.json` and applies the mapping; the app also loads that file on startup. If two or more commands share the same non-empty key, **Save** is blocked and a warning is shown. **Cancel** discards unsaved edits in the tab (restores the last applied bindings).
+
 While a **TextEditor** or **ComboBox** has keyboard focus (including inside modal dialogs), global shortcuts are **not** invoked so normal typing and selection work.
 
 Letter shortcuts may still fire when focus is on other controls (for example a plain button).
@@ -267,7 +271,7 @@ ctest --test-dir build -C Debug --output-on-failure
   - Build `AMidiOrganTests`.
   - Run `ctest`.
   - Build `AMidiOrgan` (Debug build on both platforms).
-- Current regression tests cover utility bounds, MIDI split/layer routing, preset/config persistence roundtrips, MIDI controller reset emission, shutdown-ownership crash paths, and shortcut focus deferral (text fields vs global hotkeys).
+- Current regression tests cover utility bounds, MIDI split/layer routing, preset/config persistence roundtrips, MIDI controller reset emission, shutdown-ownership crash paths, shortcut focus deferral (text fields vs global hotkeys), and hotkey duplicate detection rules.
 
 ### Recommended Manual UI Smoke Test
 
