@@ -317,7 +317,7 @@ Typical output app bundle:
 
 ### macOS Quick Start (Mac mini)
 
-Step-by-step command-line guide for a clean Mac (Makefile vs Xcode, `ctest` notes): [MacMinibuild.md](MacMinibuild.md).
+Step-by-step command-line guide for a clean Mac (Makefile vs Xcode, `ctest` notes): [MacMinibuild.md](MacMinibuild.md). **Bash automation:** `scripts/mac-bootstrap.sh` (first-time + deps) and `scripts/mac-build.sh` (repeat builds); see MacMinibuild §9.
 
 Use this as the repeatable baseline on a dedicated macOS build machine:
 

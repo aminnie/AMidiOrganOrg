@@ -188,7 +188,37 @@ cmake -S . -B build-mac -DJUCE_ROOT="$PWD/.deps/JUCE" -DCMAKE_BUILD_TYPE=Debug \
 
 ---
 
-## 9. Related docs
+## 9. Bash scripts (Option 1 and Option 2)
+
+From the **repository root** on macOS, after `chmod +x scripts/*.sh` if needed:
+
+| Script | Purpose |
+|--------|---------|
+| [`scripts/mac-bootstrap.sh`](scripts/mac-bootstrap.sh) | **Option 1** — Verifies Xcode/CLT, requires [Homebrew](https://brew.sh/), installs **cmake** (and **git** / **ninja** when needed), clones **JUCE** if missing, then runs `mac-build.sh`. Does **not** install Homebrew or CLT automatically (interactive / security). |
+| [`scripts/mac-build.sh`](scripts/mac-build.sh) | **Option 2** — Assumes toolchain + CMake + JUCE are already present; configures and builds (CI-style **Makefile** / **Ninja** by default). |
+
+Examples:
+
+```bash
+# First-time or new Mac (Homebrew + CLT already installed)
+./scripts/mac-bootstrap.sh
+
+# Later builds only (same flags as bootstrap’s build step)
+./scripts/mac-build.sh
+
+# Variants
+./scripts/mac-build.sh --release
+./scripts/mac-build.sh --ninja
+./scripts/mac-build.sh --xcode
+```
+
+Default output locations match the manual CMake flow: `build-mac/AMidiOrgan_artefacts/Debug/AMidiOrgan.app` (Debug Makefile), `build-mac-release/.../Release/...` with `--release`, `build-mac-xcode/...` with `--xcode`.
+
+The legacy [`scripts/bootstrap_macos.sh`](scripts/bootstrap_macos.sh) forwards to `mac-bootstrap.sh`.
+
+---
+
+## 10. Related docs
 
 - [README.md](README.md) — full build matrix, Windows steps, and macOS Quick Start
 - [.github/workflows/ci.yml](.github/workflows/ci.yml) — automated macOS configure/build commands
