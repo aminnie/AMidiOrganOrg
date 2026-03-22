@@ -313,9 +313,11 @@ cmake --build build-mac --config Debug --target AMidiOrgan
 
 Typical output app bundle:
 
-- `build-mac/Debug/AMidiOrgan.app`
+- `build-mac/AMidiOrgan_artefacts/Debug/AMidiOrgan.app`
 
 ### macOS Quick Start (Mac mini)
+
+Step-by-step command-line guide for a clean Mac (Makefile vs Xcode, `ctest` notes): [MacMinibuild.md](MacMinibuild.md).
 
 Use this as the repeatable baseline on a dedicated macOS build machine:
 
