@@ -1352,12 +1352,17 @@ public:
             //String sname = tabs.getCurrentTabName();
 
             // Set the input Panel Button to the newly selected instrument
-            VoiceButton* ptrvoicebutton = instrumentpanel->getVoiceButton(panelbuttonidx);
-            ptrvoicebutton->setInstrument(instrument);
+            VoiceButton* pvbtn = instrumentpanel->getVoiceButton(panelbuttonidx);
+            pvbtn->setInstrument(instrument);
 
             // Tab redraw: https://forum.juce.com/t/how-to-capture-tabbedcomponents-tab-active/29203/9
-            ptrvoicebutton->setButtonText(instrument.getVoice());
-            ptrvoicebutton->triggerClick();
+            pvbtn->setButtonText(instrument.getVoice());
+            pvbtn->triggerClick();
+
+            syncVoiceSnapshotFromInstrument();
+            selvoice = -1;
+            selvoicebank = -1;
+            updateVoicesRouteButtonDirtyStyle();
         };
         // Disable the button until Voice or Effects button selected in Keyboard Panels
         tbroute->setEnabled(false);
@@ -1377,8 +1382,14 @@ public:
                 //String sname = tabs.getCurrentTabName();
 
                 // Tab redraw: https://forum.juce.com/t/how-to-capture-tabbedcomponents-tab-active/29203/9
-                VoiceButton* ptrvoicebutton = instrumentpanel->getVoiceButton(panelbuttonidx);
-                ptrvoicebutton->triggerClick();
+                VoiceButton* pvbtn = instrumentpanel->getVoiceButton(panelbuttonidx);
+                pvbtn->triggerClick();
+
+                lblsvoicetxt.setText(pvbtn->getInstrument().getVoice(), {});
+                syncVoiceSnapshotFromInstrument();
+                selvoice = -1;
+                selvoicebank = -1;
+                updateVoicesRouteButtonDirtyStyle();
             };
 
         addAndMakeVisible(nestedMenusButton);
@@ -1395,6 +1406,7 @@ public:
             try 
             {
                 tbroute->setEnabled(false);
+                updateVoicesRouteButtonDirtyStyle();
 
                 PopupMenu menu;
                 int ccount = (int)midiInstruments->getCategoryCount();
@@ -1416,8 +1428,14 @@ public:
                 menu.showMenuAsync(PopupMenu::Options{}.withTargetComponent(nestedMenusButton),
                     ////[&selvoice, &selvoicebank](int result) { 
                     [=](int result) {
-                        // If incomplete selection, abort
-                        if (result == 0) return;
+                        // Dismissed without selection — restore route button
+                        if (result == 0)
+                        {
+                            if ((currenttabidx == PTUpper) || (currenttabidx == PTLower) || (currenttabidx == PTBass))
+                                tbroute->setEnabled(true);
+                            updateVoicesRouteButtonDirtyStyle();
+                            return;
+                        }
 
                         selvoice = result % 1000;
                         selvoicebank = (int)(result / 1000);
@@ -1459,6 +1477,7 @@ public:
 
                         if ((currenttabidx == PTUpper) || (currenttabidx == PTLower) || (currenttabidx == PTBass))
                             tbroute->setEnabled(true);
+                        updateVoicesRouteButtonDirtyStyle();
                     });
             }
             catch(...) {
@@ -1518,6 +1537,11 @@ public:
         // Trigger button to display first level menu
         nestedMenusButton.setEnabled(true);
         ////nestedMenusButton.triggerClick();
+
+        syncVoiceSnapshotFromInstrument();
+        selvoice = -1;
+        selvoicebank = -1;
+        updateVoicesRouteButtonDirtyStyle();
 
         return true;
     }
@@ -1594,6 +1618,65 @@ private:
     int mchannel = 1;
     int selvoice = 0;
     int selvoicebank = 0;
+
+    /** MSB/LSB/PC snapshot from the voice button when Sounds tab opens; menu pick compares to these. */
+    int snapMSB = 0;
+    int snapLSB = 0;
+    int snapFont = 0;
+
+    void syncVoiceSnapshotFromInstrument()
+    {
+        if (ptrvoicebutton == nullptr)
+            return;
+
+        Instrument inst = ptrvoicebutton->getInstrument();
+        snapMSB = inst.getMSB();
+        snapLSB = inst.getLSB();
+        snapFont = inst.getFont();
+    }
+
+    bool voicesSelectionDiffersFromSnapshot()
+    {
+        if (midiInstruments == nullptr)
+            return false;
+        if (selvoicebank < 0 || selvoice < 0)
+            return false;
+
+        return midiInstruments->getMSB(selvoicebank, selvoice) != snapMSB
+            || midiInstruments->getLSB(selvoicebank, selvoice) != snapLSB
+            || midiInstruments->getFont(selvoicebank, selvoice) != snapFont;
+    }
+
+    /** Same red “pending” style as panel Save and Effects tab To Upper. */
+    void updateVoicesRouteButtonDirtyStyle()
+    {
+        if (tbroute == nullptr)
+            return;
+
+        if (!tbroute->isEnabled())
+        {
+            tbroute->setColour(TextButton::textColourOffId, Colours::black);
+            tbroute->setColour(TextButton::textColourOnId, Colours::black);
+            tbroute->setColour(TextButton::buttonColourId, Colours::lightgrey);
+            tbroute->setColour(TextButton::buttonOnColourId, Colours::antiquewhite);
+            return;
+        }
+
+        if (voicesSelectionDiffersFromSnapshot())
+        {
+            tbroute->setColour(TextButton::textColourOffId, Colours::white);
+            tbroute->setColour(TextButton::textColourOnId, Colours::white);
+            tbroute->setColour(TextButton::buttonColourId, Colours::darkred);
+            tbroute->setColour(TextButton::buttonOnColourId, Colours::darkred.brighter());
+        }
+        else
+        {
+            tbroute->setColour(TextButton::textColourOffId, Colours::black);
+            tbroute->setColour(TextButton::textColourOnId, Colours::black);
+            tbroute->setColour(TextButton::buttonColourId, Colours::lightgrey);
+            tbroute->setColour(TextButton::buttonOnColourId, Colours::antiquewhite);
+        }
+    }
 
     juce::Label lblskeyboard{ "Keyboard" };
     juce::Label lblskeyboardtxt{ "No Keyboard" };
@@ -1890,6 +1973,10 @@ public:
         tbroute->setBounds(margin, 2 * margin + 140, 80, 30);
         tbroute->onClick = [=, &tabs]()
             {
+                // Treat current instrument as the new baseline (same as after setEffects).
+                syncEffectsSnapshotFromInstrument();
+                updateToRouteButtonDirtyStyle();
+
                 // Used by Listener to trigger and update Button Text
                 beffectsupdated = true;
 
@@ -2009,6 +2096,7 @@ public:
                 break;
         }
 
+        updateToRouteButtonDirtyStyle();
         return true;
     }
 
@@ -2098,6 +2186,7 @@ public:
             mididevices->sendToOutputs(ccMessage);
         }
 
+        updateToRouteButtonDirtyStyle();
         return true;
     }
 
@@ -2143,6 +2232,7 @@ public:
 
         // Enable the routing button now that Voice or Effect has been selected
         tbroute->setEnabled(true);
+        updateToRouteButtonDirtyStyle();
 
         return true;
     }
@@ -2195,6 +2285,73 @@ private:
     int effrel;
     int effbri;
     int effpan;
+
+    void syncEffectsSnapshotFromInstrument()
+    {
+        if (instrumentpanel == nullptr || panelbuttonidx < 0)
+            return;
+
+        auto* inst = instrumentpanel->getVoiceButton(panelbuttonidx)->getInstrumentPtr();
+        if (inst == nullptr)
+            return;
+
+        effvol = inst->getVol();
+        effexp = inst->getExp();
+        effrev = inst->getRev();
+        effcho = inst->getCho();
+        effmod = inst->getMod();
+        efftim = inst->getTim();
+        effatk = inst->getAtk();
+        effrel = inst->getRel();
+        effbri = inst->getBri();
+        effpan = inst->getPan();
+    }
+
+    bool effectsValuesDifferFromSnapshot() const
+    {
+        if (instrumentpanel == nullptr || panelbuttonidx < 0)
+            return false;
+
+        auto* inst = instrumentpanel->getVoiceButton(panelbuttonidx)->getInstrumentPtr();
+        if (inst == nullptr)
+            return false;
+
+        return inst->getVol() != effvol || inst->getExp() != effexp || inst->getRev() != effrev
+            || inst->getCho() != effcho || inst->getMod() != effmod || inst->getTim() != efftim
+            || inst->getAtk() != effatk || inst->getRel() != effrel || inst->getBri() != effbri
+            || inst->getPan() != effpan;
+    }
+
+    /** Same red “pending save” style as panel Save/Load (see updatePanelSaveButtonsPendingStyle). */
+    void updateToRouteButtonDirtyStyle()
+    {
+        if (tbroute == nullptr)
+            return;
+
+        if (!tbroute->isEnabled())
+        {
+            tbroute->setColour(TextButton::textColourOffId, Colours::black);
+            tbroute->setColour(TextButton::textColourOnId, Colours::black);
+            tbroute->setColour(TextButton::buttonColourId, Colours::lightgrey);
+            tbroute->setColour(TextButton::buttonOnColourId, Colours::antiquewhite);
+            return;
+        }
+
+        if (effectsValuesDifferFromSnapshot())
+        {
+            tbroute->setColour(TextButton::textColourOffId, Colours::white);
+            tbroute->setColour(TextButton::textColourOnId, Colours::white);
+            tbroute->setColour(TextButton::buttonColourId, Colours::darkred);
+            tbroute->setColour(TextButton::buttonOnColourId, Colours::darkred.brighter());
+        }
+        else
+        {
+            tbroute->setColour(TextButton::textColourOffId, Colours::black);
+            tbroute->setColour(TextButton::textColourOnId, Colours::black);
+            tbroute->setColour(TextButton::buttonColourId, Colours::lightgrey);
+            tbroute->setColour(TextButton::buttonOnColourId, Colours::antiquewhite);
+        }
+    }
 
     Slider* createSlider(bool isSnapping)
     {
