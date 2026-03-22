@@ -359,7 +359,7 @@ public:
         cancelButton.onClick = [this] { onCancelClicked(); };
 
         // Same pattern as ConfigPage: Save disabled until edits; re-disabled after successful save.
-        saveButton.setEnabled(false);
+        updateSaveButtonState();
 
         // Match tab pages that use `findColour(ResizableWindow::backgroundColourId)` (see MenuTabs::addTab).
         setOpaque(true);
@@ -445,7 +445,19 @@ private:
 
     void updateSaveButtonState()
     {
-        saveButton.setEnabled(!currentCombosMatchSnapshot());
+        const bool dirty = !currentCombosMatchSnapshot();
+        saveButton.setEnabled(dirty);
+
+        if (dirty)
+        {
+            // Match panel Save / Effects “To Upper” pending style (see MenuTabs::updatePanelSaveButtonsPendingStyle).
+            saveButton.setColour(juce::TextButton::textColourOffId, juce::Colours::white);
+            saveButton.setColour(juce::TextButton::textColourOnId, juce::Colours::white);
+            saveButton.setColour(juce::TextButton::buttonColourId, juce::Colours::darkred);
+            saveButton.setColour(juce::TextButton::buttonOnColourId, juce::Colours::darkred.brighter());
+        }
+        else
+            hotkeyUiDetail::styleTextButtonLikeConfig(saveButton);
     }
 
     /** Column-major grid: fill top-to-bottom, then next column. Chooses the widest column count that still fits the viewport to reduce scrolling. */
@@ -547,14 +559,14 @@ private:
         juce::Logger::writeToLog("HotkeysPage: hotkeys saved to " + getHotkeysFile().getFileName());
         BubbleMessage(saveButton, "Hotkeys saved", bubbleMessage);
 
-        saveButton.setEnabled(false);
+        updateSaveButtonState();
     }
 
     void onCancelClicked()
     {
         working = snapshot;
         syncCombosFromWorking();
-        saveButton.setEnabled(false);
+        updateSaveButtonState();
     }
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(HotkeysPage)
