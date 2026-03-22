@@ -518,8 +518,8 @@ inline HotkeyBindings HotkeyBindings::withDefaults()
     b.keys[0] = L'a';
     b.keys[1] = L's';
     b.keys[2] = L'd';
-    b.keys[3] = L'q';
-    b.keys[4] = L'w';
+    b.keys[3] = L'z';
+    b.keys[4] = L'x';
     b.keys[5] = L'0';
     b.keys[6] = L'1';
     b.keys[7] = L'2';
@@ -667,10 +667,14 @@ public:
                 else return false;
                 break;
             case KeyPressCommandIDs::btnTabSounds:
+                if (onVoiceEditTabHotkeysAllowed && !onVoiceEditTabHotkeysAllowed())
+                    return false;
                 if (onTabSounds) onTabSounds();
                 else return false;
                 break;
             case KeyPressCommandIDs::btnTabEffects:
+                if (onVoiceEditTabHotkeysAllowed && !onVoiceEditTabHotkeysAllowed())
+                    return false;
                 if (onTabEffects) onTabEffects();
                 else return false;
                 break;
@@ -730,6 +734,8 @@ public:
     std::function<void()> onTabBass;
     std::function<void()> onTabSounds;
     std::function<void()> onTabEffects;
+    /** If set, Sounds/Effects tab hotkeys are ignored when this returns false (e.g. no voice selected yet). */
+    std::function<bool()> onVoiceEditTabHotkeysAllowed;
     std::function<void(int)> onPresetRecall;
     std::function<void()> onUpperRotaryFastSlow;
     std::function<void()> onUpperRotaryBrake;

@@ -157,16 +157,12 @@ inline bool saveHotkeyBindingsToFile(const HotkeyBindings& b, juce::String& erro
     const juce::var root(o.get());
     const juce::String txt = juce::JSON::toString(root, true);
 
-    juce::FileOutputStream out(f);
-
-    if (!out.openedOk())
+    // FileOutputStream opens at EOF for existing files (append). Use replaceWithText so each save overwrites.
+    if (!f.replaceWithText(txt))
     {
         errorMsg = "Could not write hotkeys file.";
         return false;
     }
-
-    out.writeText(txt, false, false, "\n");
-    out.flush();
 
     return true;
 }

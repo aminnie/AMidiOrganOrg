@@ -2398,7 +2398,7 @@ private:
 // Class: KeyboardManualPage - Construct and load
 //==============================================================================
 static int zinstcntmanualpage = 0;
-struct KeyboardPanelPage final : public Component, 
+struct KeyboardPanelPage final : public Component,
     public ComponentListener
 {
     KeyboardPanelPage(TabbedComponent& tabs, PanelTabsType tabidx,
@@ -2798,6 +2798,8 @@ struct KeyboardPanelPage final : public Component,
                         }
                     };
 
+                    sb->addMouseListener(this, true);
+
                 // Default first button to send MIDI program change
                 if (i == 0)
                     sb->triggerClick();
@@ -3181,6 +3183,8 @@ struct KeyboardPanelPage final : public Component,
                         }
                     };
 
+                    sb->addMouseListener(this, true);
+
                 // Default first button to send MIDI program change
                 if (i == 0)
                     sb->triggerClick();
@@ -3559,6 +3563,8 @@ struct KeyboardPanelPage final : public Component,
                             mididevices->sendToOutputs(ccMessage);
                         }
                     };
+
+                    sb->addMouseListener(this, true);
 
                 // Default first button to send MIDI program change
                 if (i == 0)
@@ -3949,6 +3955,8 @@ struct KeyboardPanelPage final : public Component,
                         }
                     };
 
+                    sb->addMouseListener(this, true);
+
                 // Default first button to send MIDI program change
                 if (i == 0)
                     sb->triggerClick();
@@ -4149,6 +4157,11 @@ struct KeyboardPanelPage final : public Component,
                     tabs.setCurrentTabIndex(PTEffects, true);
                     //String sname = tabs->getCurrentTabName();
                 };
+
+            voiceEditSoundsButton = gxtbchange;
+            voiceEditEffectsButton = gxtbedit;
+            gxtbchange->setEnabled(false);
+            gxtbedit->setEnabled(false);
         }
 
         // --------------------------------------------------------------------
@@ -4231,8 +4244,8 @@ struct KeyboardPanelPage final : public Component,
                     pstb->setButtonText("Manual");
                     pstb->setColour(TextButton::textColourOffId, Colours::white);
                     pstb->setColour(TextButton::textColourOnId, Colours::white);
-                    pstb->setColour(TextButton::buttonColourId, Colours::darkred);
-                    pstb->setColour(TextButton::buttonOnColourId, Colours::darkred.brighter());
+                    pstb->setColour(TextButton::buttonColourId, Colours::darkred.brighter());
+                    pstb->setColour(TextButton::buttonOnColourId, Colours::darkred);
                 }
                 else {
                     pstb->setButtonText("Preset " + std::to_string(i));
@@ -5014,6 +5027,33 @@ struct KeyboardPanelPage final : public Component,
         DBG("== KeyboardManualPage(): Destructor " + std::to_string(--zinstcntmanualpage));
     }
 
+    /** Enables Sounds/Effects only on real pointer clicks — not from `triggerClick()` at panel build time. */
+    void mouseUp(const juce::MouseEvent& e) override
+    {
+        if (!e.mouseWasClicked())
+            return;
+
+        enableVoiceEditShortcutButtons();
+    }
+
+    /** True after the user has clicked a voice on this manual (Voice Edits buttons are enabled). */
+    bool areVoiceEditShortcutButtonsEnabled() const
+    {
+        return voiceEditSoundsButton != nullptr && voiceEditSoundsButton->isEnabled();
+    }
+
+    /** Sounds/Effects tab hotkeys use the same rule as the Voice Edits row: allowed if any manual has enabled those buttons. */
+    static bool anyVoiceEditShortcutsEnabledInTabs(juce::TabbedComponent& tabbed)
+    {
+        for (const int tabIdx : { PTUpper, PTLower, PTBass })
+        {
+            if (auto* k = dynamic_cast<KeyboardPanelPage*>(tabbed.getTabContentComponent(tabIdx)))
+                if (k->areVoiceEditShortcutButtonsEnabled())
+                    return true;
+        }
+        return false;
+    }
+
     void refreshPanelSaveAvailability()
     {
         if (cbSave != nullptr)
@@ -5118,6 +5158,18 @@ struct KeyboardPanelPage final : public Component,
     }
 
 private:
+    /** Sounds / Effects shortcut buttons in "Voice Edits"; enabled after user selects a voice in any group. */
+    void enableVoiceEditShortcutButtons()
+    {
+        if (voiceEditSoundsButton != nullptr)
+            voiceEditSoundsButton->setEnabled(true);
+        if (voiceEditEffectsButton != nullptr)
+            voiceEditEffectsButton->setEnabled(true);
+    }
+
+    juce::TextButton* voiceEditSoundsButton = nullptr;
+    juce::TextButton* voiceEditEffectsButton = nullptr;
+
     void applyRotaryUiSnapshot(bool wantFast, bool wantBrake, bool sendMidi)
     {
         if (currenttabidx == PTBass || tbrotslow == nullptr || tbrotbrake == nullptr)
@@ -8272,6 +8324,7 @@ public:
         keyTarget.onTabBass = [this] { tabs.setCurrentTabIndex(PTBass, true); };
         keyTarget.onTabSounds = [this] { tabs.setCurrentTabIndex(PTVoices, true); };
         keyTarget.onTabEffects = [this] { tabs.setCurrentTabIndex(PTEffects, true); };
+        keyTarget.onVoiceEditTabHotkeysAllowed = [this] { return KeyboardPanelPage::anyVoiceEditShortcutsEnabledInTabs(tabs); };
         keyTarget.onPresetRecall = [this](int idx) { tabs.recallPresetFromHotkey(idx); };
         keyTarget.onUpperRotaryFastSlow = [this] { tabs.triggerUpperRotaryFastSlowHotkey(); };
         keyTarget.onUpperRotaryBrake = [this] { tabs.triggerUpperRotaryBrakeHotkey(); };
