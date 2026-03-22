@@ -1,75 +1,262 @@
-# AMidiOrgan Help
+# AMidiOrgan User Guide
 
 ## What This App Does
-AMidiOrgan is a live-performance MIDI controller built with JUCE and C++.  
-It manages Voice Button Groups across three keyboard panels (`Upper`, `Lower`, `Bass&Drums`),
-supports layering/splits, and routes MIDI to connected hardware and software sound modules.
+AMidiOrgan is a live-performance MIDI controller built with JUCE and C++.
+It manages voice button groups across three keyboard panels, supports layering and split workflows,
+and routes MIDI to connected hardware and software sound modules from a single interface.
+
+The three performance panels are:
+
+- `Upper`
+- `Lower`
+- `Bass&Drums`
+
+Each panel uses the active configuration and panel data to determine which voices, routing, effects,
+presets, and rotary states are available during a performance.
 
 ## Supported Modules (Current)
+
 - Deebach BlackBox
 - Roland Integra7
 - Ketron SD2
 - MIDI GM
 - Custom MIDI (JSON-based)
 
+Contact the developer for additional module support.
+
 ## Startup Flow (Recommended)
-1. Open **MIDI Start Page** (`Start` tab).
-2. Select MIDI input/output devices.
-3. Select the instrument module (`To Modules`).
-4. Load panel (`.pnl`) and config (`.cfg`) if needed.
-5. Confirm panel/config labels and begin from **Upper** / **Lower** / **Bass&Drums**.
+
+1. Open the `Start` tab.
+2. Select MIDI input and output devices.
+3. Select the active sound module using `To Modules`.
+4. Load a panel (`.pnl`) and config (`.cfg`) if needed.
+5. Confirm the panel and config labels match what you expect.
+6. Move to `Upper`, `Lower`, or `Bass&Drums` and start playing.
 
 ## Tab Guide
-- **Start**
-  - MIDI input/output devices are dynamically listed on connect/disconnect.
-  - Instrument module selection and panel/config load.
-- **Upper / Lower / Bass&Drums**
-  - Voice Button Groups, volume sliders, mute, presets.
-  - Rotary controls on Upper/Lower.
-  - Panel Save and Save As.
-- **Sounds**
-  - Assign instrument voices to selected buttons.
-- **Effects**
-  - Edit per-voice MIDI effects in real time.
-- **Config**
-  - Edit MIDI In/Out routing, split notes, octave shift, and MIDI pass-through.
-- **Help**
-  - This guide.
 
-## Important Behavior Notes
-- Groups 2, 3, and 4 may start muted depending on preset state.
-- If muted:
-  - Group volume slider and Up/Down buttons are disabled by design.
-- Mute is used for fast live layering control.
+### Start
+
+- Lists MIDI input and output devices and updates as devices connect or disconnect.
+- Lets you choose the active sound module.
+- Loads panel and config files.
+- Checks config/panel pairing when loading and can warn if the selected files do not belong together.
+
+### Upper / Lower / Bass&Drums
+
+- These are the main performance tabs.
+- Each tab contains voice button groups, volume controls, mute, and preset recall.
+- `Upper` and `Lower` also include rotary controls.
+- `Save` and `Save As` write the current panel (`.pnl`) to disk.
+- The preset buttons are shared across all three keyboard tabs.
+
+### Sounds
+
+- Assigns an instrument voice to the currently selected voice button.
+- Select the target voice button on a keyboard tab before opening `Sounds`.
+- The selected sound is sent on the button group's MIDI output channel so you can audition it.
+- Use `To Upper`, `To Lower`, or `To Bass` to return to the performance tab.
+
+### Effects
+
+- Edits per-voice MIDI effect values in real time.
+- Select the target voice button on a keyboard tab before opening `Effects`.
+- Effect changes are applied on the button group's MIDI output channel as you edit them.
+- Use `To Upper`, `To Lower`, or `To Bass` to return to the performance tab.
+- Current effect set:
+  - VOL
+  - EXP
+  - REV
+  - CHO
+  - MOD
+  - TIM
+  - ATK
+  - REL
+  - BRI
+  - PAN
+
+### Config
+
+- Edits button group routing and behavior:
+  - group name
+  - MIDI In / Out channel
+  - octave shift
+  - solo split point for Upper / Lower
+- `MIDI Reset` sends a controller reset on all 16 channels.
+- `MIDI pass-through` controls whether channels not assigned to a button group are blocked or allowed through.
+- Config settings are global to the app and are separate from the currently loaded panel.
+
+### Hotkeys
+
+- Lets you assign keyboard shortcuts for tabs, presets, and rotary controls.
+- Available values are `A-Z`, `0-9`, and `(None)`.
+- `Save` applies the current shortcut map and writes it to disk.
+- `Cancel` restores the last applied shortcut map.
+- Duplicate non-empty shortcuts are blocked.
+
+### Help
+
+- Shows this guide.
+
+### Exit
+
+- Exits the application.
+- If panel-related changes are pending, the app may ask whether you want to save before quitting.
+
+## Performance Behavior
+
+### Voice Button Groups
+
+- A voice button group is a logical set of related voice buttons.
+- Each group uses routing and performance settings from the active config.
+- Every group has a volume slider with Up / Down controls.
+- Groups can be muted and unmuted during performance.
+
+### Mute and Layering
+
+- Muting is used for fast live layering control.
+- When a group is muted, its volume slider and Up / Down controls are disabled.
+- MIDI notes from the group's input are still transmitted to the group's output.
+- This allows layered note routing while keeping the group's audible level at zero until you need it.
+
+### Presets
+
+- There are 7 presets in total:
+  - `Manual`
+  - Presets `1` to `6`
+- `Manual` is the default preset on startup.
+- Each preset stores the active voice button in each button group across all three keyboard tabs.
+- Each preset also stores per-button-group rotary snapshot values used during preset recall.
+- Preset programming flow:
+  1. Select the target preset.
+  2. Adjust the active voice buttons as needed.
+  3. Click `Preset Set`.
+  4. Click the preset button again to write the snapshot.
+- Save the panel if you want preset changes to persist to disk.
+
+### Rotary
+
+- Rotary controls are available on `Upper` and `Lower`.
+- Rotary supports `Fast/Slow` and `Brake`.
+- Switching between `Upper`, `Lower`, and `Bass&Drums` refreshes the rotary controls from saved manual state.
+- Upper and Lower manual rotary states are saved with the panel.
+- Presets also store per-group rotary values for recall.
+
+## Keyboard Shortcuts
+
+When the main window has focus, the default shortcuts are:
+
+| Action | Key |
+|--------|-----|
+| Upper tab | `A` |
+| Lower tab | `S` |
+| Bass tab | `D` |
+| Sounds tab | `Z` |
+| Effects tab | `X` |
+| Manual preset | `0` |
+| Preset 1 | `1` |
+| Preset 2 | `2` |
+| Preset 3 | `3` |
+| Preset 4 | `4` |
+| Preset 5 | `5` |
+| Preset 6 | `6` |
+| Upper rotary Fast/Slow | `F` |
+| Upper rotary Brake | `B` |
+| Lower rotary Fast/Slow | `G` |
+| Lower rotary Brake | `N` |
+
+Shortcut notes:
+
+- Upper and Lower rotary shortcuts always target their respective manuals, even when another tab is selected.
+- Sounds and Effects shortcuts are intended for use after a target voice button has been selected on a keyboard tab.
+- While a `TextEditor`, `ComboBox`, or modal dialog has keyboard focus, global shortcuts are deferred so normal typing continues to work.
+- Some plain controls may still allow letter shortcuts when they have focus.
+
+### Customizing Shortcuts
+
+- Open the `Hotkeys` tab to edit shortcuts.
+- `Save` writes the current map to:
+  - `Documents/AMidiOrgan/configs/hotkeys.json`
+- That file is loaded on startup when it is present.
+- If the file is missing, the app uses the built-in defaults shown above.
+
+## Saving, Loading, and File Locations
+
+### User Data Location
+
+AMidiOrgan stores user data under:
+
+- `Documents/AMidiOrgan`
+
+Important subfolders:
+
+- `configs/` for `.cfg` files
+- `panels/` for `.pnl` files
+- `instruments/` for JSON instrument catalogs
+- `configs/hotkeys.json` for keyboard shortcut bindings
+
+### What Each File Stores
+
+- `.cfg`
+  - MIDI routing, group naming, split points, pass-through behavior, and related configuration
+- `.pnl`
+  - voice button assignments
+  - button group details
+  - presets
+  - panel-level saved state such as manual rotary values
+- `hotkeys.json`
+  - customized keyboard shortcuts
+
+### Pairing and Save Behavior
+
+- Panels and configs are related: a panel stores the config name it expects.
+- If you load a panel and config that do not match, the app can warn and let you abort or continue.
+- While a config/panel mismatch is acknowledged, normal panel `Save` may remain disabled until the relationship is resolved.
+- `Save As` can be used to write a new panel that matches the current config.
+- If you change a sound module assignment inside a config that other panels depend on, saving that same config name may be blocked so older panels are not silently broken.
+
+### Practical Save Advice
+
+- Use `Save` regularly after meaningful panel edits.
+- Use `Save As` before major changes so you keep a fallback version.
+- After saving, reload once to confirm the expected state was written.
 
 ## Window Move Tip
-- Click and drag in empty space on the top tabs bar to move the app window.
-- This keeps the 6px title bar while still allowing screen repositioning.
 
-## Save / Load Tips
-- Use **Save** frequently after meaningful edits.
-- Use **Save As** before major changes to preserve a fallback panel.
-- After save, reload once to validate persisted state.
+- Click and drag in empty space on the top tab bar to move the app window.
+- This preserves the slim title-bar layout while still letting you reposition the window.
 
 ## MIDI Troubleshooting
-- **No sound**
-  - Verify MIDI output device is connected/selected.
-  - Check Voice Button Group mute states and output channels.
-  - Confirm selected module matches active sound source.
-- **Notes not routing correctly**
-  - Check Config page MIDI In/Out channel mapping.
-  - Verify split note settings for solo groups.
-- **Unexpected voice/effect**
-  - Confirm active voice button and preset selection.
-  - Re-open Sounds/Effects pages and verify assigned values.
+
+### No sound
+
+- Verify that the MIDI output device is connected and selected.
+- Check the mute state and output channel on the active voice button group.
+- Confirm that the selected module matches the actual sound source.
+- Confirm that the intended voice button is active.
+
+### Notes not routing correctly
+
+- Check `Config` page MIDI In / Out channel mapping.
+- Verify split note settings for solo groups.
+- Confirm the intended config file is loaded.
+
+### Unexpected voice or effect
+
+- Confirm the active preset and active voice button.
+- Re-open `Sounds` or `Effects` and verify the assigned values.
+- If using custom hotkeys, confirm the current `hotkeys.json` matches what you expect.
 
 ## Pre-Performance Checklist (2-3 Minutes)
-- Open each main tab once.
-- Verify MIDI device list is stable (no missing outputs).
-- Trigger notes on Upper, Lower, and Bass&Drums.
-- Check mute states and Voice Button Group volume levels.
-- Confirm preset recall for one saved preset.
-- Save current panel snapshot.
+
+- Open each main tab once: `Start`, `Upper`, `Lower`, `Bass&Drums`, `Sounds`, `Effects`, `Config`, `Hotkeys`, `Help`.
+- Verify MIDI devices are present and stable.
+- Trigger notes on `Upper`, `Lower`, and `Bass&Drums`.
+- Check mute states and voice button group volume levels.
+- Recall at least one saved preset and confirm that the expected voices load.
+- If you use custom hotkeys, test one tab shortcut and one preset shortcut.
+- Save the current panel snapshot if you changed anything.
 
 ## Contact Details
+
 - Anton Minnie, email: `a_minnie@hotmail.com`

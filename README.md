@@ -1,12 +1,14 @@
 # AMidiOrgan Features
 
-AMidiOrgan is a MIDI controller solution built on the [JUCE](https://juce.com) open source framework. [JUCE](https://juce.com) supports building audiovisual applications and is portable across multiple operating systems. It is often used by software and hardware vendors to build user interfaces for their solutions, and also used as the basis for audio synthesis.
+AMidiOrgan is a live-performance MIDI controller built with [JUCE](https://juce.com). It is designed for rigs with multiple MIDI keyboards and sound modules, bringing routing, layering, preset recall, voice editing, and effect control into one interface.
 
-AMidiOrgan supports connecting multiple MIDI input and output device configurations and enables dynamic routing of MIDI messages between these devices supporting cross-device overlays on the output, keyboard split points, configuration presets, etc.
+The application is organized around three performance panels:
 
-When you have multiple MIDI keyboards and sound modules in your rig, AMidiOrgan gives you a single configuration setup that manages all devices in one user interface, with instant preset recall across the rig during performances.
+- `Upper`
+- `Lower`
+- `Bass&Drums`
 
-The application consists of three instrument panels: Upper, Lower, and Bass&Drums. Panels are arranged into voice and feature button groups and are built from a saved configuration that represents your keyboards and sound modules. A panel can stand for a voice style or a specific song setup—for example, a jazz organ with layered strings, or solo instruments such as sax on a configured split keyboard. A style may cover many songs in your repertoire, or just one.
+Each panel uses the active configuration and panel data to determine which voices, routing, effects, presets, and rotary states are available during a performance. A panel can represent an organ style, a layered setup, or a song-specific registration.
 
 ## UI Screenshots
 
@@ -48,140 +50,170 @@ Supported MIDI hardware and software sound modules:
 - MIDI GM
 - Contact developer for additional module support.
 
-### 1. Voice Buttons
+### 1. Startup Flow
 
-- MIDI instrument sound from loaded device (MSB, LSB, soundfont).
-- Ten MIDI effects (VOL, EXP, REV, CHO, MOD, TIM, ATK, REL, BRI, PAN) applied to the button group MIDI output channel.
-- MIDI sound settings are unique per voice button; effects may differ per button.
+1. Open the `Start` tab.
+2. Select MIDI input and output devices.
+3. Select the active sound module using `To Modules`.
+4. Load a panel (`.pnl`) and config (`.cfg`) if needed.
+5. Confirm the panel and config labels match what you expect.
+6. Move to `Upper`, `Lower`, or `Bass&Drums` and begin playing.
 
-### 2. Voice Button Groups
+### 2. Tab Guide
 
-- A voice button group is a logical grouping of voice buttons.
-- Logical groupings can be changed by the user in the Config page.
-- Each voice button group stores:
-  - MIDI In and Out settings (Config page).
-  - Octave shift settings.
-  - Solo keyboard split settings:
-    - Solo group can host typical solo instruments, while solo split remains polyphonic.
-    - One solo split for Upper and one for Lower keyboards.
-- Every group has a volume slider with level Up/Down buttons.
-  - Voice button value is initialized from the active voice button to support real-time balancing.
-  - Group volume changes are not written back to the active voice button instrument volume effect.
-- Mute/unmute behavior:
-  - Muting enables layering by setting group output volume to zero.
-  - Muting disables the group volume slider and Up/Down buttons.
-  - MIDI notes from group MIDI input are still transmitted to group MIDI output.
-  - This enables dynamic layering of input keyboard notes to multiple output channels.
-- Output note layering:
-  - First button group In channel forwards all MIDI messages directly to its Out channel (default same In/Out).
-  - Layering to groups 2, 3, and 4 forwards Note On/Off using active voice button sound/effects.
-- To do: adjust Bass/Drums panel to allow all messages on first Drum button group.
+#### Start
 
-### 3. Instrument Panel
+- Lists MIDI input and output devices and updates as devices connect or disconnect.
+- Lets you choose the active sound module.
+- Loads panel and config files.
+- Checks config and panel pairing when loading, and can warn if the selected files do not belong together.
 
-- System supports one instrument panel containing:
+#### Upper / Lower / Bass&Drums
+
+- These are the main performance tabs.
+- Each tab contains voice button groups, volume controls, mute, and preset recall.
+- `Upper` and `Lower` also include rotary controls.
+- `Save` and `Save As` write the current panel (`.pnl`) to disk.
+- The preset buttons are shared across all three keyboard tabs.
+
+#### Sounds
+
+- Assigns an instrument voice to the currently selected voice button.
+- Select the target voice button on a keyboard tab before opening `Sounds`.
+- The selected sound is sent on the button group's MIDI output channel so you can audition it.
+- Use `To Upper`, `To Lower`, or `To Bass` to return to the performance tab.
+
+#### Effects
+
+- Edits per-voice MIDI effect values in real time.
+- Select the target voice button on a keyboard tab before opening `Effects`.
+- Effect changes are applied on the button group's MIDI output channel as you edit them.
+- Use `To Upper`, `To Lower`, or `To Bass` to return to the performance tab.
+- Current effect set:
+  - VOL
+  - EXP
+  - REV
+  - CHO
+  - MOD
+  - TIM
+  - ATK
+  - REL
+  - BRI
+  - PAN
+
+#### Config
+
+- Edits button group routing and behavior:
+  - group name
+  - MIDI In / Out channel
+  - octave shift
+  - solo split point for Upper / Lower
+- `MIDI Reset` sends a controller reset on all 16 channels.
+- `MIDI pass-through` controls whether channels not assigned to a button group are blocked or allowed through.
+- Config settings are global to the app and are separate from the currently loaded panel.
+
+#### Hotkeys
+
+- Lets you assign keyboard shortcuts for tabs, presets, and rotary controls.
+- Available values are `A-Z`, `0-9`, and `(None)`.
+- `Save` applies the current shortcut map and writes it to disk.
+- `Cancel` restores the last applied shortcut map.
+- Duplicate non-empty shortcuts are blocked.
+
+#### Help
+
+- Shows the embedded user guide.
+
+#### Exit
+
+- Exits the application.
+- If panel-related changes are pending, the app may ask whether you want to save before quitting.
+
+### 3. Voice Buttons
+
+- Each voice button stores a MIDI instrument sound from the active device or module.
+- Each button also stores its own MIDI effect values, so two buttons in the same group can sound and behave differently.
+
+### 4. Voice Button Groups
+
+- A voice button group is a logical set of related voice buttons.
+- Group layout and routing are configured in the `Config` tab.
+- Each group stores:
+  - MIDI In and Out settings
+  - octave shift
+  - solo split settings for Upper or Lower
+- Every group has a volume slider with Up / Down controls.
+- Group volume changes are for live balancing and are not written back into the active voice button's stored instrument volume value.
+
+#### Mute and Layering
+
+- Muting is used for fast live layering control.
+- When a group is muted, its volume slider and Up / Down controls are disabled.
+- MIDI notes from the group's input are still transmitted to the group's output.
+- This allows layered note routing while keeping the group's audible level at zero until needed.
+- The first button group In channel forwards all MIDI messages directly to its Out channel by default.
+- Layering to groups 2, 3, and 4 forwards Note On and Note Off using the active voice button's sound and effects.
+
+### 5. Instrument Panels
+
+- The system uses one instrument panel containing:
   - Upper keyboard panel
   - Lower keyboard panel
   - Bass&Drums keyboard panel
-- Instrument panel is named, saved, and loaded from disk in the application's working directory.
-- User can create panels by organ style/type or by song.
-- Panel contains up to 96 voice buttons across 12 button groups over 3 keyboard panels.
+- Panels can be created by organ style, by setup, or by song.
+- A panel can contain up to 96 voice buttons across 12 button groups.
 - Panel save (`.pnl`) stores:
-  - all 96 voice button values,
-  - 12 button group details,
-  - 7 preset configurations.
+  - all voice button values
+  - button group details
+  - 7 preset configurations
 - Button groups are color-coded by keyboard panel.
-- To do: make voice button group sizing/count configurable.
 
-### 4. Presets
+### 6. Presets
 
-- Total presets: 7
-  - 1 Manual preset (default on startup)
-  - 6 programmable presets
-- Each preset stores active/selected voice button in each button group for all 3 keyboard panels.
-- Each preset also stores per-button-group **rotary** snapshot values (used with preset recall). Values are **0** = slow, **1** = fast, **2** = brake. Upper manual rotary updates groups 0–3; Lower updates groups 4–7.
-- Preset references reflect currently selected sound and effects.
+- There are 7 presets in total:
+  - `Manual`
+  - Presets `1` to `6`
+- `Manual` is the default preset on startup.
+- Each preset stores the active voice button in each button group across all three keyboard tabs.
+- Each preset also stores per-button-group rotary snapshot values used during preset recall.
 - Preset programming flow:
-  - Select target preset.
-  - Adjust active buttons as needed across panels.
-  - Click `Preset Set`, then click preset button to update.
-- Changing the Upper/Lower **Rotary** controls also updates the **active** preset’s stored rotary (so **Save** on the panel writes non-zero `rotary` fields without an extra Set step). Use **Preset Set** to capture a full snapshot (all groups, including Bass) into the selected preset.
-- Preset button group is shared by all keyboard panels.
-  - Selection on any panel captures all three panels into the preset.
-- Save instrument panel to persist preset selections to disk.
+  - Select the target preset.
+  - Adjust the active voice buttons as needed across panels.
+  - Click `Preset Set`, then click the preset button again to write the snapshot.
+- Changing the Upper or Lower rotary controls also updates the active preset's stored rotary state.
+- Save the panel if you want preset changes to persist to disk.
 
-### 5. Rotary Button Group
+### 7. Rotary
 
-- Available on Upper and Lower keyboard panels.
-- Switching the main **Upper** / **Lower** / **Bass&Drums** tabs refreshes the rotary control labels/toggles from saved manual state (no extra MIDI on tab change).
-- Controls rotor speed (Fast/Slow) and Brake On/Off.
-- **Upper** and **Lower** manual Fast/Slow and Brake positions are saved on the **instrument panel** root (with **Save** / **Save As**) and restored on panel load—separate from the per-group **rotary** field stored **inside each preset** (see Presets).
-- Uses internal ramp list at 100 ms intervals for speed transitions.
-- To do: improve synchronization of voice startup fast/slow state.
+- Rotary controls are available on `Upper` and `Lower`.
+- Rotary supports `Fast/Slow` and `Brake`.
+- Switching between `Upper`, `Lower`, and `Bass&Drums` refreshes the rotary controls from saved manual state without sending extra MIDI on tab change.
+- Upper and Lower manual rotary states are saved with the panel.
+- Presets also store per-group rotary values for recall.
 
-### 6. Keyboard Panel
+### 8. Config and Panel Save Behavior
 
-- Each keyboard panel contains four voice button groups.
-- Seven presets are supported per panel (shared preset set across panels).
-- Upper/Lower rotary function is associated with button group 1 (Organ by default).
+- Config settings apply globally to the app and are separate from the currently loaded panel.
+- Panels and configs are related: a panel stores the config name it expects.
+- If you load a panel and config that do not match, the app can warn and let you abort or continue.
+- While a config and panel mismatch is acknowledged, normal panel `Save` may stay disabled until the relationship is resolved.
+- `Save As` can be used to write a new panel that matches the current config.
+- If you change a sound module assignment inside a config that other panels depend on, saving that same config name may be blocked so older panels are not silently broken.
 
-### 7. Sounds Edit Page
+### 9. File Locations
 
-- Any supported instrument MIDI sound can be selected and programmed into any voice button.
-- Select intended voice button before opening Sounds page.
-- Selected sound is sent on button group MIDI Out channel for demo play.
-- Use `To Upper` / `To Lower` / `To Bass` to save and return.
-- To do: assess long-term use of JUCE popup menu (mouse-first UX).
+AMidiOrgan stores user data under:
 
-### 8. Effects Edit Page
+- `Documents/AMidiOrgan`
 
-- Any supported MIDI effect can be programmed into a voice button.
-- Select intended voice button before opening Effects page.
-- Effect changes are applied in real time to the button group MIDI output channel.
-- Use `To Upper` / `To Lower` / `To Bass` to save and return.
-- Effect behavior:
-  - Each voice button has independent effect values.
-  - Effects are emitted when that voice button is selected.
-- To do:
-  - evaluate global effect settings in addition to per-button settings,
-  - consider reading current device effect values as defaults.
+Important subfolders:
 
-### 9. Config Page
+- `configs/` for `.cfg` files
+- `panels/` for `.pnl` files
+- `instruments/` for JSON instrument catalogs
+- `configs/hotkeys.json` for keyboard shortcut bindings
 
-- Configure button group parameters:
-  - group name (1..12),
-  - MIDI In/Out channel,
-  - octave shift (-3..+3),
-  - solo keyboard split (Upper/Lower).
-- MIDI Reset sends standard controller reset on all 16 channels.
-- MIDI pass-through option:
-  - Off: channels not configured as group inputs are blocked.
-  - Useful when solo channel output conflicts with keyboard split behavior.
-  - Block list recalculated on startup or Config save.
-- Config applies globally to the application, independent of loaded instrument panel.
-- **Load pairing:** The **Load** button uses the same cfg-vs-panel embedded-name check as the Start tab: if the chosen `.cfg` does not match the panel’s embedded `configfilename`, you get **Abort** or **Load anyway** (JUCE dialog); **Load anyway** sets `configPanelPairingMismatchAcknowledged`.
-- **Panel save (pairing):** While that flag is set, the keyboard **Save** button stays disabled. **Save As** and **Exit → Save and Exit** show a **Save anyway / Cancel** dialog first; confirming saves the panel (embedding the active config name) and clears the flag. A successful **Save** also updates the in-memory pairing so the flag clears when the embedded name matches the active config. Hover tooltips on **Save** / **Save As** explain why a button is disabled or that a confirmation dialog will appear.
-- **Save guard (sound module changes):** If you change the **MIDI sound module** assignment for any button group and then choose **Save** on the same `.cfg` file, the app scans all `*.pnl` files under `Documents/AMidiOrgan` for panels whose embedded `configfilename` matches that config. If any reference it, **Save is blocked** and a dialog explains why—use **Save As** with a **new** file name so existing song/style panels keep using the previous rig file. If nothing references the config, you get a short confirmation that the scan ran. **Save As** to a different file name is never blocked by this rule; choosing the **same** file name as the active config runs the same check as **Save**.
-- To do:
-  - evaluate moving config scope into panel saves (per instrument panel),
-  - add feature to load different instrument JSON files.
-
-### 10. MIDI Start Page
-
-- **Load pairing:** **Load Config** and **Load Panel** compare the selected file to the current pairing: the active `.cfg` basename vs the `configfilename` embedded in the instrument panel ValueTree (and for **Load Panel**, the embedded name read from the file you picked). If they differ, a JUCE dialog offers **Abort** or **Load anyway**. **Load anyway** sets `configPanelPairingMismatchAcknowledged` (see Config tab notes for **Panel save (pairing)**). **Load Config** on this tab applies the full configuration from disk, consistent with the Config tab **Load** button.
-- MIDI input/output devices are dynamically listed on connect/disconnect.
-- Supports multiple MIDI input keyboards and output devices.
-- Current design assumes one active MIDI sound device at a time.
-- Button group MIDI In/Out should be configured by channel for preferred routing.
-- Input is layered both by button-group routing and by selected MIDI output devices.
-- Instrument module button shows selected module name.
-  - Supported module list includes Deebach BlackBox, Roland Integra7, Ketron SD2, MIDIGM, and Custom MIDI.
-  - A new module can be added by replacing the JSON sound file in the Custom directory.
-  - Validate JSON before use, e.g. [jsonlint.com](https://jsonlint.com/).
-- To do: test Bluetooth connectivity support through JUCE.
-
-
-## 11. Keyboard shortcuts (Phase 1)
+### 10. Keyboard Shortcuts (Phase 1)
 
 When the main window has focus:
 
@@ -197,15 +229,15 @@ When the main window has focus:
 | Lower rotary Fast/Slow | G |
 | Lower rotary Brake | N |
 
-Upper and Lower rotary keys always target their respective manuals, even when another tab is selected (same behavior as the on-screen rotary buttons, resolved from the Upper and Lower keyboard tabs).
+Upper and Lower rotary keys always target their respective manuals, even when another tab is selected.
 
-### Editing shortcuts
+### Editing Shortcuts
 
-Use the **Hotkeys** tab (between **Config** and **Help**) to assign each command to a key from **A–Z** or **0–9**, or **(None)** for no mapping. **Save** writes `Documents/AMidiOrgan/configs/hotkeys.json` and applies the mapping; the app also loads that file on startup. If two or more commands share the same non-empty key, **Save** is blocked and a warning is shown. **Cancel** discards unsaved edits in the tab (restores the last applied bindings).
+Use the `Hotkeys` tab (between `Config` and `Help`) to assign each command to a key from `A-Z` or `0-9`, or `(None)` for no mapping. `Save` writes `Documents/AMidiOrgan/configs/hotkeys.json` and applies the mapping; the app also loads that file on startup. If two or more commands share the same non-empty key, `Save` is blocked and a warning is shown. `Cancel` discards unsaved edits in the tab and restores the last applied bindings.
 
-While a **TextEditor** or **ComboBox** has keyboard focus (including inside modal dialogs), global shortcuts are **not** invoked so normal typing and selection work.
+While a `TextEditor` or `ComboBox` has keyboard focus, including inside modal dialogs, global shortcuts are deferred so normal typing and selection still work.
 
-Letter shortcuts may still fire when focus is on other controls (for example a plain button).
+Letter shortcuts may still fire when focus is on other controls, such as a plain button.
 
 
 
