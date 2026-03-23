@@ -6833,7 +6833,7 @@ public:
 
                         SoundModule.setButtonText(instrumentmodules->getDisplayName(locmoduleidx));
 
-                        saveButton.setEnabled(true);
+                        setConfigSaveButtonEnabled(true);
                     });
             };
 
@@ -6861,7 +6861,7 @@ public:
             int i = comboConfig.getSelectedId() - 1;   // Combobox is 1 based
             instrumentpanel->getButtonGroup(i)->groupname = txtGroupName.getText();
 
-            saveButton.setEnabled(true);
+            setConfigSaveButtonEnabled(true);
             };
 
         addAndMakeVisible(lblButtonCount);
@@ -6891,13 +6891,13 @@ public:
             if ((val < 1) || (val > 16)) {
                 txtMidiIn.setText("");
 
-                saveButton.setEnabled(false);
+                setConfigSaveButtonEnabled(false);
                 return;
             }
 
             instrumentpanel->getButtonGroup(i)->midiin = txtMidiIn.getText().getIntValue();
 
-            saveButton.setEnabled(true);
+            setConfigSaveButtonEnabled(true);
             };
 
         addAndMakeVisible(lblMidiOut);
@@ -6914,12 +6914,12 @@ public:
             if ((val < 1) || (val > 16)) {
                 txtMidiOut.setText("");
 
-                saveButton.setEnabled(false);
+                setConfigSaveButtonEnabled(false);
                 return;
             }
             instrumentpanel->getButtonGroup(i)->midiout = txtMidiOut.getText().getIntValue();
 
-            saveButton.setEnabled(true);
+            setConfigSaveButtonEnabled(true);
             };
 
         // Keyboard Split
@@ -6939,7 +6939,7 @@ public:
             if ((sval.length() != 2) && (sval.length() != 3)) {
                 txtSplit.setText("--");
 
-                saveButton.setEnabled(false);
+                setConfigSaveButtonEnabled(false);
                 return;
             }
 
@@ -6953,7 +6953,7 @@ public:
                 instrumentpanel->getButtonGroup(i)->splitoutname = "--";
             }
 
-            saveButton.setEnabled(true);
+            setConfigSaveButtonEnabled(true);
             };
 
         // Octave Transpose
@@ -6971,12 +6971,12 @@ public:
             if ((val < -3) || (val > 3)) {
                 txtOctave.setText("");
 
-                saveButton.setEnabled(false);
+                setConfigSaveButtonEnabled(false);
                 return;
             }
             instrumentpanel->getButtonGroup(i)->octxpose = txtOctave.getText().getIntValue();
 
-            saveButton.setEnabled(true);
+            setConfigSaveButtonEnabled(true);
             };
 
         // Keyboard Velocity on or off
@@ -6992,7 +6992,7 @@ public:
             int i = comboConfig.getSelectedId() - 1;   // Combobox is 1 based
             instrumentpanel->getButtonGroup(i)->velocity = velocitystate;
 
-            saveButton.setEnabled(true);
+            setConfigSaveButtonEnabled(true);
 
             juce::String stateString = velocitystate ? "ON" : "OFF";
             juce::Logger::outputDebugString("Velocity changed to " + stateString);
@@ -7016,7 +7016,7 @@ public:
         const int defFxBoxH = (defFxY0 + 4 * defFxDy + defFxRowH) - defFxBoxTop + defFxPad;
 
         addAndMakeVisible(effectsDefaultsGroup);
-        effectsDefaultsGroup.setColour(GroupComponent::outlineColourId, Colours::grey.darker());
+        effectsDefaultsGroup.setColour(GroupComponent::outlineColourId, Colours::antiquewhite);
         effectsDefaultsGroup.setBounds(defFxBoxLeft, defFxBoxTop, defFxBoxW, defFxBoxH);
 
         int defFxRowInCol[2] = { 0, 0 };
@@ -7035,7 +7035,7 @@ public:
         addAndMakeVisible(txtDefaultEffectsVol);
         placeDefaultEffectRow(lblDefaultEffectsVol, txtDefaultEffectsVol, "Effect Vol", 0);
         txtDefaultEffectsVol.setText(std::to_string(appState.defaultEffectsVol));
-        wireDefaultEffectsNumberField(txtDefaultEffectsVol, &appState.defaultEffectsVol, 1, 127);
+        wireDefaultEffectsNumberField(txtDefaultEffectsVol, &appState.defaultEffectsVol, 0, 127);
 
         addAndMakeVisible(lblDefaultEffectsBri);
         addAndMakeVisible(txtDefaultEffectsBri);
@@ -7193,19 +7193,129 @@ public:
                     });
             };
 
-        // Save Config changes, and enable VoiceButton ComponentGroup Title Updates
+        // Same horizontal margin as KeyboardPanelPage::mgroup for Save / filename row.
+        constexpr int kbPanelMargin = 10;
+
+        addAndMakeVisible(lblconfigfile);
+        lblconfigfile.setColour(juce::Label::textColourId, juce::Colours::grey);
+        lblconfigfile.setJustificationType(juce::Justification::left);
+        // Align with panel filename label on Upper/Lower/Bass (mgroup + 1240, 205, 200x30).
+        lblconfigfile.setBounds(kbPanelMargin + 1240, 205, 200, 30);
+
+        // Quick Access Keyboard Buttons
+        int xaccess = 920;
+        int mgroup = 10;
+        ygroup = 190;
+        {
+            addAndMakeVisible(toUpperKBD);
+            toUpperKBD.setButtonText("Upper");
+            toUpperKBD.setClickingTogglesState(false);
+            toUpperKBD.setColour(TextButton::textColourOffId, Colours::black);
+            toUpperKBD.setColour(TextButton::textColourOnId, Colours::white);
+            toUpperKBD.setColour(TextButton::buttonColourId, Colours::white);
+            toUpperKBD.setColour(TextButton::buttonOnColourId, Colours::black.brighter());
+            toUpperKBD.setBounds(mgroup + xaccess, ygroup + mgroup * 2, 80, 50);
+            toUpperKBD.setToggleState(true, dontSendNotification);
+            toUpperKBD.onClick = [=, &tabs]()
+                {
+                    tabs.setCurrentTabIndex(PTUpper, false);
+                };
+            xaccess = xaccess + 100;
+
+            addAndMakeVisible(toLowerKBD);
+            toLowerKBD.setButtonText("Lower");
+            toLowerKBD.setClickingTogglesState(false);
+            toLowerKBD.setColour(TextButton::textColourOffId, Colours::black);
+            toLowerKBD.setColour(TextButton::textColourOnId, Colours::white);
+            toLowerKBD.setColour(TextButton::buttonColourId, Colours::white);
+            toLowerKBD.setColour(TextButton::buttonOnColourId, Colours::black.brighter());
+            toLowerKBD.setBounds(mgroup + xaccess, ygroup + mgroup * 2, 80, 50);
+            toLowerKBD.setToggleState(true, dontSendNotification);
+            toLowerKBD.onClick = [=, &tabs]()
+                {
+                    tabs.setCurrentTabIndex(PTLower, false);
+                };
+            xaccess = xaccess + 100;
+
+            addAndMakeVisible(toBassKBD);
+            toBassKBD.setButtonText("Bass");
+            toBassKBD.setClickingTogglesState(false);
+            toBassKBD.setColour(TextButton::textColourOffId, Colours::black);
+            toBassKBD.setColour(TextButton::textColourOnId, Colours::white);
+            toBassKBD.setColour(TextButton::buttonColourId, Colours::white);
+            toBassKBD.setColour(TextButton::buttonOnColourId, Colours::black.brighter());
+            toBassKBD.setBounds(mgroup + xaccess, ygroup + mgroup * 2, 80, 50);
+            toBassKBD.setToggleState(true, dontSendNotification);
+            toBassKBD.onClick = [=, &tabs]()
+                {
+                    tabs.setCurrentTabIndex(PTBass, false);
+                };
+        }
+
+        addAndMakeVisible(lblPassthrough);
+        lblPassthrough.setBounds(1150, 20, 150, 24);
+        lblPassthrough.setText("MIDI In Passthru", {});
+
+        //https://docs.juce.com/master/tutorial_radio_buttons_checkboxes.html
+        addAndMakeVisible(togglePassthrough);
+        togglePassthrough.setBounds(1280, 20, 50, 24);
+        togglePassthrough.onClick = [=]() {
+            passthroughstate = togglePassthrough.getToggleState();
+
+            setConfigSaveButtonEnabled(true);
+
+            juce::String stateString = passthroughstate ? "ON" : "OFF";
+            juce::Logger::outputDebugString("Passthrough changed to " + stateString);
+            };
+
+        addAndMakeVisible(resetButton);
+        resetButton.setButtonText("MIDI Reset");
+        resetButton.setColour(TextButton::textColourOffId, Colours::white);
+        resetButton.setColour(TextButton::textColourOnId, Colours::white);
+        resetButton.setColour(TextButton::buttonColourId, Colours::black.darker());
+        resetButton.setColour(TextButton::buttonOnColourId, Colours::black.brighter());
+        resetButton.setBounds(1350, 20, 80, 30);
+
+        resetButton.onClick = [=]() {
+
+            mididevices->resetAllControllers();
+            };
+
+        addAndMakeVisible(exitButton);
+        exitButton.setButtonText("Exit");
+        exitButton.setColour(TextButton::textColourOffId, Colours::white);
+        exitButton.setColour(TextButton::textColourOnId, Colours::white);
+        exitButton.setColour(TextButton::buttonColourId, Colours::black.darker());
+        exitButton.setColour(TextButton::buttonOnColourId, Colours::black.brighter());
+        // Keep off the Save As slot (Upper tab uses mgroup+1340,235 for Save As); global Exit is used instead.
+        exitButton.setBounds(0, 0, 1, 1);
+        // Header-level Exit button is provided globally in AMidiControl.
+        exitButton.setVisible(false);
+
+        exitButton.onClick = [=]() {
+            ApplicationQuit();
+            };
+
+        // Config Status Bar
+        addAndMakeVisible(statusLabel);
+        statusLabel.setText("", {});
+        statusLabel.setColour(juce::Label::textColourId, juce::Colours::grey);
+        statusLabel.setJustificationType(juce::Justification::right);
+        statusLabel.setBounds(900, 210, 200, 20);
+
+        // Save / Save As: same bounds as Upper/Lower/Bass panel (mgroup + 1240 / + 1340, y=235). Added last so
+        // they stack above quick-access buttons and stay clickable.
         addAndMakeVisible(saveButton);
         saveButton.setButtonText("Save");
         saveButton.setColour(TextButton::textColourOffId, Colours::white);
         saveButton.setColour(TextButton::textColourOnId, Colours::white);
         saveButton.setColour(TextButton::buttonColourId, Colours::black.darker());
         saveButton.setColour(TextButton::buttonOnColourId, Colours::black.brighter());
-        saveButton.setBounds(20, 225, 80, 30);
-        saveButton.setBounds(120, 225, 80, 30);
-        saveButton.setEnabled(false);
+        saveButton.setBounds(kbPanelMargin + 1240, 235, 80, 30);
+        setConfigSaveButtonEnabled(false);
         saveButton.onClick = [this]() {
             handleConfigSaveRequest(saveButton);
-            };
+        };
 
         addAndMakeVisible(saveAsButton);
         saveAsButton.setButtonText("Save As");
@@ -7213,7 +7323,7 @@ public:
         saveAsButton.setColour(TextButton::textColourOnId, Colours::white);
         saveAsButton.setColour(TextButton::buttonColourId, Colours::black.darker());
         saveAsButton.setColour(TextButton::buttonOnColourId, Colours::black.brighter());
-        saveAsButton.setBounds(220, 225, 80, 30);
+        saveAsButton.setBounds(kbPanelMargin + 1340, 235, 80, 30);
         saveAsButton.setToggleState(false, dontSendNotification);
         saveAsButton.onClick = [this]() {
             File fileToSave = File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
@@ -7279,7 +7389,7 @@ public:
                         if (TextButton* focused = &saveAsButton)
                             BubbleMessage(*focused, msgloaded, this->bubbleMessage);
 
-                        saveButton.setEnabled(false);
+                        setConfigSaveButtonEnabled(false);
                     }
                     else {
                         ////statusLabel->setText("Empty file name save! " + appState.configfname, juce::dontSendNotification);
@@ -7287,118 +7397,14 @@ public:
 
                     lblconfigfile.setText(appState.configfname, {});
                 });
-            };
-
-        addAndMakeVisible(lblconfigfile);
-        lblconfigfile.setColour(juce::Label::textColourId, juce::Colours::grey);
-        lblconfigfile.setJustificationType(juce::Justification::left);
-        lblconfigfile.setBounds(520, 225, 120, 30);
-
-        // Quick Access Keyboard Buttons
-        int xaccess = 920;
-        int mgroup = 10;
-        ygroup = 190;
-        {
-            addAndMakeVisible(toUpperKBD);
-            toUpperKBD.setButtonText("Upper");
-            toUpperKBD.setClickingTogglesState(false);
-            toUpperKBD.setColour(TextButton::textColourOffId, Colours::black);
-            toUpperKBD.setColour(TextButton::textColourOnId, Colours::white);
-            toUpperKBD.setColour(TextButton::buttonColourId, Colours::white);
-            toUpperKBD.setColour(TextButton::buttonOnColourId, Colours::black.brighter());
-            toUpperKBD.setBounds(mgroup + xaccess, ygroup + mgroup * 2, 80, 50);
-            toUpperKBD.setToggleState(true, dontSendNotification);
-            toUpperKBD.onClick = [=, &tabs]()
-                {
-                    tabs.setCurrentTabIndex(PTUpper, false);
-                };
-            xaccess = xaccess + 100;
-
-            addAndMakeVisible(toLowerKBD);
-            toLowerKBD.setButtonText("Lower");
-            toLowerKBD.setClickingTogglesState(false);
-            toLowerKBD.setColour(TextButton::textColourOffId, Colours::black);
-            toLowerKBD.setColour(TextButton::textColourOnId, Colours::white);
-            toLowerKBD.setColour(TextButton::buttonColourId, Colours::white);
-            toLowerKBD.setColour(TextButton::buttonOnColourId, Colours::black.brighter());
-            toLowerKBD.setBounds(mgroup + xaccess, ygroup + mgroup * 2, 80, 50);
-            toLowerKBD.setToggleState(true, dontSendNotification);
-            toLowerKBD.onClick = [=, &tabs]()
-                {
-                    tabs.setCurrentTabIndex(PTLower, false);
-                };
-            xaccess = xaccess + 100;
-
-            addAndMakeVisible(toBassKBD);
-            toBassKBD.setButtonText("Bass");
-            toBassKBD.setClickingTogglesState(false);
-            toBassKBD.setColour(TextButton::textColourOffId, Colours::black);
-            toBassKBD.setColour(TextButton::textColourOnId, Colours::white);
-            toBassKBD.setColour(TextButton::buttonColourId, Colours::white);
-            toBassKBD.setColour(TextButton::buttonOnColourId, Colours::black.brighter());
-            toBassKBD.setBounds(mgroup + xaccess, ygroup + mgroup * 2, 80, 50);
-            toBassKBD.setToggleState(true, dontSendNotification);
-            toBassKBD.onClick = [=, &tabs]()
-                {
-                    tabs.setCurrentTabIndex(PTBass, false);
-                };
-        }
-
-        addAndMakeVisible(lblPassthrough);
-        lblPassthrough.setBounds(1150, 20, 150, 24);
-        lblPassthrough.setText("MIDI In Passthru", {});
-
-        //https://docs.juce.com/master/tutorial_radio_buttons_checkboxes.html
-        addAndMakeVisible(togglePassthrough);
-        togglePassthrough.setBounds(1280, 20, 50, 24);
-        togglePassthrough.onClick = [=]() {
-            passthroughstate = togglePassthrough.getToggleState();
-
-            saveButton.setEnabled(true);
-
-            juce::String stateString = passthroughstate ? "ON" : "OFF";
-            juce::Logger::outputDebugString("Passthrough changed to " + stateString);
-            };
-
-        addAndMakeVisible(resetButton);
-        resetButton.setButtonText("MIDI Reset");
-        resetButton.setColour(TextButton::textColourOffId, Colours::white);
-        resetButton.setColour(TextButton::textColourOnId, Colours::white);
-        resetButton.setColour(TextButton::buttonColourId, Colours::black.darker());
-        resetButton.setColour(TextButton::buttonOnColourId, Colours::black.brighter());
-        resetButton.setBounds(1350, 20, 80, 30);
-
-        resetButton.onClick = [=]() {
-
-            mididevices->resetAllControllers();
-            };
-
-        addAndMakeVisible(exitButton);
-        exitButton.setButtonText("Exit");
-        exitButton.setColour(TextButton::textColourOffId, Colours::white);
-        exitButton.setColour(TextButton::textColourOnId, Colours::white);
-        exitButton.setColour(TextButton::buttonColourId, Colours::black.darker());
-        exitButton.setColour(TextButton::buttonOnColourId, Colours::black.brighter());
-        exitButton.setBounds(1350, 235, 80, 30);
-        // Header-level Exit button is provided globally in AMidiControl.
-        exitButton.setVisible(false);
-
-        exitButton.onClick = [=]() {
-            ApplicationQuit();
-            };
-
-        // Config Status Bar
-        addAndMakeVisible(statusLabel);
-        statusLabel.setText("", {});
-        statusLabel.setColour(juce::Label::textColourId, juce::Colours::grey);
-        statusLabel.setJustificationType(juce::Justification::right);
-        statusLabel.setBounds(1220, 210, 200, 20);
+        };
     }
 
     void lookAndFeelChanged() override
     {
         txtGroupName.applyFontToAllText(txtGroupName.getFont());
         styleDefaultEffectsLikeButtonGroupSection();
+        updateConfigSaveButtonsPendingStyle();
     }
 
     void resized() override
@@ -7482,19 +7488,62 @@ private:
         return false;
     }
 
+    /** Same red “pending save” style as keyboard panel Save/Save As (KeyboardPanelPage::updatePanelSaveButtonsPendingStyle). */
+    bool isConfigSavePending() const { return saveButton.isEnabled(); }
+
+    void updateConfigSaveButtonsPendingStyle()
+    {
+        auto applyStyle = [&](juce::TextButton& button)
+            {
+                button.setColour(TextButton::textColourOffId, Colours::white);
+                button.setColour(TextButton::textColourOnId, Colours::white);
+
+                if (isConfigSavePending())
+                {
+                    button.setColour(TextButton::buttonColourId, Colours::darkred);
+                    button.setColour(TextButton::buttonOnColourId, Colours::darkred.brighter());
+                }
+                else
+                {
+                    button.setColour(TextButton::buttonColourId, Colours::black.darker());
+                    button.setColour(TextButton::buttonOnColourId, Colours::black.brighter());
+                }
+            };
+
+        applyStyle(saveButton);
+        applyStyle(saveAsButton);
+    }
+
+    /** Updates Save enabled state and reapplies Save/Save As colours (dirty = red). */
+    void setConfigSaveButtonEnabled(bool enabled)
+    {
+        static_cast<juce::Button&>(saveButton).setEnabled(enabled);
+        updateConfigSaveButtonsPendingStyle();
+    }
+
     void wireDefaultEffectsNumberField(juce::TextEditor& txt, int* valuePtr, int lo, int hi)
     {
+        // Digits only, max 3 chars (0–127); commit/range check on focus loss.
+        txt.setInputRestrictions(3, "0123456789");
         txt.onFocusLost = [this, &txt, valuePtr, lo, hi]()
         {
-            const int val = txt.getText().getIntValue();
+            const juce::String t = txt.getText().trim();
+            if (t.isEmpty() || ! t.containsOnly("0123456789"))
+            {
+                txt.setText(std::to_string(*valuePtr), false);
+                setConfigSaveButtonEnabled(false);
+                return;
+            }
+            const int val = t.getIntValue();
             if (val < lo || val > hi)
             {
                 txt.setText(std::to_string(*valuePtr), false);
-                saveButton.setEnabled(false);
+                setConfigSaveButtonEnabled(false);
                 return;
             }
             *valuePtr = val;
-            saveButton.setEnabled(true);
+            txt.setText(std::to_string(val), false);
+            setConfigSaveButtonEnabled(true);
         };
     }
 
@@ -7625,7 +7674,7 @@ private:
             BubbleMessage(bubbleButton, msgloaded, this->bubbleMessage);
 
             if (bsaved)
-                saveButton.setEnabled(false);
+                setConfigSaveButtonEnabled(false);
 
             return;
         }
@@ -7673,7 +7722,7 @@ private:
         BubbleMessage(bubbleButton, msgloaded, this->bubbleMessage);
 
         if (bsaved)
-            saveButton.setEnabled(false);
+            setConfigSaveButtonEnabled(false);
     }
 
     //-------------------------------------------------------------------------
@@ -8027,7 +8076,7 @@ private:
         //String vtxml = vtconfigs.toXmlString();
 
         if (vtconfigs.hasProperty(defaultEffectsVolType))
-            appState.defaultEffectsVol = juce::jlimit(1, 127, (int)vtconfigs.getProperty(defaultEffectsVolType));
+            appState.defaultEffectsVol = juce::jlimit(0, 127, (int)vtconfigs.getProperty(defaultEffectsVolType));
         else
             appState.defaultEffectsVol = 100;
 
