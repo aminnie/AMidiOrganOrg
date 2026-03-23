@@ -4825,6 +4825,13 @@ struct KeyboardPanelPage final : public Component,
 
                 DBG("*** loadPreset(): Mute Button " + std::to_string(i));
             }
+            else if (bmuted) {
+                // Voice triggerClick above may have sent non-zero volume; model/UI already say
+                // muted so the inequality branch skipped. Re-assert CC7=0 (same as Mute onClick).
+                auto ccMessage = juce::MidiMessage::controllerEvent(ptrbuttongroup->midiout, 7, 0);
+                ccMessage.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
+                mididevices->sendToOutputs(ccMessage);
+            }
         }
 
         // Activate Rotary for every Button Group (snapshot + MIDI + Upper/Lower UI)
