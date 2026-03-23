@@ -73,6 +73,8 @@ struct AppState final
     String pnlconfigfname = "amidiconfigs.cfg";
     String configdir = "configs";
     int defaultEffectsVol = 100;
+    /** Default Brilliance (CC) for newly assigned voices (Sounds tab route + fresh panel init). */
+    int defaultEffectsBri = 30;
     bool configchanged = false;
     bool configreload = false;
     /** User chose "Load anyway" when cfg vs panel embedded name differed; gates panel Save until confirmed or realigned. */
@@ -123,6 +125,7 @@ inline String& configfname = getAppState().configfname;
 inline String& pnlconfigfname = getAppState().pnlconfigfname;
 inline String& configdir = getAppState().configdir;
 inline int& defaultEffectsVol = getAppState().defaultEffectsVol;
+inline int& defaultEffectsBri = getAppState().defaultEffectsBri;
 inline bool& configchanged = getAppState().configchanged;
 inline bool& configreload = getAppState().configreload;
 inline bool& configPanelPairingMismatchAcknowledged = getAppState().configPanelPairingMismatchAcknowledged;

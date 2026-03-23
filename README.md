@@ -110,6 +110,7 @@ Supported MIDI hardware and software sound modules:
   - solo split point for Upper / Lower
 - `MIDI Reset` sends a controller reset on all 16 channels.
 - `MIDI pass-through` controls whether channels not assigned to a button group are blocked or allowed through.
+- **Default Effects Vol** and **Default Effects Bri** set starting values for new voice assignments (Sounds tab route and fresh panel initialization); they are saved in the config file (defaults: Vol 100, Bri 30).
 - Config settings are global to the app and are separate from the currently loaded panel.
 
 #### Hotkeys

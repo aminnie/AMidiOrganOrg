@@ -204,7 +204,7 @@ private:
     int tim = 0;
     int atk = 0;
     int rel = 0;
-    int bri = 0;
+    int bri = 30;
     int pan = 64;
 
     int isdirty = 0;

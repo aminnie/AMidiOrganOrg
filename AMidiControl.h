@@ -564,6 +564,7 @@ public:
             }
 
             instrument.setVol(appState.defaultEffectsVol);
+            instrument.setBri(appState.defaultEffectsBri);
 
             instrument.setChannel(buttongroupmidiout);
             instrument.setButtonIdx(panelbuttonidx);
@@ -1315,6 +1316,8 @@ public:
             instrument.setFont(midiInstruments->getFont(selvoicebank, selvoice));
             instrument.setVoice(midiInstruments->getVoice(selvoicebank, selvoice));
             instrument.setChannel(mchannel);
+            instrument.setVol(getAppState().defaultEffectsVol);
+            instrument.setBri(getAppState().defaultEffectsBri);
 
             int controllerNumber = CCMSB; // MSB
             juce::MidiMessage ccMessage = juce::MidiMessage::controllerEvent(
@@ -6995,6 +6998,25 @@ public:
             saveButton.setEnabled(true);
         };
 
+        addAndMakeVisible(lblDefaultEffectsBri);
+        lblDefaultEffectsBri.setBounds(1150, 80, 160, 24);
+        lblDefaultEffectsBri.setText("Default Effects Bri", {});
+
+        addAndMakeVisible(txtDefaultEffectsBri);
+        txtDefaultEffectsBri.setBounds(1280, 80, 60, 24);
+        txtDefaultEffectsBri.setText(std::to_string(appState.defaultEffectsBri));
+        txtDefaultEffectsBri.onFocusLost = [=]() {
+            const int val = txtDefaultEffectsBri.getText().getIntValue();
+            if (val < 0 || val > 127) {
+                txtDefaultEffectsBri.setText(std::to_string(appState.defaultEffectsBri), false);
+                saveButton.setEnabled(false);
+                return;
+            }
+
+            appState.defaultEffectsBri = val;
+            saveButton.setEnabled(true);
+        };
+
         addAndMakeVisible(loadConfigButton);
         loadConfigButton.setButtonText("Load");
         loadConfigButton.setColour(TextButton::textColourOffId, Colours::white);
@@ -7334,9 +7356,9 @@ private:
     ComboBox comboConfig{ "ConfigCombo" };
     GroupComponent group{ "group", "Button Group Configs" };
     juce::TextButton SoundModule;
-    juce::TextEditor txtGroupName, txtMidiIn, txtMidiOut, txtSplit, txtOctave, txtDefaultEffectsVol;
+    juce::TextEditor txtGroupName, txtMidiIn, txtMidiOut, txtSplit, txtOctave, txtDefaultEffectsVol, txtDefaultEffectsBri;
     juce::Label lblKeyboard, lblGroupName, lblButtonCount, lblMidiIn, lblMidiOut, lblSplit, lblOctave;
-    juce::Label lblPassthrough,lblVelocity, lblDefaultEffectsVol, lblconfigfile, label11, label31;
+    juce::Label lblPassthrough,lblVelocity, lblDefaultEffectsVol, lblDefaultEffectsBri, lblconfigfile, label11, label31;
     juce::ToggleButton togglePassthrough, toggleVelocity;
     juce::TextButton loadConfigButton, saveButton, saveAsButton, resetButton, exitButton;
     juce::TextButton toUpperKBD, toLowerKBD, toBassKBD;
@@ -7588,6 +7610,7 @@ private:
         static Identifier configsType("configs");           // Pre-create an Identifier
         static Identifier buttongroupType("group");         // Child
         static Identifier defaultEffectsVolType("defaultEffectsVol");
+        static Identifier defaultEffectsBriType("defaultEffectsBri");
 
         static Identifier indexType("index");               // Child Properties
         static Identifier midikeyboardType("keyboard");
@@ -7608,6 +7631,7 @@ private:
         // Configs ValueTree
         ValueTree configsTree(configsType);
         configsTree.setProperty(defaultEffectsVolType, appState.defaultEffectsVol, nullptr);
+        configsTree.setProperty(defaultEffectsBriType, appState.defaultEffectsBri, nullptr);
 
         for (int i = 0; i < numberbuttongroups; i++) {
             ValueTree vtcfg(buttongroupType);
@@ -7720,6 +7744,7 @@ private:
         static Identifier configsType("configs");       // Pre-create an Identifier
         static Identifier buttongroupType("group");     // Child
         static Identifier defaultEffectsVolType("defaultEffectsVol");
+        static Identifier defaultEffectsBriType("defaultEffectsBri");
 
         static Identifier indexType("index");           // Child Properties
         static Identifier midikeyboardType("keyboard");
@@ -7751,6 +7776,11 @@ private:
             appState.defaultEffectsVol = juce::jlimit(1, 127, (int)vtconfigs.getProperty(defaultEffectsVolType));
         else
             appState.defaultEffectsVol = 100;
+
+        if (vtconfigs.hasProperty(defaultEffectsBriType))
+            appState.defaultEffectsBri = juce::jlimit(0, 127, (int)vtconfigs.getProperty(defaultEffectsBriType));
+        else
+            appState.defaultEffectsBri = 30;
 
         for (int i = 0; i < numberbuttongroups; i++) {
             ValueTree vtcfg = vtconfigs.getChild(i);
@@ -7857,6 +7887,7 @@ private:
         }
 
         txtDefaultEffectsVol.setText(std::to_string(appState.defaultEffectsVol), false);
+        txtDefaultEffectsBri.setText(std::to_string(appState.defaultEffectsBri), false);
 
         return true;
     }

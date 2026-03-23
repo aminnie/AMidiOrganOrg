@@ -52,6 +52,7 @@ namespace
         String configfname;
         String pnlconfigfname;
         int defaultEffectsVol = 100;
+        int defaultEffectsBri = 30;
         bool configreload = false;
         bool configPanelPairingMismatchAcknowledged = false;
         bool upperManualRotaryFast = true;
@@ -71,6 +72,7 @@ namespace
         snapshot.configfname = state.configfname;
         snapshot.pnlconfigfname = state.pnlconfigfname;
         snapshot.defaultEffectsVol = state.defaultEffectsVol;
+        snapshot.defaultEffectsBri = state.defaultEffectsBri;
         snapshot.configreload = state.configreload;
         snapshot.configPanelPairingMismatchAcknowledged = state.configPanelPairingMismatchAcknowledged;
         snapshot.upperManualRotaryFast = state.upperManualRotaryFast;
@@ -90,6 +92,7 @@ namespace
         state.configfname = snapshot.configfname;
         state.pnlconfigfname = snapshot.pnlconfigfname;
         state.defaultEffectsVol = snapshot.defaultEffectsVol;
+        state.defaultEffectsBri = snapshot.defaultEffectsBri;
         state.configreload = snapshot.configreload;
         state.configPanelPairingMismatchAcknowledged = snapshot.configPanelPairingMismatchAcknowledged;
         state.upperManualRotaryFast = snapshot.upperManualRotaryFast;
