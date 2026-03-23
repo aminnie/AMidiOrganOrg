@@ -143,6 +143,7 @@ Supported MIDI hardware and software sound modules:
   - octave shift
   - solo split settings for Upper or Lower
 - Every group has a volume slider with Up / Down controls.
+- Volume slider, Up/Down, and Mute send MIDI on the group's **current** MIDI Out channel (after loading or saving Config), not a channel frozen at app startup.
 - Group volume changes are for live balancing and are not written back into the active voice button's stored instrument volume value.
 
 #### Mute and Layering
