@@ -15,7 +15,9 @@
 #include "AMidiRotors.h"
 
 #include <functional>
+#include <map>
 #include <memory>
+#include <vector>
 #include<iostream>
 #include<fstream>
 
@@ -565,6 +567,14 @@ public:
 
             instrument.setVol(appState.defaultEffectsVol);
             instrument.setBri(appState.defaultEffectsBri);
+            instrument.setExp(appState.defaultEffectsExp);
+            instrument.setRev(appState.defaultEffectsRev);
+            instrument.setCho(appState.defaultEffectsCho);
+            instrument.setMod(appState.defaultEffectsMod);
+            instrument.setTim(appState.defaultEffectsTim);
+            instrument.setAtk(appState.defaultEffectsAtk);
+            instrument.setRel(appState.defaultEffectsRel);
+            instrument.setPan(appState.defaultEffectsPan);
 
             instrument.setChannel(buttongroupmidiout);
             instrument.setButtonIdx(panelbuttonidx);
@@ -1316,8 +1326,17 @@ public:
             instrument.setFont(midiInstruments->getFont(selvoicebank, selvoice));
             instrument.setVoice(midiInstruments->getVoice(selvoicebank, selvoice));
             instrument.setChannel(mchannel);
-            instrument.setVol(getAppState().defaultEffectsVol);
-            instrument.setBri(getAppState().defaultEffectsBri);
+            auto& st = getAppState();
+            instrument.setVol(st.defaultEffectsVol);
+            instrument.setBri(st.defaultEffectsBri);
+            instrument.setExp(st.defaultEffectsExp);
+            instrument.setRev(st.defaultEffectsRev);
+            instrument.setCho(st.defaultEffectsCho);
+            instrument.setMod(st.defaultEffectsMod);
+            instrument.setTim(st.defaultEffectsTim);
+            instrument.setAtk(st.defaultEffectsAtk);
+            instrument.setRel(st.defaultEffectsRel);
+            instrument.setPan(st.defaultEffectsPan);
 
             int controllerNumber = CCMSB; // MSB
             juce::MidiMessage ccMessage = juce::MidiMessage::controllerEvent(
@@ -6979,43 +6998,100 @@ public:
             juce::Logger::outputDebugString("Velocity changed to " + stateString);
         };
 
-        addAndMakeVisible(lblDefaultEffectsVol);
-        lblDefaultEffectsVol.setBounds(1150, 50, 160, 24);
-        lblDefaultEffectsVol.setText("Default Effects Vol", {});
+        // Two columns (5 + 5) inside "Effects Defaults" group (border matches Button Group Configs).
+        const int defFxLabelX0 = 750;
+        const int defFxLabelW = 118; // room for "Effect …" labels
+        const int defFxTxtW = 48;
+        const int defFxFieldGap = 6;
+        const int defFxColGap = 10;
+        const int defFxColStride = defFxLabelW + defFxFieldGap + defFxTxtW + defFxColGap;
+        const int defFxY0 = 36;
+        const int defFxRowH = 24; // same height as Button Group row fields (e.g. txtMidiIn)
+        const int defFxDy = 28;
+        const int defFxPad = 10;
+        const int defFxInnerRight = defFxLabelX0 + defFxColStride + defFxLabelW + defFxFieldGap + defFxTxtW;
+        const int defFxBoxLeft = defFxLabelX0 - defFxPad;
+        const int defFxBoxTop = 10;
+        const int defFxBoxW = (defFxInnerRight - defFxBoxLeft) + defFxPad;
+        const int defFxBoxH = (defFxY0 + 4 * defFxDy + defFxRowH) - defFxBoxTop + defFxPad;
 
-        addAndMakeVisible(txtDefaultEffectsVol);
-        txtDefaultEffectsVol.setBounds(1280, 50, 60, 24);
-        txtDefaultEffectsVol.setText(std::to_string(appState.defaultEffectsVol));
-        txtDefaultEffectsVol.onFocusLost = [=]() {
-            const int val = txtDefaultEffectsVol.getText().getIntValue();
-            if (val < 1 || val > 127) {
-                txtDefaultEffectsVol.setText(std::to_string(appState.defaultEffectsVol), false);
-                saveButton.setEnabled(false);
-                return;
-            }
+        addAndMakeVisible(effectsDefaultsGroup);
+        effectsDefaultsGroup.setColour(GroupComponent::outlineColourId, Colours::grey.darker());
+        effectsDefaultsGroup.setBounds(defFxBoxLeft, defFxBoxTop, defFxBoxW, defFxBoxH);
 
-            appState.defaultEffectsVol = val;
-            saveButton.setEnabled(true);
+        int defFxRowInCol[2] = { 0, 0 };
+        auto placeDefaultEffectRow = [&](juce::Label& lbl, juce::TextEditor& txt, const String& labelText, int column)
+        {
+            jassert(column == 0 || column == 1);
+            const int row = defFxRowInCol[column]++;
+            const int xL = defFxLabelX0 + column * defFxColStride;
+            const int y = defFxY0 + row * defFxDy;
+            lbl.setBounds(xL, y, defFxLabelW, defFxRowH);
+            lbl.setText(labelText, {});
+            txt.setBounds(xL + defFxLabelW + defFxFieldGap, y, defFxTxtW, defFxRowH);
         };
+
+        addAndMakeVisible(lblDefaultEffectsVol);
+        addAndMakeVisible(txtDefaultEffectsVol);
+        placeDefaultEffectRow(lblDefaultEffectsVol, txtDefaultEffectsVol, "Effect Vol", 0);
+        txtDefaultEffectsVol.setText(std::to_string(appState.defaultEffectsVol));
+        wireDefaultEffectsNumberField(txtDefaultEffectsVol, &appState.defaultEffectsVol, 1, 127);
 
         addAndMakeVisible(lblDefaultEffectsBri);
-        lblDefaultEffectsBri.setBounds(1150, 80, 160, 24);
-        lblDefaultEffectsBri.setText("Default Effects Bri", {});
-
         addAndMakeVisible(txtDefaultEffectsBri);
-        txtDefaultEffectsBri.setBounds(1280, 80, 60, 24);
+        placeDefaultEffectRow(lblDefaultEffectsBri, txtDefaultEffectsBri, "Effect Bri", 0);
         txtDefaultEffectsBri.setText(std::to_string(appState.defaultEffectsBri));
-        txtDefaultEffectsBri.onFocusLost = [=]() {
-            const int val = txtDefaultEffectsBri.getText().getIntValue();
-            if (val < 0 || val > 127) {
-                txtDefaultEffectsBri.setText(std::to_string(appState.defaultEffectsBri), false);
-                saveButton.setEnabled(false);
-                return;
-            }
+        wireDefaultEffectsNumberField(txtDefaultEffectsBri, &appState.defaultEffectsBri, 0, 127);
 
-            appState.defaultEffectsBri = val;
-            saveButton.setEnabled(true);
-        };
+        addAndMakeVisible(lblDefaultEffectsExp);
+        addAndMakeVisible(txtDefaultEffectsExp);
+        placeDefaultEffectRow(lblDefaultEffectsExp, txtDefaultEffectsExp, "Effect Exp", 0);
+        txtDefaultEffectsExp.setText(std::to_string(appState.defaultEffectsExp));
+        wireDefaultEffectsNumberField(txtDefaultEffectsExp, &appState.defaultEffectsExp, 0, 127);
+
+        addAndMakeVisible(lblDefaultEffectsRev);
+        addAndMakeVisible(txtDefaultEffectsRev);
+        placeDefaultEffectRow(lblDefaultEffectsRev, txtDefaultEffectsRev, "Effect Rev", 0);
+        txtDefaultEffectsRev.setText(std::to_string(appState.defaultEffectsRev));
+        wireDefaultEffectsNumberField(txtDefaultEffectsRev, &appState.defaultEffectsRev, 0, 127);
+
+        addAndMakeVisible(lblDefaultEffectsCho);
+        addAndMakeVisible(txtDefaultEffectsCho);
+        placeDefaultEffectRow(lblDefaultEffectsCho, txtDefaultEffectsCho, "Effect Cho", 0);
+        txtDefaultEffectsCho.setText(std::to_string(appState.defaultEffectsCho));
+        wireDefaultEffectsNumberField(txtDefaultEffectsCho, &appState.defaultEffectsCho, 0, 127);
+
+        addAndMakeVisible(lblDefaultEffectsMod);
+        addAndMakeVisible(txtDefaultEffectsMod);
+        placeDefaultEffectRow(lblDefaultEffectsMod, txtDefaultEffectsMod, "Effect Mod", 1);
+        txtDefaultEffectsMod.setText(std::to_string(appState.defaultEffectsMod));
+        wireDefaultEffectsNumberField(txtDefaultEffectsMod, &appState.defaultEffectsMod, 0, 127);
+
+        addAndMakeVisible(lblDefaultEffectsTim);
+        addAndMakeVisible(txtDefaultEffectsTim);
+        placeDefaultEffectRow(lblDefaultEffectsTim, txtDefaultEffectsTim, "Effect Tim", 1);
+        txtDefaultEffectsTim.setText(std::to_string(appState.defaultEffectsTim));
+        wireDefaultEffectsNumberField(txtDefaultEffectsTim, &appState.defaultEffectsTim, 0, 127);
+
+        addAndMakeVisible(lblDefaultEffectsAtk);
+        addAndMakeVisible(txtDefaultEffectsAtk);
+        placeDefaultEffectRow(lblDefaultEffectsAtk, txtDefaultEffectsAtk, "Effect Atk", 1);
+        txtDefaultEffectsAtk.setText(std::to_string(appState.defaultEffectsAtk));
+        wireDefaultEffectsNumberField(txtDefaultEffectsAtk, &appState.defaultEffectsAtk, 0, 127);
+
+        addAndMakeVisible(lblDefaultEffectsRel);
+        addAndMakeVisible(txtDefaultEffectsRel);
+        placeDefaultEffectRow(lblDefaultEffectsRel, txtDefaultEffectsRel, "Effect Rel", 1);
+        txtDefaultEffectsRel.setText(std::to_string(appState.defaultEffectsRel));
+        wireDefaultEffectsNumberField(txtDefaultEffectsRel, &appState.defaultEffectsRel, 0, 127);
+
+        addAndMakeVisible(lblDefaultEffectsPan);
+        addAndMakeVisible(txtDefaultEffectsPan);
+        placeDefaultEffectRow(lblDefaultEffectsPan, txtDefaultEffectsPan, "Effect Pan", 1);
+        txtDefaultEffectsPan.setText(std::to_string(appState.defaultEffectsPan));
+        wireDefaultEffectsNumberField(txtDefaultEffectsPan, &appState.defaultEffectsPan, 0, 127);
+
+        styleDefaultEffectsLikeButtonGroupSection();
 
         addAndMakeVisible(loadConfigButton);
         loadConfigButton.setButtonText("Load");
@@ -7322,6 +7398,13 @@ public:
     void lookAndFeelChanged() override
     {
         txtGroupName.applyFontToAllText(txtGroupName.getFont());
+        styleDefaultEffectsLikeButtonGroupSection();
+    }
+
+    void resized() override
+    {
+        txtGroupName.applyFontToAllText(txtGroupName.getFont());
+        styleDefaultEffectsLikeButtonGroupSection();
     }
 
     /** Load cfg from `configs/` by basename; updates `appState.configfname`, labels, and module baseline when successful. */
@@ -7355,10 +7438,18 @@ private:
 
     ComboBox comboConfig{ "ConfigCombo" };
     GroupComponent group{ "group", "Button Group Configs" };
+    GroupComponent effectsDefaultsGroup{ "effectsDefaultsGroup", "Effects Defaults" };
     juce::TextButton SoundModule;
-    juce::TextEditor txtGroupName, txtMidiIn, txtMidiOut, txtSplit, txtOctave, txtDefaultEffectsVol, txtDefaultEffectsBri;
+    juce::TextEditor txtGroupName, txtMidiIn, txtMidiOut, txtSplit, txtOctave;
+    juce::TextEditor txtDefaultEffectsVol, txtDefaultEffectsBri, txtDefaultEffectsExp, txtDefaultEffectsRev;
+    juce::TextEditor txtDefaultEffectsCho, txtDefaultEffectsMod, txtDefaultEffectsTim, txtDefaultEffectsAtk;
+    juce::TextEditor txtDefaultEffectsRel, txtDefaultEffectsPan;
     juce::Label lblKeyboard, lblGroupName, lblButtonCount, lblMidiIn, lblMidiOut, lblSplit, lblOctave;
-    juce::Label lblPassthrough,lblVelocity, lblDefaultEffectsVol, lblDefaultEffectsBri, lblconfigfile, label11, label31;
+    juce::Label lblPassthrough, lblVelocity;
+    juce::Label lblDefaultEffectsVol, lblDefaultEffectsBri, lblDefaultEffectsExp, lblDefaultEffectsRev;
+    juce::Label lblDefaultEffectsCho, lblDefaultEffectsMod, lblDefaultEffectsTim, lblDefaultEffectsAtk;
+    juce::Label lblDefaultEffectsRel, lblDefaultEffectsPan;
+    juce::Label lblconfigfile, label11, label31;
     juce::ToggleButton togglePassthrough, toggleVelocity;
     juce::TextButton loadConfigButton, saveButton, saveAsButton, resetButton, exitButton;
     juce::TextButton toUpperKBD, toLowerKBD, toBassKBD;
@@ -7389,6 +7480,127 @@ private:
                 return true;
 
         return false;
+    }
+
+    void wireDefaultEffectsNumberField(juce::TextEditor& txt, int* valuePtr, int lo, int hi)
+    {
+        txt.onFocusLost = [this, &txt, valuePtr, lo, hi]()
+        {
+            const int val = txt.getText().getIntValue();
+            if (val < lo || val > hi)
+            {
+                txt.setText(std::to_string(*valuePtr), false);
+                saveButton.setEnabled(false);
+                return;
+            }
+            *valuePtr = val;
+            saveButton.setEnabled(true);
+        };
+    }
+
+    void refreshDefaultEffectsEditorsFromAppState()
+    {
+        txtDefaultEffectsVol.setText(std::to_string(appState.defaultEffectsVol), false);
+        txtDefaultEffectsBri.setText(std::to_string(appState.defaultEffectsBri), false);
+        txtDefaultEffectsExp.setText(std::to_string(appState.defaultEffectsExp), false);
+        txtDefaultEffectsRev.setText(std::to_string(appState.defaultEffectsRev), false);
+        txtDefaultEffectsCho.setText(std::to_string(appState.defaultEffectsCho), false);
+        txtDefaultEffectsMod.setText(std::to_string(appState.defaultEffectsMod), false);
+        txtDefaultEffectsTim.setText(std::to_string(appState.defaultEffectsTim), false);
+        txtDefaultEffectsAtk.setText(std::to_string(appState.defaultEffectsAtk), false);
+        txtDefaultEffectsRel.setText(std::to_string(appState.defaultEffectsRel), false);
+        txtDefaultEffectsPan.setText(std::to_string(appState.defaultEffectsPan), false);
+        styleDefaultEffectsLikeButtonGroupSection();
+    }
+
+    /** Match the "Button Group Name" row using the same L&F font + colour resolution JUCE uses when painting. */
+    void styleDefaultEffectsLikeButtonGroupSection()
+    {
+        auto& lf = getLookAndFeel();
+        const auto labelFont = lf.getLabelFont(lblGroupName);
+        // Base LookAndFeel has no getTextEditorFont; match the group-name editor to the L&F label metrics.
+        const auto editorFont = txtGroupName.getFont().withHeight(labelFont.getHeight()).withStyle(labelFont.getStyleFlags());
+        const auto labelJust = lblGroupName.getJustificationType();
+
+        juce::Label* const labels[] = {
+            &lblDefaultEffectsVol, &lblDefaultEffectsBri, &lblDefaultEffectsExp, &lblDefaultEffectsRev, &lblDefaultEffectsCho,
+            &lblDefaultEffectsMod, &lblDefaultEffectsTim, &lblDefaultEffectsAtk, &lblDefaultEffectsRel, &lblDefaultEffectsPan
+        };
+        for (auto* l : labels)
+        {
+            l->setFont(labelFont);
+            l->setJustificationType(labelJust);
+            l->setColour(juce::Label::textColourId, lblGroupName.findColour(juce::Label::textColourId, true));
+            l->setMinimumHorizontalScale(lblGroupName.getMinimumHorizontalScale());
+        }
+
+        juce::TextEditor* const editors[] = {
+            &txtDefaultEffectsVol, &txtDefaultEffectsBri, &txtDefaultEffectsExp, &txtDefaultEffectsRev, &txtDefaultEffectsCho,
+            &txtDefaultEffectsMod, &txtDefaultEffectsTim, &txtDefaultEffectsAtk, &txtDefaultEffectsRel, &txtDefaultEffectsPan
+        };
+        for (auto* e : editors)
+        {
+            e->setColour(juce::TextEditor::textColourId, txtGroupName.findColour(juce::TextEditor::textColourId, true));
+            e->setColour(juce::TextEditor::backgroundColourId, txtGroupName.findColour(juce::TextEditor::backgroundColourId, true));
+            e->setColour(juce::TextEditor::outlineColourId, txtGroupName.findColour(juce::TextEditor::outlineColourId, true));
+            e->setColour(juce::TextEditor::focusedOutlineColourId, txtGroupName.findColour(juce::TextEditor::focusedOutlineColourId, true));
+            e->setColour(juce::TextEditor::highlightColourId, txtGroupName.findColour(juce::TextEditor::highlightColourId, true));
+            e->setColour(juce::TextEditor::highlightedTextColourId, txtGroupName.findColour(juce::TextEditor::highlightedTextColourId, true));
+            e->setFont(editorFont);
+            e->applyFontToAllText(editorFont);
+        }
+    }
+
+    /** Non-empty if two or more button groups share the same MIDI module index and MIDI out channel (invalid routing). */
+    String getDuplicateModuleMidiOutAssignmentDetails() const
+    {
+        using Key = std::pair<int, int>;
+        std::map<Key, std::vector<int>> groupsByModuleAndOut;
+
+        for (int i = 0; i < numberbuttongroups; ++i)
+        {
+            ButtonGroup* bg = instrumentpanel->getButtonGroup(i);
+            const int mod = bg->getMidiModule();
+            const int outch = bg->midiout;
+            groupsByModuleAndOut[{ mod, outch }].push_back(i);
+        }
+
+        String lines;
+        for (const auto& e : groupsByModuleAndOut)
+        {
+            const std::vector<int>& idxs = e.second;
+            if (idxs.size() < 2)
+                continue;
+
+            const int mod = e.first.first;
+            const int outch = e.first.second;
+            String moduleLabel;
+            if (instrumentmodules != nullptr)
+            {
+                const int n = instrumentmodules->getNumModules();
+                if (mod >= 0 && mod < n)
+                    moduleLabel = instrumentmodules->getModuleIdString(mod);
+                else
+                    moduleLabel = "(invalid index " + String(mod) + ")";
+            }
+            else
+            {
+                moduleLabel = String(mod);
+            }
+
+            String groupsList;
+            for (size_t k = 0; k < idxs.size(); ++k)
+            {
+                if (k > 0)
+                    groupsList << ", ";
+                groupsList << "\"" << instrumentpanel->getButtonGroup(idxs[k])->groupname << "\"";
+            }
+
+            lines << "Module \"" << moduleLabel << "\" (index " << String(mod) << "), MIDI out ch " << String(outch)
+                  << ": " << groupsList << "\n";
+        }
+
+        return lines;
     }
 
     void handleConfigSaveRequest(TextButton& bubbleButton)
@@ -7611,6 +7823,14 @@ private:
         static Identifier buttongroupType("group");         // Child
         static Identifier defaultEffectsVolType("defaultEffectsVol");
         static Identifier defaultEffectsBriType("defaultEffectsBri");
+        static Identifier defaultEffectsExpType("defaultEffectsExp");
+        static Identifier defaultEffectsRevType("defaultEffectsRev");
+        static Identifier defaultEffectsChoType("defaultEffectsCho");
+        static Identifier defaultEffectsModType("defaultEffectsMod");
+        static Identifier defaultEffectsTimType("defaultEffectsTim");
+        static Identifier defaultEffectsAtkType("defaultEffectsAtk");
+        static Identifier defaultEffectsRelType("defaultEffectsRel");
+        static Identifier defaultEffectsPanType("defaultEffectsPan");
 
         static Identifier indexType("index");               // Child Properties
         static Identifier midikeyboardType("keyboard");
@@ -7632,6 +7852,14 @@ private:
         ValueTree configsTree(configsType);
         configsTree.setProperty(defaultEffectsVolType, appState.defaultEffectsVol, nullptr);
         configsTree.setProperty(defaultEffectsBriType, appState.defaultEffectsBri, nullptr);
+        configsTree.setProperty(defaultEffectsExpType, appState.defaultEffectsExp, nullptr);
+        configsTree.setProperty(defaultEffectsRevType, appState.defaultEffectsRev, nullptr);
+        configsTree.setProperty(defaultEffectsChoType, appState.defaultEffectsCho, nullptr);
+        configsTree.setProperty(defaultEffectsModType, appState.defaultEffectsMod, nullptr);
+        configsTree.setProperty(defaultEffectsTimType, appState.defaultEffectsTim, nullptr);
+        configsTree.setProperty(defaultEffectsAtkType, appState.defaultEffectsAtk, nullptr);
+        configsTree.setProperty(defaultEffectsRelType, appState.defaultEffectsRel, nullptr);
+        configsTree.setProperty(defaultEffectsPanType, appState.defaultEffectsPan, nullptr);
 
         for (int i = 0; i < numberbuttongroups; i++) {
             ValueTree vtcfg(buttongroupType);
@@ -7693,6 +7921,24 @@ private:
 
         DBG("*** saveConfigs(): Saving Config file from disk");
 
+        const String dupDetails = getDuplicateModuleMidiOutAssignmentDetails();
+        if (dupDetails.isNotEmpty())
+        {
+            juce::Logger::writeToLog(
+                "*** saveConfigs(): Blocked — duplicate MIDI module + output channel across button groups:\n"
+                + dupDetails);
+            juce::AlertWindow::showMessageBoxAsync(
+                juce::AlertWindow::WarningIcon,
+                "Cannot save configuration",
+                "Two or more button groups use the same MIDI sound module and the same MIDI output channel. "
+                "Only one group can use each module/channel pair (otherwise routing is ambiguous).\n\n"
+                + dupDetails,
+                {},
+                this,
+                nullptr);
+            return false;
+        }
+
         // Prepare to save Instrument Configs to Disk
         File outputFile = File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
             .getChildFile(organdir)
@@ -7745,6 +7991,14 @@ private:
         static Identifier buttongroupType("group");     // Child
         static Identifier defaultEffectsVolType("defaultEffectsVol");
         static Identifier defaultEffectsBriType("defaultEffectsBri");
+        static Identifier defaultEffectsExpType("defaultEffectsExp");
+        static Identifier defaultEffectsRevType("defaultEffectsRev");
+        static Identifier defaultEffectsChoType("defaultEffectsCho");
+        static Identifier defaultEffectsModType("defaultEffectsMod");
+        static Identifier defaultEffectsTimType("defaultEffectsTim");
+        static Identifier defaultEffectsAtkType("defaultEffectsAtk");
+        static Identifier defaultEffectsRelType("defaultEffectsRel");
+        static Identifier defaultEffectsPanType("defaultEffectsPan");
 
         static Identifier indexType("index");           // Child Properties
         static Identifier midikeyboardType("keyboard");
@@ -7781,6 +8035,46 @@ private:
             appState.defaultEffectsBri = juce::jlimit(0, 127, (int)vtconfigs.getProperty(defaultEffectsBriType));
         else
             appState.defaultEffectsBri = 30;
+
+        if (vtconfigs.hasProperty(defaultEffectsExpType))
+            appState.defaultEffectsExp = juce::jlimit(0, 127, (int)vtconfigs.getProperty(defaultEffectsExpType));
+        else
+            appState.defaultEffectsExp = 127;
+
+        if (vtconfigs.hasProperty(defaultEffectsRevType))
+            appState.defaultEffectsRev = juce::jlimit(0, 127, (int)vtconfigs.getProperty(defaultEffectsRevType));
+        else
+            appState.defaultEffectsRev = 20;
+
+        if (vtconfigs.hasProperty(defaultEffectsChoType))
+            appState.defaultEffectsCho = juce::jlimit(0, 127, (int)vtconfigs.getProperty(defaultEffectsChoType));
+        else
+            appState.defaultEffectsCho = 10;
+
+        if (vtconfigs.hasProperty(defaultEffectsModType))
+            appState.defaultEffectsMod = juce::jlimit(0, 127, (int)vtconfigs.getProperty(defaultEffectsModType));
+        else
+            appState.defaultEffectsMod = 0;
+
+        if (vtconfigs.hasProperty(defaultEffectsTimType))
+            appState.defaultEffectsTim = juce::jlimit(0, 127, (int)vtconfigs.getProperty(defaultEffectsTimType));
+        else
+            appState.defaultEffectsTim = 0;
+
+        if (vtconfigs.hasProperty(defaultEffectsAtkType))
+            appState.defaultEffectsAtk = juce::jlimit(0, 127, (int)vtconfigs.getProperty(defaultEffectsAtkType));
+        else
+            appState.defaultEffectsAtk = 0;
+
+        if (vtconfigs.hasProperty(defaultEffectsRelType))
+            appState.defaultEffectsRel = juce::jlimit(0, 127, (int)vtconfigs.getProperty(defaultEffectsRelType));
+        else
+            appState.defaultEffectsRel = 0;
+
+        if (vtconfigs.hasProperty(defaultEffectsPanType))
+            appState.defaultEffectsPan = juce::jlimit(0, 127, (int)vtconfigs.getProperty(defaultEffectsPanType));
+        else
+            appState.defaultEffectsPan = 64;
 
         for (int i = 0; i < numberbuttongroups; i++) {
             ValueTree vtcfg = vtconfigs.getChild(i);
@@ -7886,8 +8180,7 @@ private:
             togglePassthrough.setToggleState(false, dontSendNotification);
         }
 
-        txtDefaultEffectsVol.setText(std::to_string(appState.defaultEffectsVol), false);
-        txtDefaultEffectsBri.setText(std::to_string(appState.defaultEffectsBri), false);
+        refreshDefaultEffectsEditorsFromAppState();
 
         return true;
     }

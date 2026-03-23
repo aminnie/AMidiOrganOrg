@@ -110,7 +110,8 @@ Supported MIDI hardware and software sound modules:
   - solo split point for Upper / Lower
 - `MIDI Reset` sends a controller reset on all 16 channels.
 - `MIDI pass-through` controls whether channels not assigned to a button group are blocked or allowed through.
-- **Default Effects Vol** and **Default Effects Bri** set starting values for new voice assignments (Sounds tab route and fresh panel initialization); they are saved in the config file (defaults: Vol 100, Bri 30).
+- **Default Effects** fields (Vol, Bri, Exp, Rev, Cho, Mod, Tim, Atk, Rel, Pan) set starting MIDI CC values for new voice assignments (Sounds tab route and fresh panel initialization). They are saved in the config file. Defaults match a new `Instrument`: Vol 100, Bri 30, Exp 127, Rev 20, Cho 10, Mod/Tim/Atk/Rel 0, Pan 64. Vol must be 1–127; the others are 0–127.
+- Saving config is blocked if two or more button groups share the same **MIDI sound module** and the same **MIDI Out channel** (each module/channel pair must be unique).
 - Config settings are global to the app and are separate from the currently loaded panel.
 
 #### Hotkeys
@@ -201,6 +202,7 @@ Supported MIDI hardware and software sound modules:
 - While a config and panel mismatch is acknowledged, normal panel `Save` may stay disabled until the relationship is resolved.
 - `Save As` can be used to write a new panel that matches the current config.
 - If you change a sound module assignment inside a config that other panels depend on, saving that same config name may be blocked so older panels are not silently broken.
+- Duplicate **module + MIDI Out channel** across button groups is detected on config save and blocks the write until fixed.
 
 ### 9. File Locations
 

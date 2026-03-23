@@ -75,6 +75,15 @@ struct AppState final
     int defaultEffectsVol = 100;
     /** Default Brilliance (CC) for newly assigned voices (Sounds tab route + fresh panel init). */
     int defaultEffectsBri = 30;
+    /** Remaining default MIDI effect CC values for new voice assignments (0–127; match `Instrument` defaults). */
+    int defaultEffectsExp = 127;
+    int defaultEffectsRev = 20;
+    int defaultEffectsCho = 10;
+    int defaultEffectsMod = 0;
+    int defaultEffectsTim = 0;
+    int defaultEffectsAtk = 0;
+    int defaultEffectsRel = 0;
+    int defaultEffectsPan = 64;
     bool configchanged = false;
     bool configreload = false;
     /** User chose "Load anyway" when cfg vs panel embedded name differed; gates panel Save until confirmed or realigned. */
