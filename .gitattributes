@@ -1,7 +1,31 @@
 ###############################################################################
-# Set default behavior to automatically normalize line endings.
+# Line endings: store LF in Git and check out LF on all platforms.
+# Avoids huge noisy diffs when developers on Windows (CRLF) and macOS/Linux
+# (LF) touch the same files.
+#
+# After changing this, run once per clone to fix the index vs working tree:
+#   git add --renormalize .
+#   git status   # review, then commit if anything changed
 ###############################################################################
-* text=auto
+* text=auto eol=lf
+
+# Explicit types (redundant with * above but documents intent for this repo)
+*.h     text eol=lf
+*.hpp   text eol=lf
+*.c     text eol=lf
+*.cpp   text eol=lf
+*.cc    text eol=lf
+*.cmake text eol=lf
+*.md    text eol=lf
+*.txt   text eol=lf
+*.sh    text eol=lf
+*.json  text eol=lf
+*.yml   text eol=lf
+*.yaml  text eol=lf
+
+# Windows-only scripts may use CRLF (uncomment if you add .cmd/.bat tooling)
+# *.bat text eol=crlf
+# *.cmd text eol=crlf
 
 ###############################################################################
 # Set default behavior for command prompt diff.
