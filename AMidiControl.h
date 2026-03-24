@@ -1791,7 +1791,7 @@ private:
         }
 
         auto inner = voiceBrowserGroup.getBounds().reduced(10);
-        inner.removeFromTop(25);
+        inner.removeFromTop(20);
         constexpr int cols = 6;
         constexpr int rows = 4;
         const int gapX = 8;
