@@ -64,6 +64,11 @@
 - [x] Run manual smoke test across tabs (Start, Upper, Lower, Bass, Voices, Effects, Config, Help).
 - [x] Exercise MIDI routing/layering and preset recall after fixes.
 
+## Start tab: sticky MIDI ports (future)
+
+- [ ] **Forget saved ports**: UI control on Start (or settings) to clear remembered MIDI In/Out without editing `configs/midi_sticky_devices.json` manually.
+- [ ] **Separate profiles**: Named profiles for different rigs (e.g. home vs stage), each with its own saved port set; pick a profile instead of a single global sticky file.
+
 ## Keyboard shortcuts (future)
 
 Phase 1 bindings and focus behavior are documented in `README.md`. Optional later work:

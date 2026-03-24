@@ -354,6 +354,9 @@ inline std::function<void()> gNotifyManualRotarySyncFromAppState;
 /** Optional: after preset recall, sync Upper/Lower rotary UI from ButtonGroup::rotary. */
 inline std::function<void()> gNotifyPresetRotarySyncFromButtonGroups;
 
+/** Optional: refresh Sounds/Effects tab enabled state when voice-edit gating changes. */
+inline std::function<void()> gNotifyVoiceEditTabAccessChanged;
+
 /** Preset rotary encoding in .pnl per ButtonGroup: 0=slow, 1=fast, 2=brake (see tests). */
 inline int encodePresetRotaryFromManual(bool isFast, bool brake) noexcept
 {

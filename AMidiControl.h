@@ -5194,6 +5194,8 @@ private:
             voiceEditSoundsButton->setEnabled(true);
         if (voiceEditEffectsButton != nullptr)
             voiceEditEffectsButton->setEnabled(true);
+        if (gNotifyVoiceEditTabAccessChanged)
+            gNotifyVoiceEditTabAccessChanged();
     }
 
     juce::TextButton* voiceEditSoundsButton = nullptr;
@@ -8496,6 +8498,11 @@ public:
                         k->applyPresetRotaryUiFromStoredGroups();
             };
         gNotifyPresetRotarySyncFromButtonGroups = std::move(syncPresetRotaryKb);
+        gNotifyVoiceEditTabAccessChanged = [this]()
+            {
+                updateVoiceEditTabAccessUi();
+            };
+        updateVoiceEditTabAccessUi();
 
         //this->grabKeyboardFocus();
     }
@@ -8505,6 +8512,7 @@ public:
         gNotifyPanelSaveAvailabilityChanged = {};
         gNotifyManualRotarySyncFromAppState = {};
         gNotifyPresetRotarySyncFromButtonGroups = {};
+        gNotifyVoiceEditTabAccessChanged = {};
     }
 
     /** Phase 1 hotkeys: recall preset on all keyboard pages (single loadPreset + radio sync). */
@@ -8592,6 +8600,23 @@ public:
 
     void currentTabChanged(int newCurrentTabIndex, const String& newCurrentTabName) override
     {
+        updateVoiceEditTabAccessUi();
+
+        if ((newCurrentTabIndex == PTVoices || newCurrentTabIndex == PTEffects)
+            && !KeyboardPanelPage::anyVoiceEditShortcutsEnabledInTabs(*this))
+        {
+            const int fallbackTab = (lastNonExitTabIndex == PTVoices || lastNonExitTabIndex == PTEffects)
+                ? PTUpper
+                : lastNonExitTabIndex;
+            setCurrentTabIndex(fallbackTab, false);
+            juce::AlertWindow::showMessageBoxAsync(
+                juce::AlertWindow::InfoIcon,
+                "Voice Selection Required",
+                "Select a voice on Upper, Lower, or Bass&Drums first. "
+                "Then Sounds and Effects tabs become available.");
+            return;
+        }
+
         if (newCurrentTabName == "Exit")
         {
             const auto previousTab = lastNonExitTabIndex;
@@ -8736,6 +8761,25 @@ public:
     };
 
 private:
+    void updateVoiceEditTabAccessUi()
+    {
+        const bool allowVoiceEditTabs = KeyboardPanelPage::anyVoiceEditShortcutsEnabledInTabs(*this);
+        const juce::String blockedHint =
+            "Select a voice on Upper, Lower, or Bass&Drums first.";
+
+        if (auto* soundsTab = getTabbedButtonBar().getTabButton(PTVoices))
+        {
+            soundsTab->setEnabled(allowVoiceEditTabs);
+            soundsTab->setTooltip(allowVoiceEditTabs ? juce::String() : blockedHint);
+        }
+
+        if (auto* effectsTab = getTabbedButtonBar().getTabButton(PTEffects))
+        {
+            effectsTab->setEnabled(allowVoiceEditTabs);
+            effectsTab->setTooltip(allowVoiceEditTabs ? juce::String() : blockedHint);
+        }
+    }
+
     ComponentDragger windowDragger;
     bool draggingFromTabBarBackground = false;
     int lastNonExitTabIndex = PTStart;
