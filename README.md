@@ -40,6 +40,14 @@ Each panel uses the active configuration and panel data to determine which voice
 
 ![Config Tab](docs/images/tab-config.png)
 
+### Hotkeys Tab
+
+![Config Tab](docs/images/tab-hotkeys.png)
+
+### Help Tab
+
+![Config Tab](docs/images/tab-help.png)
+
 ## Functional Overview
 
 Supported MIDI hardware and software sound modules:
