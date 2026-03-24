@@ -1279,7 +1279,7 @@ public:
         auto margin = 20;
 
         int xgroup = 220, ygroup = 10, gwidth = 1030, gheight = 260;
-        group = addToList(new GroupComponent("group", "Sounds for Voice Button"));
+        group = addToList(new GroupComponent("group", "Voice Button Config"));
         group->setColour(GroupComponent::outlineColourId, Colours::grey.darker());
         group->setBounds(xgroup, ygroup, gwidth, gheight);
 
