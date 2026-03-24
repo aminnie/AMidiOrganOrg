@@ -1801,7 +1801,6 @@ private:
         auto inner = voiceBrowserGroup.getBounds().reduced(10);
         inner.removeFromTop(20);
         constexpr int cols = 6;
-        constexpr int rows = 4;
         const int gapX = 8;
         const int gapY = 8;
         const int btnW = 143; // keep current visual button width
@@ -1861,7 +1860,7 @@ private:
 
         browserBackButton.setVisible(browserLevel == BrowserLevel::voices);
         if (browserLevel == BrowserLevel::voices && selectedCategoryIdx >= 0)
-            voiceBrowserGroup.setText("Voices for Category: " + midiInstruments->getCategory(selectedCategoryIdx));
+            voiceBrowserGroup.setText("Category Voices: " + midiInstruments->getCategory(selectedCategoryIdx));
         else
             voiceBrowserGroup.setText("Voice Categories");
         browserPrevButton.setVisible(pageCount > 1);
