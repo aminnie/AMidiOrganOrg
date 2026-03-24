@@ -7203,6 +7203,12 @@ public:
         // Same horizontal margin as KeyboardPanelPage::mgroup for Save / filename row.
         constexpr int kbPanelMargin = 10;
 
+        addAndMakeVisible(lblconfigfileprefix);
+        lblconfigfileprefix.setColour(juce::Label::textColourId, juce::Colours::grey);
+        lblconfigfileprefix.setJustificationType(juce::Justification::left);
+        lblconfigfileprefix.setText("Config:", {});
+        lblconfigfileprefix.setBounds(kbPanelMargin + 1180, 205, 60, 30);
+
         addAndMakeVisible(lblconfigfile);
         lblconfigfile.setColour(juce::Label::textColourId, juce::Colours::grey);
         lblconfigfile.setJustificationType(juce::Justification::left);
@@ -7259,13 +7265,17 @@ public:
                 };
         }
 
+        addAndMakeVisible(globalConfigsGroup);
+        globalConfigsGroup.setColour(GroupComponent::outlineColourId, Colours::grey.darker());
+        globalConfigsGroup.setBounds(1135, 8, 305, 60);
+
         addAndMakeVisible(lblPassthrough);
-        lblPassthrough.setBounds(1150, 20, 150, 24);
-        lblPassthrough.setText("MIDI In Passthru", {});
+        lblPassthrough.setBounds(1150, 32, 135, 24);
+        lblPassthrough.setText("Allow all MIDI In", {});
 
         //https://docs.juce.com/master/tutorial_radio_buttons_checkboxes.html
         addAndMakeVisible(togglePassthrough);
-        togglePassthrough.setBounds(1280, 20, 50, 24);
+        togglePassthrough.setBounds(1295, 32, 50, 24);
         togglePassthrough.onClick = [=]() {
             passthroughstate = togglePassthrough.getToggleState();
 
@@ -7281,7 +7291,7 @@ public:
         resetButton.setColour(TextButton::textColourOnId, Colours::white);
         resetButton.setColour(TextButton::buttonColourId, Colours::black.darker());
         resetButton.setColour(TextButton::buttonOnColourId, Colours::black.brighter());
-        resetButton.setBounds(1350, 20, 80, 30);
+        resetButton.setBounds(1350, 24, 80, 30);
 
         resetButton.onClick = [=]() {
 
@@ -7452,6 +7462,7 @@ private:
     ComboBox comboConfig{ "ConfigCombo" };
     GroupComponent group{ "group", "Button Group Configs" };
     GroupComponent effectsDefaultsGroup{ "effectsDefaultsGroup", "Effects Defaults" };
+    GroupComponent globalConfigsGroup{ "globalConfigsGroup", "Global Configs" };
     juce::TextButton SoundModule;
     juce::TextEditor txtGroupName, txtMidiIn, txtMidiOut, txtSplit, txtOctave;
     juce::TextEditor txtDefaultEffectsVol, txtDefaultEffectsBri, txtDefaultEffectsExp, txtDefaultEffectsRev;
@@ -7462,7 +7473,7 @@ private:
     juce::Label lblDefaultEffectsVol, lblDefaultEffectsBri, lblDefaultEffectsExp, lblDefaultEffectsRev;
     juce::Label lblDefaultEffectsCho, lblDefaultEffectsMod, lblDefaultEffectsTim, lblDefaultEffectsAtk;
     juce::Label lblDefaultEffectsRel, lblDefaultEffectsPan;
-    juce::Label lblconfigfile, label11, label31;
+    juce::Label lblconfigfileprefix, lblconfigfile, label11, label31;
     juce::ToggleButton togglePassthrough, toggleVelocity;
     juce::TextButton loadConfigButton, saveButton, saveAsButton, resetButton, exitButton;
     juce::TextButton toUpperKBD, toLowerKBD, toBassKBD;

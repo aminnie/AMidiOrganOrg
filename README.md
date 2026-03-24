@@ -109,7 +109,10 @@ Supported MIDI hardware and software sound modules:
   - octave shift
   - solo split point for Upper / Lower
 - `MIDI Reset` sends a controller reset on all 16 channels.
-- `MIDI pass-through` controls whether channels not assigned to a button group are blocked or allowed through.
+- `MIDI In Passthru` is a global input-channel filter, not a per-device or per-output setting.
+- When it is **ON**, all incoming MIDI channels are allowed through.
+- When it is **OFF**, only MIDI input channels assigned to button groups are allowed through; other incoming channels are blocked.
+- MIDI channel `16` is still allowed for controller-style traffic even when pass-through is off.
 - **Default Effects** fields (Vol, Bri, Exp, Rev, Cho, Mod, Tim, Atk, Rel, Pan) set starting MIDI CC values for new voice assignments (Sounds tab route and fresh panel initialization). They are saved in the config file. Defaults match a new `Instrument`: Vol 100, Bri 30, Exp 127, Rev 20, Cho 10, Mod/Tim/Atk/Rel 0, Pan 64. Each field accepts **0–127** only (digits-only entry; invalid or out-of-range values are rejected on focus loss). Volume scaling still treats a default Vol of **0** like **1** when computing effective CC7.
 - Saving config is blocked if two or more button groups share the same **MIDI sound module** and the same **MIDI Out channel** (each module/channel pair must be unique).
 - Config settings are global to the app and are separate from the currently loaded panel.

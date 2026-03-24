@@ -83,7 +83,10 @@ Contact the developer for additional module support.
   - octave shift
   - solo split point for Upper / Lower
 - `MIDI Reset` sends a controller reset on all 16 channels.
-- `MIDI pass-through` controls whether channels not assigned to a button group are blocked or allowed through.
+- `MIDI In Passthru` is a global input-channel filter, not a per-device or per-output setting.
+- When it is **ON**, all incoming MIDI channels are allowed through.
+- When it is **OFF**, only MIDI input channels assigned to button groups are allowed through; other incoming channels are blocked.
+- MIDI channel `16` is still allowed for controller-style traffic even when pass-through is off.
 - Config settings are global to the app and are separate from the currently loaded panel.
 
 ### Hotkeys
