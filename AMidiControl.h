@@ -5932,6 +5932,8 @@ public:
         if (Label* focused = &statusLabel)
             BubbleMessage(*focused, msgloaded, this->bubbleMessage);
 
+        loadStickyMidiPortsFromDisk();
+
         // Update with active devices and Channel Output based on Button Groups
         updateDeviceLists();
 
@@ -5960,6 +5962,8 @@ public:
     ~MidiStartPage() override
     {
         DBG("=== MidiStartPage(): Destructor " + std::to_string(--zinstcntMidiStartPage));
+
+        saveStickyMidiPortsToDisk();
 
         // Disconnect device-change callback before tearing down controls/state.
         connection.reset();
@@ -6030,6 +6034,58 @@ public:
     }
 
 private:
+
+    juce::StringArray stickyMidiInputIds;
+    juce::StringArray stickyMidiOutputIds;
+
+    void loadStickyMidiPortsFromDisk()
+    {
+        loadMidiStickyDeviceIdentifiersFromFile(stickyMidiInputIds, stickyMidiOutputIds);
+    }
+
+    void saveStickyMidiPortsToDisk()
+    {
+        juce::StringArray inIds, outIds;
+        for (int i = 0; i < mididevices->midiInputs.size(); ++i)
+            if (mididevices->midiInputs[i]->inDevice != nullptr)
+                inIds.add(mididevices->midiInputs[i]->deviceInfo.identifier);
+        for (int i = 0; i < mididevices->midiOutputs.size(); ++i)
+            if (mididevices->midiOutputs[i]->outDevice != nullptr)
+                outIds.add(mididevices->midiOutputs[i]->deviceInfo.identifier);
+
+        if (!saveMidiStickyDeviceIdentifiersToFile(inIds, outIds))
+            juce::Logger::writeToLog("*** MidiStartPage: could not save midi_sticky_devices.json");
+    }
+
+    void applyStickyMidiPortsForList(bool isInputDeviceList)
+    {
+        const juce::StringArray& sticky = isInputDeviceList ? stickyMidiInputIds : stickyMidiOutputIds;
+        if (sticky.isEmpty())
+            return;
+
+        auto& devices = isInputDeviceList ? mididevices->midiInputs : mididevices->midiOutputs;
+
+        for (const auto& stickyId : sticky)
+        {
+            if (stickyId.isEmpty())
+                continue;
+
+            for (int i = 0; i < devices.size(); ++i)
+            {
+                if (devices[i]->deviceInfo.identifier != stickyId)
+                    continue;
+
+                const bool alreadyOpen = isInputDeviceList
+                    ? (devices[i]->inDevice != nullptr)
+                    : (devices[i]->outDevice != nullptr);
+
+                if (!alreadyOpen)
+                    mididevices->openDevice(isInputDeviceList, i);
+
+                break;
+            }
+        }
+    }
 
     void proceedWithPickedPanelFile(const juce::File& pnlFile)
     {
@@ -6195,6 +6251,7 @@ private:
                 }
 
                 lastSelectedItems = newSelectedItems;
+                parent.saveStickyMidiPortsToDisk();
             }
         }
 
@@ -6363,6 +6420,8 @@ private:
 
             // actually update the device list
             midiDevices = newDeviceList;
+
+            applyStickyMidiPortsForList(isInputDeviceList);
 
             // update the selection status of the combo-box
             if (auto* midiSelector = isInputDeviceList ? midiInputSelector.get() : midiOutputSelector.get())

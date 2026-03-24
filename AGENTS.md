@@ -30,7 +30,7 @@ For canonical build/run commands, use the `Build` section in `README.md`.
 - Do not silently change on-disk locations under user Documents (`AMidiOrgan/...`).
 
 ## User Documents layout (`Documents/AMidiOrgan`)
-- **`configs/`** — `.cfg` configuration files (see `AppState::configdir`); also **`hotkeys.json`** (keyboard shortcut map) written by the Hotkeys tab.
+- **`configs/`** — `.cfg` configuration files (see `AppState::configdir`); also **`hotkeys.json`** (keyboard shortcut map) written by the Hotkeys tab, and **`midi_sticky_devices.json`** (last MIDI In/Out selections on the Start tab).
 - **`panels/`** — `.pnl` instrument panel files (see `AppState::paneldir`); canonical read/write target; older installs may still load from legacy `instruments/` or module-named folders via fallbacks.
 - **`instruments/`** — JSON instrument catalogs only (not `.pnl`).
 

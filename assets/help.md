@@ -27,7 +27,7 @@ Contact the developer for additional module support.
 ## Startup Flow (Recommended)
 
 1. Open the `Start` tab.
-2. Select MIDI input and output devices.
+2. Select MIDI input and output devices (selections are restored automatically on the next launch when the same ports are available).
 3. Select the active sound module using `To Modules`.
 4. Load a panel (`.pnl`) and config (`.cfg`) if needed.
 5. Confirm the panel and config labels match what you expect.

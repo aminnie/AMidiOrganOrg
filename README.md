@@ -72,6 +72,7 @@ Supported MIDI hardware and software sound modules:
 #### Start
 
 - Lists MIDI input and output devices and updates as devices connect or disconnect.
+- Your selected MIDI In and Out ports are remembered across launches (`Documents/AMidiOrgan/configs/midi_sticky_devices.json`, by JUCE device identifier).
 - Lets you choose the active sound module.
 - Loads panel and config files.
 - Checks config and panel pairing when loading, and can warn if the selected files do not belong together.

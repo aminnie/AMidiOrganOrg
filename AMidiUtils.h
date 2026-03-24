@@ -171,6 +171,80 @@ inline juce::File getDefaultPanelsDirectory()
     return dir;
 }
 
+/** Last Start-tab MIDI In/Out selections (`configs/midi_sticky_devices.json`, JUCE device identifiers). */
+inline juce::File getMidiStickyDevicesFile()
+{
+    juce::File dir = getOrganUserDocumentsRoot().getChildFile(getAppState().configdir);
+    if (!dir.isDirectory())
+        dir.createDirectory();
+    return dir.getChildFile("midi_sticky_devices.json");
+}
+
+/** Reads sticky port ids; missing file is OK (leaves arrays empty). */
+inline void loadMidiStickyDeviceIdentifiersFromFile(juce::StringArray& inputIds, juce::StringArray& outputIds)
+{
+    inputIds.clear();
+    outputIds.clear();
+
+    const juce::File f = getMidiStickyDevicesFile();
+    if (!f.existsAsFile())
+        return;
+
+    juce::FileInputStream in(f);
+    if (!in.openedOk())
+        return;
+
+    const juce::var parsed = juce::JSON::parse(in.readEntireStreamAsString());
+    if (parsed.isVoid())
+        return;
+
+    auto* obj = parsed.getDynamicObject();
+    if (obj == nullptr)
+        return;
+
+    auto appendStringArray = [](const juce::var& v, juce::StringArray& out)
+        {
+            if (!v.isArray())
+                return;
+            const auto* arr = v.getArray();
+            if (arr == nullptr)
+                return;
+            for (const auto& item : *arr)
+            {
+                const juce::String s = item.toString().trim();
+                if (s.isNotEmpty())
+                    out.addIfNotAlreadyThere(s);
+            }
+        };
+
+    appendStringArray(obj->getProperty("midiInputIdentifiers"), inputIds);
+    appendStringArray(obj->getProperty("midiOutputIdentifiers"), outputIds);
+}
+
+/** Overwrites sticky file; returns false if the directory could not be created or write failed. */
+inline bool saveMidiStickyDeviceIdentifiersToFile(const juce::StringArray& inputIds, const juce::StringArray& outputIds)
+{
+    const juce::File f = getMidiStickyDevicesFile();
+    if (!f.getParentDirectory().createDirectory())
+        return false;
+
+    juce::Array<juce::var> inArr;
+    juce::Array<juce::var> outArr;
+    for (const auto& s : inputIds)
+        if (s.isNotEmpty())
+            inArr.add(juce::var(s));
+    for (const auto& s : outputIds)
+        if (s.isNotEmpty())
+            outArr.add(juce::var(s));
+
+    juce::DynamicObject::Ptr o = new juce::DynamicObject();
+    o->setProperty("midiInputIdentifiers", juce::var(inArr));
+    o->setProperty("midiOutputIdentifiers", juce::var(outArr));
+
+    const juce::String txt = juce::JSON::toString(juce::var(o.get()), true);
+    return f.replaceWithText(txt);
+}
+
 // Volume model helpers
 static int sliderStepToMasterCc7(int sliderStep)
 {
