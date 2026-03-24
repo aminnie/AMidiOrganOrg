@@ -1564,9 +1564,12 @@ public:
         selvoice = -1;
         selvoicebank = -1;
         updateVoicesRouteButtonDirtyStyle();
+        hasPanelContextFlag = true;
 
         return true;
     }
+
+    bool hasPanelContext() const { return hasPanelContextFlag; }
 
     //-------------------------------------------------------------------------
     ~VoicesPage() {
@@ -1640,6 +1643,7 @@ private:
     int mchannel = 1;
     int selvoice = 0;
     int selvoicebank = 0;
+    bool hasPanelContextFlag = false;
 
     /** MSB/LSB/PC snapshot from the voice button when Sounds tab opens; menu pick compares to these. */
     int snapMSB = 0;
@@ -2255,9 +2259,12 @@ public:
         // Enable the routing button now that Voice or Effect has been selected
         tbroute->setEnabled(true);
         updateToRouteButtonDirtyStyle();
+        hasPanelContextFlag = true;
 
         return true;
     }
+
+    bool hasPanelContext() const { return hasPanelContextFlag; }
 
 private:
     OwnedArray<Component> components;
@@ -2276,6 +2283,7 @@ private:
     TextButton* tbcancel;
     VoiceButton* ptrvoicebutton;
     int panelbuttonidx = 0;
+    bool hasPanelContextFlag = false;
 
     int mchannel = 1;
 
@@ -2629,6 +2637,7 @@ struct KeyboardPanelPage final : public Component,
                 sb->setButtonGroupId(bgroupid);
                 sb->setButtonId(i);
                 sb->setPanelButtonIdx(panelbuttonidx);
+                sb->setExplicitUserClickHandler([this](int idx) { registerExplicitVoiceSelection(idx); });
 
                 sb->setClickingTogglesState(true);
 
@@ -3015,6 +3024,7 @@ struct KeyboardPanelPage final : public Component,
                 sb->setButtonGroupId(bgroupid);
                 sb->setButtonId(i);
                 sb->setPanelButtonIdx(panelbuttonidx);
+                sb->setExplicitUserClickHandler([this](int idx) { registerExplicitVoiceSelection(idx); });
 
                 sb->setClickingTogglesState(true);
 
@@ -3396,6 +3406,7 @@ struct KeyboardPanelPage final : public Component,
                 sb->setButtonGroupId(bgroupid);
                 sb->setButtonId(i);
                 sb->setPanelButtonIdx(panelbuttonidx);
+                sb->setExplicitUserClickHandler([this](int idx) { registerExplicitVoiceSelection(idx); });
 
                 sb->setClickingTogglesState(true);
 
@@ -3787,6 +3798,7 @@ struct KeyboardPanelPage final : public Component,
                 sb->setButtonGroupId(bgroupid);
                 sb->setButtonId(i);
                 sb->setPanelButtonIdx(panelbuttonidx);
+                sb->setExplicitUserClickHandler([this](int idx) { registerExplicitVoiceSelection(idx); });
 
                 sb->setClickingTogglesState(true);
 
@@ -4993,6 +5005,8 @@ struct KeyboardPanelPage final : public Component,
 
             // Apply Preset 0 = Manual to default Instrument Panel Voice Buttons
             loadPreset(0);
+            appState.lastSelectedPanelButtonIdx = -1;
+            appState.hasExplicitVoiceSelection = false;
 
             instrumentpanel->setPanelUpdated(false);
 
@@ -5054,15 +5068,6 @@ struct KeyboardPanelPage final : public Component,
     ~KeyboardPanelPage()
     {
         DBG("== KeyboardManualPage(): Destructor " + std::to_string(--zinstcntmanualpage));
-    }
-
-    /** Enables Sounds/Effects only on real pointer clicks — not from `triggerClick()` at panel build time. */
-    void mouseUp(const juce::MouseEvent& e) override
-    {
-        if (!e.mouseWasClicked())
-            return;
-
-        enableVoiceEditShortcutButtons();
     }
 
     /** True after the user has clicked a voice on this manual (Voice Edits buttons are enabled). */
@@ -5187,6 +5192,18 @@ struct KeyboardPanelPage final : public Component,
     }
 
 private:
+    /** Called from VoiceButton::mouseUp only for explicit user clicks on a voice button. */
+    void registerExplicitVoiceSelection(int selectedPanelButtonIdx)
+    {
+        if (selectedPanelButtonIdx < 0 || selectedPanelButtonIdx >= numbervoicebuttons)
+            return;
+
+        panelbuttonidx = selectedPanelButtonIdx;
+        appState.lastSelectedPanelButtonIdx = selectedPanelButtonIdx;
+        appState.hasExplicitVoiceSelection = true;
+        enableVoiceEditShortcutButtons();
+    }
+
     /** Sounds / Effects shortcut buttons in "Voice Edits"; enabled after user selects a voice in any group. */
     void enableVoiceEditShortcutButtons()
     {
@@ -8450,6 +8467,8 @@ public:
         ConfigPage* configspage = new ConfigPage(*this, refreshKbPanelSaves);
         EffectsPage* effectspage = new EffectsPage(*this);
         VoicesPage* voicespage = new VoicesPage(*this);
+        effectsPageRef = effectspage;
+        voicesPageRef = voicespage;
 
         // Create MidiStart Page
         addTab("Start",        colour, new MidiStartPage(*this, [configspage](const juce::String& b)
@@ -8480,6 +8499,8 @@ public:
         // Set default tab
         this->setCurrentTabIndex(PTStart, true);
         String sname = this->getCurrentTabName();
+        getAppState().lastSelectedPanelButtonIdx = -1;
+        getAppState().hasExplicitVoiceSelection = false;
 
         gNotifyPanelSaveAvailabilityChanged = std::move(refreshKbPanelSaves);
 
@@ -8564,6 +8585,12 @@ public:
             k->triggerRotaryBrakeHotkey();
     }
 
+    bool canOpenVoiceEditTabs()
+    {
+        return KeyboardPanelPage::anyVoiceEditShortcutsEnabledInTabs(*this)
+            || hasValidLastSelectedVoiceButton();
+    }
+
     void mouseDown(const MouseEvent& e) override
     {
         draggingFromTabBarBackground = false;
@@ -8602,19 +8629,21 @@ public:
     {
         updateVoiceEditTabAccessUi();
 
-        if ((newCurrentTabIndex == PTVoices || newCurrentTabIndex == PTEffects)
-            && !KeyboardPanelPage::anyVoiceEditShortcutsEnabledInTabs(*this))
+        if (newCurrentTabIndex == PTVoices || newCurrentTabIndex == PTEffects)
         {
-            const int fallbackTab = (lastNonExitTabIndex == PTVoices || lastNonExitTabIndex == PTEffects)
-                ? PTUpper
-                : lastNonExitTabIndex;
-            setCurrentTabIndex(fallbackTab, false);
-            juce::AlertWindow::showMessageBoxAsync(
-                juce::AlertWindow::InfoIcon,
-                "Voice Selection Required",
-                "Select a voice on Upper, Lower, or Bass&Drums first. "
-                "Then Sounds and Effects tabs become available.");
-            return;
+            if (!ensureVoiceEditTabHasContext(newCurrentTabIndex))
+            {
+                const int fallbackTab = (lastNonExitTabIndex == PTVoices || lastNonExitTabIndex == PTEffects)
+                    ? PTUpper
+                    : lastNonExitTabIndex;
+                setCurrentTabIndex(fallbackTab, false);
+                juce::AlertWindow::showMessageBoxAsync(
+                    juce::AlertWindow::InfoIcon,
+                    "Voice Selection Required",
+                    "Select a voice on Upper, Lower, or Bass&Drums first. "
+                    "Then Sounds and Effects tabs become available.");
+                return;
+            }
         }
 
         if (newCurrentTabName == "Exit")
@@ -8761,9 +8790,73 @@ public:
     };
 
 private:
+    bool hasValidLastSelectedVoiceButton() const
+    {
+        if (!getAppState().hasExplicitVoiceSelection)
+            return false;
+
+        const int panelBtnIdx = getAppState().lastSelectedPanelButtonIdx;
+        if (panelBtnIdx < 0 || panelBtnIdx >= numbervoicebuttons)
+            return false;
+
+        const int panelGroup = lookupPanelGroup(panelBtnIdx);
+        return panelGroup >= 0 && panelGroup < numberbuttongroups;
+    }
+
+    bool tryPopulateVoiceEditContextFromLastSelected(int targetTab)
+    {
+        if (!hasValidLastSelectedVoiceButton())
+            return false;
+
+        auto* ip = InstrumentPanel::getInstance();
+        auto* im = InstrumentModules::getInstance();
+        if (ip == nullptr || im == nullptr)
+            return false;
+
+        const int panelBtnIdx = getAppState().lastSelectedPanelButtonIdx;
+        const int panelGroup = lookupPanelGroup(panelBtnIdx);
+        if (panelGroup < 0 || panelGroup >= numberbuttongroups)
+            return false;
+
+        ButtonGroup* bg = ip->getButtonGroup(panelGroup);
+        if (bg == nullptr)
+            return false;
+
+        const int keyboardTab = (bg->midikeyboard == KBDLOWER) ? PTLower
+            : (bg->midikeyboard == KBDBASS) ? PTBass
+            : PTUpper;
+
+        const juce::String panelGroupTitle = bg->groupname
+            + "   [In:" + std::to_string(bg->midiin)
+            + " | Out:" + std::to_string(bg->midiout) + "]";
+
+        if (targetTab == PTVoices && voicesPageRef != nullptr)
+        {
+            const juce::String soundFile = im->getFileName(bg->moduleidx);
+            return voicesPageRef->setPanelButton(panelBtnIdx, panelGroupTitle, soundFile, bg->midiout, keyboardTab);
+        }
+        if (targetTab == PTEffects && effectsPageRef != nullptr)
+            return effectsPageRef->setPanelButton(panelBtnIdx, panelGroupTitle, bg->midiout, keyboardTab);
+
+        return false;
+    }
+
+    bool ensureVoiceEditTabHasContext(int targetTab)
+    {
+        const bool hasContext = (targetTab == PTVoices)
+            ? (voicesPageRef != nullptr && voicesPageRef->hasPanelContext())
+            : (effectsPageRef != nullptr && effectsPageRef->hasPanelContext());
+
+        if (hasContext)
+            return true;
+
+        return tryPopulateVoiceEditContextFromLastSelected(targetTab);
+    }
+
     void updateVoiceEditTabAccessUi()
     {
-        const bool allowVoiceEditTabs = KeyboardPanelPage::anyVoiceEditShortcutsEnabledInTabs(*this);
+        const bool allowVoiceEditTabs = KeyboardPanelPage::anyVoiceEditShortcutsEnabledInTabs(*this)
+            || hasValidLastSelectedVoiceButton();
         const juce::String blockedHint =
             "Select a voice on Upper, Lower, or Bass&Drums first.";
 
@@ -8783,6 +8876,8 @@ private:
     ComponentDragger windowDragger;
     bool draggingFromTabBarBackground = false;
     int lastNonExitTabIndex = PTStart;
+    VoicesPage* voicesPageRef = nullptr;
+    EffectsPage* effectsPageRef = nullptr;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MenuTabs)
 };
@@ -8822,7 +8917,7 @@ public:
         keyTarget.onTabBass = [this] { tabs.setCurrentTabIndex(PTBass, true); };
         keyTarget.onTabSounds = [this] { tabs.setCurrentTabIndex(PTVoices, true); };
         keyTarget.onTabEffects = [this] { tabs.setCurrentTabIndex(PTEffects, true); };
-        keyTarget.onVoiceEditTabHotkeysAllowed = [this] { return KeyboardPanelPage::anyVoiceEditShortcutsEnabledInTabs(tabs); };
+        keyTarget.onVoiceEditTabHotkeysAllowed = [this] { return tabs.canOpenVoiceEditTabs(); };
         keyTarget.onPresetRecall = [this](int idx) { tabs.recallPresetFromHotkey(idx); };
         keyTarget.onUpperRotaryFastSlow = [this] { tabs.triggerUpperRotaryFastSlowHotkey(); };
         keyTarget.onUpperRotaryBrake = [this] { tabs.triggerUpperRotaryBrakeHotkey(); };

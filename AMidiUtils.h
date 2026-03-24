@@ -113,6 +113,10 @@ struct AppState final
     /** Manual Leslie Fast/Slow + Brake UI on Lower keyboard tab (saved on panel root). */
     bool lowerManualRotaryFast = true;
     bool lowerManualRotaryBrake = false;
+    /** Runtime-only last voice button selected on keyboard tabs; used to hydrate Sounds/Effects context. */
+    int lastSelectedPanelButtonIdx = -1;
+    /** True only after an explicit user click on a keyboard voice button. */
+    bool hasExplicitVoiceSelection = false;
 
     // Static voice from the 1st voice in selected Midi module. Used to create new panel file.
     String sdefVoice;

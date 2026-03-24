@@ -10,6 +10,8 @@
 
 #pragma once
 
+#include <functional>
+
 
 //==============================================================================
 // Class: VoiceButton - Create TextButton type that stores the MidiInstrument
@@ -91,6 +93,19 @@ public:
         displaybuttonptr = dspbtnptr;
     }
 
+    /** Fired only on explicit mouse clicks (not `triggerClick()`). */
+    void setExplicitUserClickHandler(std::function<void(int)> handler)
+    {
+        explicitUserClickHandler = std::move(handler);
+    }
+
+    void mouseUp(const juce::MouseEvent& e) override
+    {
+        TextButton::mouseUp(e);
+        if (e.mouseWasClicked() && explicitUserClickHandler)
+            explicitUserClickHandler(panelbuttonidx);
+    }
+
 private:
     Instrument instrument;
 
@@ -98,6 +113,7 @@ private:
     int buttonid;
     int panelbuttonidx;
     Component::SafePointer<VoiceButton>displaybuttonptr;
+    std::function<void(int)> explicitUserClickHandler;
 
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(VoiceButton)
