@@ -89,7 +89,12 @@ Supported MIDI hardware and software sound modules:
 
 - Assigns an instrument voice to the currently selected voice button.
 - Select the target voice button on a keyboard tab before opening `Sounds`.
-- The selected sound is sent on the button group's MIDI output channel so you can audition it.
+- Browse in two levels inside the `Sounds for Voice Button` area:
+  - Level 1: voice category buttons (for example `A-Piano`, `E-Piano`, `Organ`)
+  - Level 2: voice buttons in the selected category
+- Clicking a voice sends MSB/LSB/PC immediately on the button group's MIDI output channel for audition.
+- `Back` returns from Level 2 to Level 1.
+- `Prev` / `Next` paginate categories or voices when the list exceeds visible space.
 - Use `To Upper`, `To Lower`, or `To Bass` to return to the performance tab.
 
 #### Effects

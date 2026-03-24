@@ -1304,7 +1304,8 @@ public:
 
         lblsvendornametxt.setText("Sound Filename", {});
         addLabelAndSetStyle(lblsvendornametxt, false);
-        lblsvendornametxt.setBounds(margin + 220, margin + 200, 160, 50);
+        // Keep module/vendor context in the left column to free horizontal space for voice buttons.
+        lblsvendornametxt.setBounds(margin, margin + 150, 180, 24);
 
         tbroute = addToList(new TextButton("To Upper"));
         tbroute->setColour(TextButton::textColourOffId, Colours::black);
@@ -1313,7 +1314,7 @@ public:
         tbroute->setColour(TextButton::buttonOnColourId, Colours::antiquewhite);
 
         tbroute->setClickingTogglesState(false);
-        tbroute->setBounds(margin, 4 * margin + 100, 80, 30);
+        tbroute->setBounds(margin, 225, 80, 30);
         tbroute->onClick = [=, &tabs]()
         {
             // Check if we still waiting for async voice select
@@ -1396,7 +1397,7 @@ public:
         tbcancel->setColour(TextButton::buttonOnColourId, Colours::antiquewhite);
 
         tbcancel->setClickingTogglesState(false);
-        tbcancel->setBounds(margin + 100, 4 * margin + 100, 80, 30);
+        tbcancel->setBounds(margin + 100, 225, 80, 30);
         tbcancel->onClick = [=, &tabs]()
             {
                 // Populate the Effects Page with last Button Instrument pressed and switch to tab
@@ -1414,100 +1415,64 @@ public:
                 updateVoicesRouteButtonDirtyStyle();
             };
 
-        addAndMakeVisible(nestedMenusButton);
-        nestedMenusButton.setColour(TextButton::textColourOffId, Colours::black);
-        nestedMenusButton.setColour(TextButton::textColourOnId, Colours::black);
-        nestedMenusButton.setColour(TextButton::buttonColourId, Colours::lightgrey);
-        nestedMenusButton.setColour(TextButton::buttonOnColourId, Colours::antiquewhite);
+        addAndMakeVisible(voiceBrowserGroup);
+        voiceBrowserGroup.setText("Voice Categories");
+        voiceBrowserGroup.setColour(GroupComponent::outlineColourId, Colours::grey.darker());
+        voiceBrowserGroup.setBounds(margin + 220, 35, 920, 185);
 
-        // Select Voices Menu and Sub-Menu
-        nestedMenusButton.setBounds(margin + 220, 30, 150, 30);
-        ////nestedMenusButton.onClick = [=, &selvoice, &selvoicebank, &midiInstruments]()
-        nestedMenusButton.onClick = [=]()
+        addAndMakeVisible(browserBackButton);
+        browserBackButton.setButtonText("Back");
+        browserBackButton.setColour(TextButton::textColourOffId, Colours::black);
+        browserBackButton.setColour(TextButton::textColourOnId, Colours::black);
+        browserBackButton.setColour(TextButton::buttonColourId, Colours::lightgrey);
+        browserBackButton.setColour(TextButton::buttonOnColourId, Colours::antiquewhite);
+        browserBackButton.setBounds(margin + 220, 225, 80, 30);
+        browserBackButton.onClick = [this]()
         {
-            try 
+            browserLevel = BrowserLevel::categories;
+            browserPage = 0;
+            renderVoiceBrowser();
+        };
+
+        addAndMakeVisible(browserPrevButton);
+        browserPrevButton.setButtonText("Prev");
+        browserPrevButton.setColour(TextButton::textColourOffId, Colours::black);
+        browserPrevButton.setColour(TextButton::textColourOnId, Colours::black);
+        browserPrevButton.setColour(TextButton::buttonColourId, Colours::lightgrey);
+        browserPrevButton.setColour(TextButton::buttonOnColourId, Colours::antiquewhite);
+        browserPrevButton.setBounds(margin + 960, 225, 80, 30);
+        browserPrevButton.onClick = [this]()
+        {
+            if (browserPage > 0)
             {
-                tbroute->setEnabled(false);
-                updateVoicesRouteButtonDirtyStyle();
-
-                PopupMenu menu;
-                int ccount = (int)midiInstruments->getCategoryCount();
-                for (int i = 0; i < ccount; ++i)
-                {
-                    int inscount = (int)midiInstruments->getCategoryVoiceCount(i);
-
-                    PopupMenu subMenu;
-                    for (int j = 1; j < inscount; ++j)
-                    {
-                        //subMenu.addItem("Sub-item " + String(j), nullptr);
-                        String svoice = midiInstruments->getVoice(i, j);
-                        subMenu.addItem(i * 1000 + j, svoice);
-                    }
-                    //menu.addSubMenu("Item " + String(i), subMenu);
-                    menu.addSubMenu(midiInstruments->getCategory(i), subMenu);
-                }
-                //menu.showMenuAsync(PopupMenu::Options{}.withTargetComponent(nestedMenusButton), handleMenuClick);
-                menu.showMenuAsync(PopupMenu::Options{}.withTargetComponent(nestedMenusButton),
-                    ////[&selvoice, &selvoicebank](int result) { 
-                    [=](int result) {
-                        // Dismissed without selection — restore route button
-                        if (result == 0)
-                        {
-                            if ((currenttabidx == PTUpper) || (currenttabidx == PTLower) || (currenttabidx == PTBass))
-                                tbroute->setEnabled(true);
-                            updateVoicesRouteButtonDirtyStyle();
-                            return;
-                        }
-
-                        selvoice = result % 1000;
-                        selvoicebank = (int)(result / 1000);
-
-                        // Check if we still waiting for async voice select
-                        if ((selvoicebank < 0) || (selvoice < 0)) return;
-
-                        // Update the displayed voice name to newly selected
-                        lblsvoicetxt.setText(midiInstruments->getVoice(selvoicebank, selvoice), {});
-
-                        // Apply the sound font Program Change to enable testing sound with keyboard
-                        int controllerNumber = CCMSB; // MSB
-                        juce::MidiMessage ccMessage = juce::MidiMessage::controllerEvent(
-                            buttongroupmidiout,
-                            controllerNumber,
-                            midiInstruments->getMSB(selvoicebank, selvoice)
-                        );
-                        ccMessage.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
-                        // Send the MIDI CC message to MIDI output(s)
-                        //mididevices->sendMessageNow(ccMessage);
-                        mididevices->sendToOutputs(ccMessage);
-
-                        controllerNumber = CCLSB;    // LSB
-                        ccMessage = juce::MidiMessage::controllerEvent(
-                            buttongroupmidiout,
-                            controllerNumber,
-                            midiInstruments->getLSB(selvoicebank, selvoice)
-                        );
-                        ccMessage.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
-                        mididevices->sendToOutputs(ccMessage);
-
-                        // Send PC
-                        ccMessage = juce::MidiMessage::programChange(
-                            buttongroupmidiout,
-                            midiInstruments->getFont(selvoicebank, selvoice)
-                        );
-                        ccMessage.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
-                        mididevices->sendToOutputs(ccMessage);
-
-                        if ((currenttabidx == PTUpper) || (currenttabidx == PTLower) || (currenttabidx == PTBass))
-                            tbroute->setEnabled(true);
-                        updateVoicesRouteButtonDirtyStyle();
-                    });
-            }
-            catch(...) {
-                DBG("=== VoicesPage(): Aborted Voices select");
+                --browserPage;
+                renderVoiceBrowser();
             }
         };
-        // Disable the button until Voice or Effects button selected in Keyboard Panels
-        nestedMenusButton.setEnabled(false);
+
+        addAndMakeVisible(browserNextButton);
+        browserNextButton.setButtonText("Next");
+        browserNextButton.setColour(TextButton::textColourOffId, Colours::black);
+        browserNextButton.setColour(TextButton::textColourOnId, Colours::black);
+        browserNextButton.setColour(TextButton::buttonColourId, Colours::lightgrey);
+        browserNextButton.setColour(TextButton::buttonOnColourId, Colours::antiquewhite);
+        browserNextButton.setBounds(margin + 1060, 225, 80, 30);
+        browserNextButton.onClick = [this]()
+        {
+            const int pageCount = getBrowserPageCount();
+            if (browserPage + 1 < pageCount)
+            {
+                ++browserPage;
+                renderVoiceBrowser();
+            }
+        };
+
+        addAndMakeVisible(browserPageLabel);
+        browserPageLabel.setJustificationType(juce::Justification::centred);
+        browserPageLabel.setColour(juce::Label::textColourId, juce::Colours::white);
+        browserPageLabel.setBounds(margin + 840, 225, 110, 30);
+
+        setVoiceBrowserInteractive(false);
     }
 
     //-------------------------------------------------------------------------
@@ -1556,9 +1521,11 @@ public:
         }
         lblsvendornametxt.setText(midiInstruments->getVendor(), {});
 
-        // Trigger button to display first level menu
-        nestedMenusButton.setEnabled(true);
-        ////nestedMenusButton.triggerClick();
+        setVoiceBrowserInteractive(true);
+        browserLevel = BrowserLevel::categories;
+        selectedCategoryIdx = -1;
+        browserPage = 0;
+        renderVoiceBrowser();
 
         syncVoiceSnapshotFromInstrument();
         selvoice = -1;
@@ -1711,10 +1678,192 @@ private:
     juce::Label lblsvoice{ "Button Voice" };
     juce::Label lblsvoicetxt{ "No Voice" };
     juce::Label lblsvendornametxt{ "Sound File" };
+    juce::GroupComponent voiceBrowserGroup{ "voiceBrowser", "Voice Categories" };
+    juce::TextButton browserBackButton{ "Back" };
+    juce::TextButton browserPrevButton{ "Prev" };
+    juce::TextButton browserNextButton{ "Next" };
+    juce::Label browserPageLabel{ "browserPageLabel", "" };
+    juce::OwnedArray<juce::TextButton> browserButtons;
 
-    TextButton  nestedMenusButton{ "Voices Menu" };
+    enum class BrowserLevel
+    {
+        categories,
+        voices
+    };
+    BrowserLevel browserLevel = BrowserLevel::categories;
+    int selectedCategoryIdx = -1;
+    int browserPage = 0;
+    bool browserInteractive = false;
 
-    void resized() override {}
+    void resized() override
+    {
+        renderVoiceBrowser();
+    }
+
+    void setVoiceBrowserInteractive(bool enabled)
+    {
+        browserInteractive = enabled;
+        voiceBrowserGroup.setEnabled(enabled);
+        browserBackButton.setEnabled(enabled);
+        browserPrevButton.setEnabled(enabled);
+        browserNextButton.setEnabled(enabled);
+        if (!enabled)
+            browserPageLabel.setText("", dontSendNotification);
+
+        renderVoiceBrowser();
+    }
+
+    int getBrowserItemCount() const
+    {
+        if (midiInstruments == nullptr)
+            return 0;
+
+        if (browserLevel == BrowserLevel::categories)
+            return midiInstruments->getCategoryCount();
+
+        if (selectedCategoryIdx < 0)
+            return 0;
+
+        return midiInstruments->getCategoryVoiceCount(selectedCategoryIdx);
+    }
+
+    int getButtonsPerPage() const
+    {
+        constexpr int cols = 6;
+        constexpr int rows = 4;
+        return cols * rows;
+    }
+
+    int getBrowserPageCount() const
+    {
+        const int count = getBrowserItemCount();
+        const int perPage = juce::jmax(1, getButtonsPerPage());
+        return juce::jmax(1, (count + perPage - 1) / perPage);
+    }
+
+    void clearBrowserButtons()
+    {
+        for (auto* b : browserButtons)
+            removeChildComponent(b);
+        browserButtons.clear(true);
+    }
+
+    void sendPreviewMidiForSelection(int categoryIdx, int voiceIdx)
+    {
+        int controllerNumber = CCMSB; // MSB
+        juce::MidiMessage ccMessage = juce::MidiMessage::controllerEvent(
+            buttongroupmidiout,
+            controllerNumber,
+            midiInstruments->getMSB(categoryIdx, voiceIdx)
+        );
+        ccMessage.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
+        mididevices->sendToOutputs(ccMessage);
+
+        controllerNumber = CCLSB;    // LSB
+        ccMessage = juce::MidiMessage::controllerEvent(
+            buttongroupmidiout,
+            controllerNumber,
+            midiInstruments->getLSB(categoryIdx, voiceIdx)
+        );
+        ccMessage.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
+        mididevices->sendToOutputs(ccMessage);
+
+        // Send PC
+        ccMessage = juce::MidiMessage::programChange(
+            buttongroupmidiout,
+            midiInstruments->getFont(categoryIdx, voiceIdx)
+        );
+        ccMessage.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
+        mididevices->sendToOutputs(ccMessage);
+    }
+
+    void renderVoiceBrowser()
+    {
+        clearBrowserButtons();
+
+        if (!browserInteractive || midiInstruments == nullptr)
+        {
+            browserBackButton.setVisible(false);
+            browserPrevButton.setVisible(false);
+            browserNextButton.setVisible(false);
+            browserPageLabel.setText("", dontSendNotification);
+            return;
+        }
+
+        auto inner = voiceBrowserGroup.getBounds().reduced(10);
+        inner.removeFromTop(25);
+        constexpr int cols = 6;
+        constexpr int rows = 4;
+        const int gapX = 8;
+        const int gapY = 8;
+        const int btnW = 143; // keep current visual button width
+        const int btnH = 29;  // keep current visual button height
+        const int perPage = juce::jmax(1, getButtonsPerPage());
+        const int itemCount = getBrowserItemCount();
+        const int pageCount = getBrowserPageCount();
+
+        browserPage = juce::jlimit(0, juce::jmax(0, pageCount - 1), browserPage);
+        const int pageStart = browserPage * perPage;
+        const int pageEnd = juce::jmin(itemCount, pageStart + perPage);
+
+        for (int item = pageStart; item < pageEnd; ++item)
+        {
+            const int local = item - pageStart;
+            const int col = local % cols;
+            const int row = local / cols;
+
+            auto* b = browserButtons.add(new juce::TextButton());
+            addAndMakeVisible(b);
+            b->setColour(TextButton::textColourOffId, Colours::black);
+            b->setColour(TextButton::textColourOnId, Colours::black);
+            b->setColour(TextButton::buttonColourId, Colours::lightgrey);
+            b->setColour(TextButton::buttonOnColourId, Colours::antiquewhite);
+            b->setBounds(inner.getX() + col * (btnW + gapX), inner.getY() + row * (btnH + gapY), btnW, btnH);
+
+            if (browserLevel == BrowserLevel::categories)
+            {
+                const int categoryIdx = item;
+                b->setButtonText(midiInstruments->getCategory(categoryIdx));
+                b->onClick = [this, categoryIdx]()
+                {
+                    selectedCategoryIdx = categoryIdx;
+                    browserLevel = BrowserLevel::voices;
+                    browserPage = 0;
+                    renderVoiceBrowser();
+                };
+            }
+            else
+            {
+                const int voiceIdx = item + 1;
+                b->setButtonText(midiInstruments->getVoice(selectedCategoryIdx, voiceIdx));
+                b->onClick = [this, voiceIdx]()
+                {
+                    selvoicebank = selectedCategoryIdx;
+                    selvoice = voiceIdx;
+
+                    lblsvoicetxt.setText(midiInstruments->getVoice(selvoicebank, selvoice), {});
+                    sendPreviewMidiForSelection(selvoicebank, selvoice);
+
+                    if ((currenttabidx == PTUpper) || (currenttabidx == PTLower) || (currenttabidx == PTBass))
+                        tbroute->setEnabled(true);
+                    updateVoicesRouteButtonDirtyStyle();
+                };
+            }
+        }
+
+        browserBackButton.setVisible(browserLevel == BrowserLevel::voices);
+        if (browserLevel == BrowserLevel::voices && selectedCategoryIdx >= 0)
+            voiceBrowserGroup.setText("Voices for Category: " + midiInstruments->getCategory(selectedCategoryIdx));
+        else
+            voiceBrowserGroup.setText("Voice Categories");
+        browserPrevButton.setVisible(pageCount > 1);
+        browserNextButton.setVisible(pageCount > 1);
+        browserPrevButton.setEnabled(browserPage > 0);
+        browserNextButton.setEnabled(browserPage + 1 < pageCount);
+        browserPageLabel.setText(pageCount > 1
+            ? ("Page " + juce::String(browserPage + 1) + "/" + juce::String(pageCount))
+            : juce::String(), dontSendNotification);
+    }
 
     void addLabelAndSetStyle(Label& label, bool heading)
     {
