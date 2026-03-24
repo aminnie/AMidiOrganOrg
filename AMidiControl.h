@@ -21,6 +21,14 @@
 #include<iostream>
 #include<fstream>
 
+#ifndef AMIDIORGAN_PROJECT_VERSION
+#define AMIDIORGAN_PROJECT_VERSION "1.0.0"
+#endif
+
+#ifndef AMIDIORGAN_BUILD_NUMBER
+#define AMIDIORGAN_BUILD_NUMBER "local"
+#endif
+
 // Logging to a file
 // https://forum.juce.com/t/logging-to-file-in-plugin/30950
 // Widgets to use in future release
@@ -6073,6 +6081,12 @@ public:
         statusLabel.setColour(juce::Label::textColourId, juce::Colours::grey);
         statusLabel.setJustificationType(juce::Justification::right);
 
+        addAndMakeVisible(buildInfoLabel);
+        buildInfoLabel.setColour(juce::Label::textColourId, juce::Colours::grey);
+        buildInfoLabel.setJustificationType(juce::Justification::right);
+        buildInfoLabel.setText("Build " + juce::String(AMIDIORGAN_PROJECT_VERSION)
+            + " (" + juce::String(AMIDIORGAN_BUILD_NUMBER) + ")", juce::dontSendNotification);
+
         // Preset Device Modules includig index so we start with the same one as last saved
         instrumentmodules->loadModules();
         instrumentmodules->setInstrumentModule(appState.moduleidx);
@@ -6180,6 +6194,7 @@ public:
         configfileLabel.setBounds(550, margin + 230, 280, 20);
 
         statusLabel.setBounds(1180, margin + 200, 250, 20);
+        buildInfoLabel.setBounds(getWidth() - 290, getHeight() - 24, 280, 20);
     }
 
     //-----------------------------------------------------------------------------
@@ -6731,6 +6746,7 @@ private:
     Label configPrefixLabel{ "Config Prefix", "Config:" };
     Label configfileLabel { "Config File",  "Config File" };
     Label statusLabel{ "" };
+    Label buildInfoLabel{ "BuildInfo", "" };
 
     ////ReferenceCountedArray<MidiDeviceListEntry> midiInputs, midiOutputs;
     std::unique_ptr<MidiDeviceListBox> midiInputSelector, midiOutputSelector;

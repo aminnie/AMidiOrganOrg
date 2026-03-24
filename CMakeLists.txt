@@ -98,10 +98,26 @@ target_include_directories(AMidiOrgan
         "${CMAKE_CURRENT_SOURCE_DIR}"
 )
 
+set(AMIDIORGAN_GIT_SHA "local")
+find_package(Git QUIET)
+if(GIT_FOUND)
+    execute_process(
+        COMMAND "${GIT_EXECUTABLE}" -C "${CMAKE_CURRENT_SOURCE_DIR}" rev-parse --short=8 HEAD
+        OUTPUT_VARIABLE AMIDIORGAN_GIT_SHA
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_QUIET
+    )
+    if(AMIDIORGAN_GIT_SHA STREQUAL "")
+        set(AMIDIORGAN_GIT_SHA "local")
+    endif()
+endif()
+
 target_compile_definitions(AMidiOrgan
     PRIVATE
         JUCE_WEB_BROWSER=0
         JUCE_USE_CURL=0
+        AMIDIORGAN_PROJECT_VERSION="${PROJECT_VERSION}"
+        AMIDIORGAN_BUILD_NUMBER="${AMIDIORGAN_GIT_SHA}"
 )
 
 target_link_libraries(AMidiOrgan
