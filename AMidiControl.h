@@ -6931,13 +6931,13 @@ public:
 
         // Keyboard Split
         addAndMakeVisible(lblSplit);
-        lblSplit.setBounds(400, 165, 200, 24);
+        lblSplit.setBounds(20, 195, 200, 24);
         lblSplit.setText("Solo Out Split", {});
 
         //https://studiocode.dev/resources/midi-middle-c/
         addAndMakeVisible(txtSplit);
         txtSplit.setEnabled(false);
-        txtSplit.setBounds(560, 165, 100, 24);
+        txtSplit.setBounds(180, 195, 100, 24);
         txtSplit.setText("--");
         txtSplit.onFocusLost = [=]() {
             int i = comboConfig.getSelectedId() - 1;   // Combobox is 1 based
@@ -6988,11 +6988,11 @@ public:
 
         // Keyboard Velocity on or off
         addAndMakeVisible(lblVelocity);
-        lblVelocity.setBounds(400, 195, 200, 24);
+        lblVelocity.setBounds(20, 225, 200, 24);
         lblVelocity.setText("Velocity Out", {});
 
         addAndMakeVisible(toggleVelocity);
-        toggleVelocity.setBounds(560, 195, 200, 24);
+        toggleVelocity.setBounds(180, 225, 100, 24);
         toggleVelocity.onClick = [=]() {
             velocitystate = toggleVelocity.getToggleState();
 
@@ -7101,12 +7101,12 @@ public:
         styleDefaultEffectsLikeButtonGroupSection();
 
         addAndMakeVisible(loadConfigButton);
-        loadConfigButton.setButtonText("Load");
+        loadConfigButton.setButtonText("Load Config");
         loadConfigButton.setColour(TextButton::textColourOffId, Colours::white);
         loadConfigButton.setColour(TextButton::textColourOnId, Colours::white);
         loadConfigButton.setColour(TextButton::buttonColourId, Colours::black.darker());
         loadConfigButton.setColour(TextButton::buttonOnColourId, Colours::black.brighter());
-        loadConfigButton.setBounds(20, 225, 80, 30);
+        loadConfigButton.setBounds(1140, 235, 80, 30);
         loadConfigButton.setToggleState(false, dontSendNotification);
         loadConfigButton.onClick = [=]()
             {
@@ -7210,7 +7210,7 @@ public:
         lblconfigfile.setBounds(kbPanelMargin + 1240, 205, 200, 30);
 
         // Quick Access Keyboard Buttons
-        int xaccess = 920;
+        int xaccess = 820;
         int mgroup = 10;
         ygroup = 190;
         {
