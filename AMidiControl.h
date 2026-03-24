@@ -6811,6 +6811,10 @@ public:
         // Select first itemin dropdown on creation
         comboConfig.setSelectedId(1);
 
+        addAndMakeVisible(lblModule);
+        lblModule.setBounds(400, 30, 100, 30);
+        lblModule.setText("Sound Module", {});
+
         addAndMakeVisible(SoundModule);
         SoundModule.setButtonText(instrumentmodules->getDisplayName(appState.moduleidx));
         SoundModule.setClickingTogglesState(false);
@@ -7468,7 +7472,7 @@ private:
     juce::TextEditor txtDefaultEffectsVol, txtDefaultEffectsBri, txtDefaultEffectsExp, txtDefaultEffectsRev;
     juce::TextEditor txtDefaultEffectsCho, txtDefaultEffectsMod, txtDefaultEffectsTim, txtDefaultEffectsAtk;
     juce::TextEditor txtDefaultEffectsRel, txtDefaultEffectsPan;
-    juce::Label lblKeyboard, lblGroupName, lblButtonCount, lblMidiIn, lblMidiOut, lblSplit, lblOctave;
+    juce::Label lblKeyboard, lblGroupName, lblButtonCount, lblMidiIn, lblMidiOut, lblSplit, lblOctave, lblModule;
     juce::Label lblPassthrough, lblVelocity;
     juce::Label lblDefaultEffectsVol, lblDefaultEffectsBri, lblDefaultEffectsExp, lblDefaultEffectsRev;
     juce::Label lblDefaultEffectsCho, lblDefaultEffectsMod, lblDefaultEffectsTim, lblDefaultEffectsAtk;
