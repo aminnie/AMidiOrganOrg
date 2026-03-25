@@ -559,13 +559,14 @@ enum KeyPressCommandIDs {
     btnPreset4 = 14,
     btnPreset5 = 15,
     btnPreset6 = 16,
+    btnPresetNext = 17,
     btnUpperRotaryFastSlow = 20,
     btnUpperRotaryBrake = 21,
     btnLowerRotaryFastSlow = 22,
     btnLowerRotaryBrake = 23
 };
 
-constexpr int kNumHotkeyCommands = 16;
+constexpr int kNumHotkeyCommands = 17;
 
 inline constexpr std::array<KeyPressCommandIDs, kNumHotkeyCommands> kHotkeyCommandOrder = {
     KeyPressCommandIDs::btnTabUpper,
@@ -580,6 +581,7 @@ inline constexpr std::array<KeyPressCommandIDs, kNumHotkeyCommands> kHotkeyComma
     KeyPressCommandIDs::btnPreset4,
     KeyPressCommandIDs::btnPreset5,
     KeyPressCommandIDs::btnPreset6,
+    KeyPressCommandIDs::btnPresetNext,
     KeyPressCommandIDs::btnUpperRotaryFastSlow,
     KeyPressCommandIDs::btnUpperRotaryBrake,
     KeyPressCommandIDs::btnLowerRotaryFastSlow,
@@ -620,10 +622,11 @@ inline HotkeyBindings HotkeyBindings::withDefaults()
     b.keys[9] = L'4';
     b.keys[10] = L'5';
     b.keys[11] = L'6';
-    b.keys[12] = L'f';
-    b.keys[13] = L'b';
-    b.keys[14] = L'g';
-    b.keys[15] = L'n';
+    b.keys[12] = L'7';
+    b.keys[13] = L'f';
+    b.keys[14] = L'b';
+    b.keys[15] = L'g';
+    b.keys[16] = L'n';
     return b;
 }
 
@@ -671,6 +674,7 @@ public:
             KeyPressCommandIDs::btnPreset4,
             KeyPressCommandIDs::btnPreset5,
             KeyPressCommandIDs::btnPreset6,
+            KeyPressCommandIDs::btnPresetNext,
             KeyPressCommandIDs::btnUpperRotaryFastSlow,
             KeyPressCommandIDs::btnUpperRotaryBrake,
             KeyPressCommandIDs::btnLowerRotaryFastSlow,
@@ -725,6 +729,9 @@ public:
                 break;
             case KeyPressCommandIDs::btnPreset6:
                 addShortcutInfo("Preset 6", "Recall Preset 6");
+                break;
+            case KeyPressCommandIDs::btnPresetNext:
+                addShortcutInfo("Next preset", "Advance to the next preset");
                 break;
             case KeyPressCommandIDs::btnUpperRotaryFastSlow:
                 addShortcutInfo("Upper rotary Fast/Slow", "Upper manual rotary Fast/Slow");
@@ -799,6 +806,10 @@ public:
                 if (onPresetRecall) onPresetRecall(6);
                 else return false;
                 break;
+            case KeyPressCommandIDs::btnPresetNext:
+                if (onPresetNext) onPresetNext();
+                else return false;
+                break;
             case KeyPressCommandIDs::btnUpperRotaryFastSlow:
                 if (onUpperRotaryFastSlow) onUpperRotaryFastSlow();
                 else return false;
@@ -830,6 +841,7 @@ public:
     /** If set, Sounds/Effects tab hotkeys are ignored when this returns false (e.g. no voice selected yet). */
     std::function<bool()> onVoiceEditTabHotkeysAllowed;
     std::function<void(int)> onPresetRecall;
+    std::function<void()> onPresetNext;
     std::function<void()> onUpperRotaryFastSlow;
     std::function<void()> onUpperRotaryBrake;
     std::function<void()> onLowerRotaryFastSlow;

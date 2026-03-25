@@ -4379,7 +4379,7 @@ struct KeyboardPanelPage final : public Component,
             int g10xoffset = 370; //xgroup;
             ygroup = 190;
 
-            int cbuttons = 8;
+            const int cbuttons = numberpresets + 2; // Set + Preset(0..6) + Next Preset
             int rbuttons = 1;
             int bgroupid = 110;
 
@@ -4393,13 +4393,15 @@ struct KeyboardPanelPage final : public Component,
             int col = 0;
 
             // Manual Preset Set/Unset
+            const int presetControlButtonWidth = bwidth;
+
             auto* tbsetpreset = addToList(new PresetButton("Set"));
             tbsetpreset->setClickingTogglesState(true);
             tbsetpreset->setColour(TextButton::textColourOffId, Colours::white);
             tbsetpreset->setColour(TextButton::textColourOnId, Colours::black);
             tbsetpreset->setColour(TextButton::buttonColourId, Colours::black.darker());
             tbsetpreset->setColour(TextButton::buttonOnColourId, Colours::antiquewhite);
-            tbsetpreset->setBounds(g10xoffset + mgroup + col * bwidth, ygroup + mgroup * 2, bwidth, bheight);
+            tbsetpreset->setBounds(g10xoffset + mgroup + col * bwidth, ygroup + mgroup * 2, presetControlButtonWidth, bheight);
             tbsetpreset->setConnectedEdges(Button::ConnectedOnRight);
             tbsetpreset->onClick = [=]()
                 {
@@ -4419,7 +4421,7 @@ struct KeyboardPanelPage final : public Component,
 
             // Create the Panel Buttons for Group 1
             col = 1;
-            for (int i = 0; i < (cbuttons - 1); ++i)
+            for (int i = 0; i < numberpresets; ++i)
             {
                 auto* pstb = addToList(new PresetButton());
 
@@ -4489,6 +4491,19 @@ struct KeyboardPanelPage final : public Component,
 
                 col++;
             }
+
+            auto* tbnextpreset = addToList(new PresetButton("Next"));
+            tbnextpreset->setClickingTogglesState(false);
+            tbnextpreset->setColour(TextButton::textColourOffId, Colours::white);
+            tbnextpreset->setColour(TextButton::textColourOnId, Colours::white);
+            tbnextpreset->setColour(TextButton::buttonColourId, Colours::black.darker());
+            tbnextpreset->setColour(TextButton::buttonOnColourId, Colours::antiquewhite);
+            tbnextpreset->setBounds(g10xoffset + mgroup + col * bwidth, ygroup + mgroup * 2, presetControlButtonWidth, bheight);
+            tbnextpreset->setConnectedEdges(Button::ConnectedOnLeft);
+            tbnextpreset->onClick = [=]()
+                {
+                    triggerNextPresetFromCurrentSelection();
+                };
         }   //End - Preset Button Group
 
         // --------------------------------------------------------------------
@@ -4689,7 +4704,7 @@ struct KeyboardPanelPage final : public Component,
         }   // End - Rotary Group
 
         // Quick Access Keyboard Buttons
-        int xaccess = 1020;
+        int xaccess = 1070;
         {
             if ((tabidx == PTLower) || (tabidx == PTBass)) {
                 auto* toUpperKBD = addToList(new CommandButton());
@@ -4705,7 +4720,7 @@ struct KeyboardPanelPage final : public Component,
                     {
                         tabs.setCurrentTabIndex(PTUpper, false);
                     };
-                xaccess = xaccess + 100;
+                xaccess = xaccess + 90;
             }
 
             if ((tabidx == PTUpper) || (tabidx == PTBass)) {
@@ -4722,7 +4737,7 @@ struct KeyboardPanelPage final : public Component,
                     {
                         tabs.setCurrentTabIndex(PTLower, false);
                     };
-                xaccess = xaccess + 100;
+                xaccess = xaccess + 90;
             }
 
             if ((tabidx == PTUpper) || (tabidx == PTLower)) {
@@ -4782,7 +4797,7 @@ struct KeyboardPanelPage final : public Component,
             tbSave->setColour(TextButton::textColourOnId, Colours::white);
             tbSave->setColour(TextButton::buttonColourId, Colours::black.darker());
             tbSave->setColour(TextButton::buttonOnColourId, Colours::black.brighter());
-            tbSave->setBounds(mgroup + 1240, 235, 80, 30);
+            tbSave->setBounds(mgroup + 1260, 235, 80, 30);
             tbSave->setToggleState(false, dontSendNotification);
             tbSave->onClick = [=]()
                 {
@@ -4817,7 +4832,7 @@ struct KeyboardPanelPage final : public Component,
             tbSaveAs->setColour(TextButton::textColourOnId, Colours::white);
             tbSaveAs->setColour(TextButton::buttonColourId, Colours::black.darker());
             tbSaveAs->setColour(TextButton::buttonOnColourId, Colours::black.brighter());
-            tbSaveAs->setBounds(mgroup + 1340, 235, 80, 30);
+            tbSaveAs->setBounds(mgroup + 1360, 235, 80, 30);
             tbSaveAs->setToggleState(false, dontSendNotification);
             tbSaveAs->onClick = [=]()
                 {
@@ -4912,7 +4927,7 @@ struct KeyboardPanelPage final : public Component,
         lblpanelfile = addToList(new Label("Panel File", appState.panelfname));
         lblpanelfile->setColour(juce::Label::textColourId, juce::Colours::grey);
         lblpanelfile->setJustificationType(juce::Justification::left);
-        lblpanelfile->setBounds(mgroup + 1240, 205, 200, 30);
+        lblpanelfile->setBounds(mgroup + 1260, 205, 200, 30);
 
     }   // End KeyboardManual Page Constructor
 
@@ -5331,6 +5346,11 @@ struct KeyboardPanelPage final : public Component,
     }
 
     /** Upper/Lower manual rotary from global hotkeys (works regardless of selected tab). */
+    void triggerNextPresetHotkey()
+    {
+        triggerNextPresetFromCurrentSelection();
+    }
+
     void triggerRotaryFastSlowHotkey()
     {
         if (currenttabidx == PTBass || tbrotslow == nullptr) return;
@@ -5348,6 +5368,23 @@ struct KeyboardPanelPage final : public Component,
     }
 
 private:
+    void triggerNextPresetFromCurrentSelection()
+    {
+        const int activePresetIdx = juce::jlimit(0, numberpresets - 1, instrumentpanel->panelpresets->getActivePresetIdx());
+        int nextPresetIdx = activePresetIdx + 1;
+
+        // Manual (0) jumps to Preset 1. Preset 6 wraps to Preset 1.
+        if (nextPresetIdx >= numberpresets || activePresetIdx == 0)
+            nextPresetIdx = 1;
+
+        if (nextPresetIdx < 0 || nextPresetIdx >= presetbuttons.size())
+            return;
+
+        auto* nextPresetButton = presetbuttons[nextPresetIdx]->getPresetButtonPtr();
+        if (nextPresetButton != nullptr)
+            nextPresetButton->triggerClick();
+    }
+
     /** Called from VoiceButton::mouseUp only for explicit user clicks on a voice button. */
     void registerExplicitVoiceSelection(int selectedPanelButtonIdx)
     {
@@ -7453,13 +7490,13 @@ public:
         lblconfigfileprefix.setColour(juce::Label::textColourId, juce::Colours::grey);
         lblconfigfileprefix.setJustificationType(juce::Justification::left);
         lblconfigfileprefix.setText("Config:", {});
-        lblconfigfileprefix.setBounds(kbPanelMargin + 1180, 205, 60, 30);
+        lblconfigfileprefix.setBounds(kbPanelMargin + 1200, 205, 60, 30);
 
         addAndMakeVisible(lblconfigfile);
         lblconfigfile.setColour(juce::Label::textColourId, juce::Colours::grey);
         lblconfigfile.setJustificationType(juce::Justification::left);
         // Align with panel filename label on Upper/Lower/Bass (mgroup + 1240, 205, 200x30).
-        lblconfigfile.setBounds(kbPanelMargin + 1240, 205, 200, 30);
+        lblconfigfile.setBounds(kbPanelMargin + 1260, 205, 200, 30);
 
         // Quick Access Keyboard Buttons
         int xaccess = 820;
@@ -7574,7 +7611,7 @@ public:
         saveButton.setColour(TextButton::textColourOnId, Colours::white);
         saveButton.setColour(TextButton::buttonColourId, Colours::black.darker());
         saveButton.setColour(TextButton::buttonOnColourId, Colours::black.brighter());
-        saveButton.setBounds(kbPanelMargin + 1240, 235, 80, 30);
+        saveButton.setBounds(kbPanelMargin + 1260, 235, 80, 30);
         setConfigSaveButtonEnabled(false);
         saveButton.onClick = [this]() {
             handleConfigSaveRequest(saveButton);
@@ -7586,7 +7623,7 @@ public:
         saveAsButton.setColour(TextButton::textColourOnId, Colours::white);
         saveAsButton.setColour(TextButton::buttonColourId, Colours::black.darker());
         saveAsButton.setColour(TextButton::buttonOnColourId, Colours::black.brighter());
-        saveAsButton.setBounds(kbPanelMargin + 1340, 235, 80, 30);
+        saveAsButton.setBounds(kbPanelMargin + 1360, 235, 80, 30);
         saveAsButton.setToggleState(false, dontSendNotification);
         saveAsButton.onClick = [this]() {
             File fileToSave = File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
@@ -8725,6 +8762,18 @@ public:
             kbForLoad->loadPreset(pstidx);
     }
 
+    void triggerNextPresetHotkey()
+    {
+        for (int i = 0; i < getNumTabs(); ++i)
+        {
+            if (auto* k = dynamic_cast<KeyboardPanelPage*>(getTabContentComponent(i)))
+            {
+                k->triggerNextPresetHotkey();
+                break;
+            }
+        }
+    }
+
     void triggerUpperRotaryFastSlowHotkey()
     {
         if (auto* k = dynamic_cast<KeyboardPanelPage*>(getTabContentComponent(PTUpper)))
@@ -9083,6 +9132,7 @@ public:
         keyTarget.onTabEffects = [this] { tabs.setCurrentTabIndex(PTEffects, true); };
         keyTarget.onVoiceEditTabHotkeysAllowed = [this] { return tabs.canOpenVoiceEditTabs(); };
         keyTarget.onPresetRecall = [this](int idx) { tabs.recallPresetFromHotkey(idx); };
+        keyTarget.onPresetNext = [this] { tabs.triggerNextPresetHotkey(); };
         keyTarget.onUpperRotaryFastSlow = [this] { tabs.triggerUpperRotaryFastSlowHotkey(); };
         keyTarget.onUpperRotaryBrake = [this] { tabs.triggerUpperRotaryBrakeHotkey(); };
         keyTarget.onLowerRotaryFastSlow = [this] { tabs.triggerLowerRotaryFastSlowHotkey(); };

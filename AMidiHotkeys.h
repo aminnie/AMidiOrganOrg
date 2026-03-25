@@ -249,6 +249,7 @@ namespace hotkeyUiDetail
         "Preset 4",
         "Preset 5",
         "Preset 6",
+        "Next preset",
         "Upper rotary Fast/Slow",
         "Upper rotary Brake",
         "Lower rotary Fast/Slow",
