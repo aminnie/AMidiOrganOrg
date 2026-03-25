@@ -4762,34 +4762,6 @@ struct KeyboardPanelPage final : public Component,
         // Instrument Panel Save and Save As Buttons
         if ((tabidx != PTUpper) || (tabidx != PTLower) || (tabidx != PTBass))
         {
-            auto* tbExit = addToList(new CommandButton());
-            tbExit->setButtonText("Exit");
-            tbExit->setColour(TextButton::textColourOffId, Colours::white);
-            tbExit->setColour(TextButton::textColourOnId, Colours::white);
-            tbExit->setColour(TextButton::buttonColourId, Colours::black.darker());
-            tbExit->setColour(TextButton::buttonOnColourId, Colours::black.brighter());
-            tbExit->setBounds(1350, 235, 80, 30);
-            tbExit->setToggleState(false, dontSendNotification);
-            tbExit->onClick = [=]()
-                {
-                    if (auto* topLevel = getTopLevelComponent())
-                    {
-                        auto safeTop = juce::Component::SafePointer<juce::Component>(topLevel);
-                        juce::MessageManager::callAsync([safeTop]()
-                            {
-                                if (safeTop != nullptr)
-                                    safeTop->userTriedToCloseWindow();
-                            });
-                    }
-                    else if (auto* app = juce::JUCEApplication::getInstance())
-                    {
-                        juce::MessageManager::callAsync([app]()
-                            {
-                                app->systemRequestedQuit();
-                            });
-                    }
-                };
-
             auto* tbSave = addToList(new CommandButton());
             cbSave = tbSave;
             tbSave->setButtonText("Save");
