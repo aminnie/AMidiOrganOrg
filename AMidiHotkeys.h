@@ -310,7 +310,7 @@ public:
 
         const juce::Colour tabBg = findColour(juce::ResizableWindow::backgroundColourId);
 
-        mainGroup.setColour(juce::GroupComponent::outlineColourId, juce::Colours::grey.darker());
+        mainGroup.setColour(juce::GroupComponent::outlineColourId, juce::Colours::yellow.darker(0.45f));
         addAndMakeVisible(mainGroup);
 
         viewport.setScrollBarsShown(true, false);

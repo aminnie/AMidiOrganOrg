@@ -6824,7 +6824,7 @@ public:
 
     void paint(juce::Graphics& g) override
     {
-        g.fillAll(juce::Colour(0xff141414));
+        g.fillAll(findColour(juce::ResizableWindow::backgroundColourId));
 
         g.setColour(juce::Colours::grey.withAlpha(0.45f));
         g.drawRect(getLocalBounds(), 1);
