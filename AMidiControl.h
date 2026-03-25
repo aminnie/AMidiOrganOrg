@@ -6826,7 +6826,7 @@ public:
     {
         g.fillAll(findColour(juce::ResizableWindow::backgroundColourId));
 
-        g.setColour(juce::Colours::grey.withAlpha(0.45f));
+        g.setColour(juce::Colours::grey.withAlpha(0.22f));
         g.drawRect(getLocalBounds(), 1);
 
         layout.draw(g, juce::Rectangle<float>(8.0f, 8.0f, (float)getWidth() - 16.0f, (float)getHeight() - 16.0f));
