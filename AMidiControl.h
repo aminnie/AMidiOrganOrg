@@ -2702,7 +2702,7 @@ struct KeyboardPanelPage final : public Component,
         //statusLabel->setColour(juce::Label::backgroundColourId, juce::Colours::black);
         statusLabel->setColour(juce::Label::textColourId, juce::Colours::grey);
         statusLabel->setJustificationType(juce::Justification::left);
-        statusLabel->setBounds(1250, 185, 200, 20);
+        statusLabel->setBounds(mgroup + 1260, 185, 200, 20);
 
         int g1width, g2width, g3width, g4width;
         int g1widthfull;
@@ -4401,6 +4401,7 @@ struct KeyboardPanelPage final : public Component,
             tbsetpreset->setColour(TextButton::textColourOnId, Colours::black);
             tbsetpreset->setColour(TextButton::buttonColourId, Colours::black.darker());
             tbsetpreset->setColour(TextButton::buttonOnColourId, Colours::antiquewhite);
+            tbsetpreset->setTooltip("Toggle Set mode to store changes into the selected preset.");
             tbsetpreset->setBounds(g10xoffset + mgroup + col * bwidth, ygroup + mgroup * 2, presetControlButtonWidth, bheight);
             tbsetpreset->setConnectedEdges(Button::ConnectedOnRight);
             tbsetpreset->onClick = [=]()
@@ -4498,6 +4499,7 @@ struct KeyboardPanelPage final : public Component,
             tbnextpreset->setColour(TextButton::textColourOnId, Colours::white);
             tbnextpreset->setColour(TextButton::buttonColourId, Colours::black.darker());
             tbnextpreset->setColour(TextButton::buttonOnColourId, Colours::antiquewhite);
+            tbnextpreset->setTooltip("Advance to the next preset (Manual and Preset 6 both go to Preset 1).");
             tbnextpreset->setBounds(g10xoffset + mgroup + col * bwidth, ygroup + mgroup * 2, presetControlButtonWidth, bheight);
             tbnextpreset->setConnectedEdges(Button::ConnectedOnLeft);
             tbnextpreset->onClick = [=]()
@@ -4714,6 +4716,7 @@ struct KeyboardPanelPage final : public Component,
                 toUpperKBD->setColour(TextButton::textColourOnId, Colours::white);
                 toUpperKBD->setColour(TextButton::buttonColourId, Colours::white);
                 toUpperKBD->setColour(TextButton::buttonOnColourId, Colours::black.brighter());
+                toUpperKBD->setTooltip("Switch to the Upper tab.");
                 toUpperKBD->setBounds(mgroup + xaccess, ygroup + mgroup * 2, 80, 50);
                 toUpperKBD->setToggleState(true, dontSendNotification);
                 toUpperKBD->onClick = [=, &tabs]()
@@ -4731,6 +4734,7 @@ struct KeyboardPanelPage final : public Component,
                 toLowerKBD->setColour(TextButton::textColourOnId, Colours::white);
                 toLowerKBD->setColour(TextButton::buttonColourId, Colours::white);
                 toLowerKBD->setColour(TextButton::buttonOnColourId, Colours::black.brighter());
+                toLowerKBD->setTooltip("Switch to the Lower tab.");
                 toLowerKBD->setBounds(mgroup + xaccess, ygroup + mgroup * 2, 80, 50);
                 toLowerKBD->setToggleState(true, dontSendNotification);
                 toLowerKBD->onClick = [=, &tabs]()
@@ -4748,6 +4752,7 @@ struct KeyboardPanelPage final : public Component,
                 toBassKBD->setColour(TextButton::textColourOnId, Colours::white);
                 toBassKBD->setColour(TextButton::buttonColourId, Colours::white);
                 toBassKBD->setColour(TextButton::buttonOnColourId, Colours::black.brighter());
+                toBassKBD->setTooltip("Switch to the Bass&Drums tab.");
                 toBassKBD->setBounds(mgroup + xaccess, ygroup + mgroup * 2, 80, 50);
                 toBassKBD->setToggleState(true, dontSendNotification);
                 toBassKBD->onClick = [=, &tabs]()
@@ -4769,6 +4774,7 @@ struct KeyboardPanelPage final : public Component,
             tbSave->setColour(TextButton::textColourOnId, Colours::white);
             tbSave->setColour(TextButton::buttonColourId, Colours::black.darker());
             tbSave->setColour(TextButton::buttonOnColourId, Colours::black.brighter());
+            tbSave->setTooltip("Save the current panel to the existing file.");
             tbSave->setBounds(mgroup + 1260, 235, 80, 30);
             tbSave->setToggleState(false, dontSendNotification);
             tbSave->onClick = [=]()
@@ -4804,6 +4810,7 @@ struct KeyboardPanelPage final : public Component,
             tbSaveAs->setColour(TextButton::textColourOnId, Colours::white);
             tbSaveAs->setColour(TextButton::buttonColourId, Colours::black.darker());
             tbSaveAs->setColour(TextButton::buttonOnColourId, Colours::black.brighter());
+            tbSaveAs->setTooltip("Save the current panel to a new file name.");
             tbSaveAs->setBounds(mgroup + 1360, 235, 80, 30);
             tbSaveAs->setToggleState(false, dontSendNotification);
             tbSaveAs->onClick = [=]()
@@ -4899,7 +4906,9 @@ struct KeyboardPanelPage final : public Component,
         lblpanelfile = addToList(new Label("Panel File", appState.panelfname));
         lblpanelfile->setColour(juce::Label::textColourId, juce::Colours::grey);
         lblpanelfile->setJustificationType(juce::Justification::left);
+        lblpanelfile->setMinimumHorizontalScale(0.8f);
         lblpanelfile->setBounds(mgroup + 1260, 205, 200, 30);
+        updatePanelFileStatusLabel();
 
     }   // End KeyboardManual Page Constructor
 
@@ -5203,7 +5212,7 @@ struct KeyboardPanelPage final : public Component,
             appState.configchanged = false;
         }
 
-        lblpanelfile->setText(appState.panelfname, {});
+        updatePanelFileStatusLabel();
         refreshPanelSaveAvailability();
     }
 
@@ -5340,6 +5349,15 @@ struct KeyboardPanelPage final : public Component,
     }
 
 private:
+    void updatePanelFileStatusLabel()
+    {
+        if (lblpanelfile == nullptr)
+            return;
+
+        lblpanelfile->setText("Panel: " + appState.panelfname, juce::dontSendNotification);
+        lblpanelfile->setTooltip(appState.panelfullpathname);
+    }
+
     void triggerNextPresetFromCurrentSelection()
     {
         const int activePresetIdx = juce::jlimit(0, numberpresets - 1, instrumentpanel->panelpresets->getActivePresetIdx());
@@ -6976,7 +6994,7 @@ public:
 
         // 1. Load the system Confg from disk - mostly Button Group IO mappings 
         loadConfigs(appState.configfname);
-        lblconfigfile.setText(appState.configfname, {});
+        updateConfigFileStatusLabel();
 
         captureModuleIdxBaselineFromPanel();
 
@@ -7467,8 +7485,10 @@ public:
         addAndMakeVisible(lblconfigfile);
         lblconfigfile.setColour(juce::Label::textColourId, juce::Colours::grey);
         lblconfigfile.setJustificationType(juce::Justification::left);
+        lblconfigfile.setMinimumHorizontalScale(0.8f);
         // Align with panel filename label on Upper/Lower/Bass (mgroup + 1240, 205, 200x30).
         lblconfigfile.setBounds(kbPanelMargin + 1260, 205, 200, 30);
+        updateConfigFileStatusLabel();
 
         // Quick Access Keyboard Buttons
         int xaccess = 820;
@@ -7583,6 +7603,7 @@ public:
         saveButton.setColour(TextButton::textColourOnId, Colours::white);
         saveButton.setColour(TextButton::buttonColourId, Colours::black.darker());
         saveButton.setColour(TextButton::buttonOnColourId, Colours::black.brighter());
+        saveButton.setTooltip("Save the current config to the existing file.");
         saveButton.setBounds(kbPanelMargin + 1260, 235, 80, 30);
         setConfigSaveButtonEnabled(false);
         saveButton.onClick = [this]() {
@@ -7595,6 +7616,7 @@ public:
         saveAsButton.setColour(TextButton::textColourOnId, Colours::white);
         saveAsButton.setColour(TextButton::buttonColourId, Colours::black.darker());
         saveAsButton.setColour(TextButton::buttonOnColourId, Colours::black.brighter());
+        saveAsButton.setTooltip("Save the current config under a new file name.");
         saveAsButton.setBounds(kbPanelMargin + 1360, 235, 80, 30);
         saveAsButton.setToggleState(false, dontSendNotification);
         saveAsButton.onClick = [this]() {
@@ -7639,7 +7661,7 @@ public:
                         if (selconfigfname == previousConfigFname)
                         {
                             handleConfigSaveRequest(saveAsButton);
-                            lblconfigfile.setText(appState.configfname, {});
+                            updateConfigFileStatusLabel();
                             return;
                         }
 
@@ -7667,7 +7689,7 @@ public:
                         ////statusLabel->setText("Empty file name save! " + appState.configfname, juce::dontSendNotification);
                     }
 
-                    lblconfigfile.setText(appState.configfname, {});
+                    updateConfigFileStatusLabel();
                 });
         };
     }
@@ -7693,7 +7715,7 @@ public:
             return false;
 
         appState.configfname = basename;
-        lblconfigfile.setText(appState.configfname, {});
+        updateConfigFileStatusLabel();
         appState.configchanged = true;
         comboConfig.setSelectedId(1);
         captureModuleIdxBaselineFromPanel();
@@ -7745,6 +7767,12 @@ private:
     juce::Label statusLabel;
 
     std::array<int, numberbuttongroups> cfgModuleIdxBaseline{};
+
+    void updateConfigFileStatusLabel()
+    {
+        lblconfigfile.setText(appState.configfname, juce::dontSendNotification);
+        lblconfigfile.setTooltip(appState.configfname);
+    }
 
     void captureModuleIdxBaselineFromPanel()
     {

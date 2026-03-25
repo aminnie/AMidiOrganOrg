@@ -408,7 +408,7 @@ private:
     juce::ApplicationCommandManager& commandManager;
     KeyPressTarget& keyTarget;
 
-    juce::GroupComponent mainGroup { "hotkeysGroup", "Keyboard shortcuts" };
+    juce::GroupComponent mainGroup { "hotkeysGroup", "Keyboard Shortcuts" };
     juce::Viewport viewport;
     HotkeyScrollContent content;
     std::vector<std::unique_ptr<juce::Label>> labels;

@@ -78,3 +78,17 @@ Phase 1 bindings and focus behavior are documented in `README.md`. Optional late
 - [ ] Hotkeys for tabs not yet covered (e.g. Start, Config, Help) and policy for Exit / app quit.
 - [ ] Per–button-group mute shortcuts (12 groups).
 - [ ] Broader “shortcuts enabled” toggle or conflict editor if global vs. control focus remains awkward.
+
+## UI polish roadmap (new)
+
+### Polish Pass 1 (implemented)
+- [x] Remove overlapping keyboard-tab `Exit` control near `Save` / `Save As`.
+- [x] Standardize Presets row controls so `Set` and `Next` use the same width and visual weight.
+- [x] Add contextual tooltips for key actions (`Set`, `Next`, `Save`, `Save As`, and tab quick-navigation buttons).
+- [x] Improve file-status readability by adding status-label scaling and explicit status text/tooltips for panel/config filenames.
+
+### Polish Pass 2 (proposal)
+- [ ] Normalize horizontal spacing/gutters across all action rows (Start, Keyboard, Sounds, Effects, Config).
+- [ ] Standardize section heading contrast and label font hierarchy for faster visual scan.
+- [ ] Group Hotkeys rows visually by function clusters (tabs, presets, rotary) without changing bindings.
+- [ ] Add consistent disabled-state tooltip language across guarded tabs/actions.
