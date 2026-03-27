@@ -5839,6 +5839,8 @@ public:
                                     return;
                                 }
                                 const bool bloaded = loadConfigFromBasename(selectedfname);
+                                if (bloaded)
+                                    saveLastSessionStateToFile(appState);
                                 refreshConfigLabel();
                                 const String msgloaded = bloaded ? ("Loaded: " + appState.configfname)
                                     : ("Load failed: " + selectedfname);
@@ -5876,6 +5878,8 @@ public:
                                     if (!safeStart->loadConfigFromBasename)
                                         return;
                                     const bool bloaded = safeStart->loadConfigFromBasename(selectedfname);
+                                    if (bloaded)
+                                        saveLastSessionStateToFile(safeStart->appState);
                                     safeStart->appState.configreload = (safeStart->appState.configfname.compare(safeStart->appState.pnlconfigfname) != 0);
                                     safeStart->configfileLabel.setText(safeStart->appState.configfname, {});
                                     if (safeStart->appState.configreload == true)
@@ -6163,6 +6167,8 @@ public:
         DBG("=== MidiStartPage(): Destructor " + std::to_string(--zinstcntMidiStartPage));
 
         saveStickyMidiPortsToDisk();
+        if (!saveLastSessionStateToFile(appState))
+            juce::Logger::writeToLog("*** MidiStartPage: could not save last_session.json");
 
         // Disconnect device-change callback before tearing down controls/state.
         connection.reset();
@@ -6341,6 +6347,9 @@ private:
                 else
                     msgloaded = "Panel load failed: " + appState.panelfname;
 
+                if (bloaded)
+                    saveLastSessionStateToFile(appState);
+
                 if (TextButton* focused = &loadPanelButton)
                     BubbleMessage(*focused, msgloaded, this->bubbleMessage);
 
@@ -6402,6 +6411,8 @@ private:
                         msgloaded = "Loaded panel:\n " + safeStart->appState.panelfname;
                     else
                         msgloaded = "Panel load failed: " + safeStart->appState.panelfname;
+                    if (bloaded)
+                        saveLastSessionStateToFile(safeStart->appState);
                     if (juce::TextButton* focused = &safeStart->loadPanelButton)
                         BubbleMessage(*focused, msgloaded, safeStart->bubbleMessage);
                     safeStart->panelfileLabel.setText(safeStart->appState.panelfname, {});
@@ -9134,6 +9145,9 @@ public:
         juce::Logger::writeToLog("== MenuTabs(): Constructor ");
 
         auto colour = findColour (ResizableWindow::backgroundColourId);
+
+        // Restore last used panel/config before constructing pages so Start + Config stay in sync.
+        loadLastSessionStateFromFile(getAppState());
 
         std::function<void()> refreshKbPanelSaves = [this]()
             {

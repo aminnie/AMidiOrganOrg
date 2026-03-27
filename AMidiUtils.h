@@ -249,6 +249,69 @@ inline bool saveMidiStickyDeviceIdentifiersToFile(const juce::StringArray& input
     return f.replaceWithText(txt);
 }
 
+/** Last used startup session state (`configs/last_session.json`). */
+inline juce::File getLastSessionStateFile()
+{
+    juce::File dir = getOrganUserDocumentsRoot().getChildFile(getAppState().configdir);
+    if (!dir.isDirectory())
+        dir.createDirectory();
+    return dir.getChildFile("last_session.json");
+}
+
+/** Restores last used panel/config basenames if those files still exist. */
+inline void loadLastSessionStateFromFile(AppState& state)
+{
+    const juce::File f = getLastSessionStateFile();
+    if (!f.existsAsFile())
+        return;
+
+    juce::FileInputStream in(f);
+    if (!in.openedOk())
+        return;
+
+    const juce::var parsed = juce::JSON::parse(in.readEntireStreamAsString());
+    auto* obj = parsed.getDynamicObject();
+    if (obj == nullptr)
+        return;
+
+    const juce::String panelFile = obj->getProperty("panelFile").toString().trim();
+    if (panelFile.isNotEmpty())
+    {
+        const juce::File resolvedPanel = getDefaultPanelsDirectory().getChildFile(panelFile);
+        if (resolvedPanel.existsAsFile())
+        {
+            state.panelfname = panelFile;
+            state.panelfullpathname = {};
+        }
+    }
+
+    const juce::String configFile = obj->getProperty("configFile").toString().trim();
+    if (configFile.isNotEmpty())
+    {
+        const juce::File resolvedConfig = getOrganUserDocumentsRoot()
+            .getChildFile(state.configdir)
+            .getChildFile(configFile);
+        if (resolvedConfig.existsAsFile())
+            state.configfname = configFile;
+    }
+}
+
+/** Saves last used panel/config basenames for startup restore. */
+inline bool saveLastSessionStateToFile(const AppState& state)
+{
+    const juce::File f = getLastSessionStateFile();
+    if (!f.getParentDirectory().createDirectory())
+        return false;
+
+    const juce::String panelJson = juce::JSON::toString(juce::var(state.panelfname), false);
+    const juce::String configJson = juce::JSON::toString(juce::var(state.configfname), false);
+    const juce::String txt = "{\n"
+                             "  \"panelFile\": " + panelJson + ",\n"
+                             "  \"configFile\": " + configJson + "\n"
+                             "}\n";
+    return f.replaceWithText(txt);
+}
+
 // Volume model helpers
 static int sliderStepToMasterCc7(int sliderStep)
 {
