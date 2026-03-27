@@ -7126,7 +7126,7 @@ public:
         monitorTextArea.setTextToShowWhenEmpty("Enable monitoring to see outgoing MIDI messages.", juce::Colours::grey);
 
         addAndMakeVisible(startOctaveLabel);
-        startOctaveLabel.setText("Start Octave", juce::dontSendNotification);
+        startOctaveLabel.setText("Octave", juce::dontSendNotification);
         startOctaveLabel.setJustificationType(juce::Justification::centredLeft);
 
         addAndMakeVisible(startOctaveCombo);
@@ -7241,7 +7241,7 @@ private:
     {
         const int selectedOctave = juce::jlimit(1, 8, startOctaveCombo.getSelectedId());
         const int startNote = juce::jlimit(0, 127, (selectedOctave + 1) * 12);
-        const int endNote = juce::jlimit(0, 127, startNote + 47);
+        const int endNote = juce::jlimit(0, 127, startNote + 71);
         monitorKeyboard.setAvailableRange(startNote, endNote);
     }
 
@@ -7357,7 +7357,7 @@ private:
     juce::TextButton enableButton{ "Enable" };
     juce::TextButton clearButton{ "Clear" };
     juce::TextEditor monitorTextArea;
-    juce::Label startOctaveLabel{ "startOctaveLabel", "Start Octave" };
+    juce::Label startOctaveLabel{ "startOctaveLabel", "Octave" };
     juce::ComboBox startOctaveCombo;
     juce::Label midiChannelLabel{ "midiChannelLabel", "MIDI Channel" };
     juce::ComboBox midiChannelCombo;
@@ -7828,7 +7828,7 @@ public:
         loadConfigButton.setColour(TextButton::textColourOnId, Colours::white);
         loadConfigButton.setColour(TextButton::buttonColourId, Colours::black.darker());
         loadConfigButton.setColour(TextButton::buttonOnColourId, Colours::black.brighter());
-        loadConfigButton.setBounds(1140, 235, 80, 30);
+        loadConfigButton.setBounds(1140, 235, 106, 30);
         loadConfigButton.setToggleState(false, dontSendNotification);
         loadConfigButton.onClick = [=]()
             {
@@ -7929,14 +7929,14 @@ public:
         lblconfigfileprefix.setColour(juce::Label::textColourId, juce::Colours::grey);
         lblconfigfileprefix.setJustificationType(juce::Justification::left);
         lblconfigfileprefix.setText("Config:", {});
-        lblconfigfileprefix.setBounds(kbPanelMargin + 1200, 205, 60, 30);
+        lblconfigfileprefix.setBounds(kbPanelMargin + 1260, 205, 60, 30);
 
         addAndMakeVisible(lblconfigfile);
         lblconfigfile.setColour(juce::Label::textColourId, juce::Colours::grey);
         lblconfigfile.setJustificationType(juce::Justification::left);
         lblconfigfile.setMinimumHorizontalScale(0.8f);
         // Align with panel filename label on Upper/Lower/Bass (mgroup + 1240, 205, 200x30).
-        lblconfigfile.setBounds(kbPanelMargin + 1260, 205, 200, 30);
+        lblconfigfile.setBounds(kbPanelMargin + 1320, 205, 140, 30);
         updateConfigFileStatusLabel();
 
         // Quick Access Keyboard Buttons
