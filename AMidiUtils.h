@@ -553,6 +553,7 @@ enum KeyPressCommandIDs {
     btnTabBass = 3,
     btnTabSounds = 4,
     btnTabEffects = 5,
+    btnTabMonitor = 6,
     btnPreset0 = 10,
     btnPreset1 = 11,
     btnPreset2 = 12,
@@ -567,7 +568,7 @@ enum KeyPressCommandIDs {
     btnLowerRotaryBrake = 23
 };
 
-constexpr int kNumHotkeyCommands = 17;
+constexpr int kNumHotkeyCommands = 18;
 
 inline constexpr std::array<KeyPressCommandIDs, kNumHotkeyCommands> kHotkeyCommandOrder = {
     KeyPressCommandIDs::btnTabUpper,
@@ -575,6 +576,7 @@ inline constexpr std::array<KeyPressCommandIDs, kNumHotkeyCommands> kHotkeyComma
     KeyPressCommandIDs::btnTabBass,
     KeyPressCommandIDs::btnTabSounds,
     KeyPressCommandIDs::btnTabEffects,
+    KeyPressCommandIDs::btnTabMonitor,
     KeyPressCommandIDs::btnPreset0,
     KeyPressCommandIDs::btnPreset1,
     KeyPressCommandIDs::btnPreset2,
@@ -616,18 +618,19 @@ inline HotkeyBindings HotkeyBindings::withDefaults()
     b.keys[2] = L'd';
     b.keys[3] = L'z';
     b.keys[4] = L'x';
-    b.keys[5] = L'0';
-    b.keys[6] = L'1';
-    b.keys[7] = L'2';
-    b.keys[8] = L'3';
-    b.keys[9] = L'4';
-    b.keys[10] = L'5';
-    b.keys[11] = L'6';
-    b.keys[12] = L'7';
-    b.keys[13] = L'f';
-    b.keys[14] = L'b';
-    b.keys[15] = L'g';
-    b.keys[16] = L'n';
+    b.keys[5] = L'm';
+    b.keys[6] = L'0';
+    b.keys[7] = L'1';
+    b.keys[8] = L'2';
+    b.keys[9] = L'3';
+    b.keys[10] = L'4';
+    b.keys[11] = L'5';
+    b.keys[12] = L'6';
+    b.keys[13] = L'7';
+    b.keys[14] = L'f';
+    b.keys[15] = L'b';
+    b.keys[16] = L'g';
+    b.keys[17] = L'n';
     return b;
 }
 
@@ -668,6 +671,7 @@ public:
             KeyPressCommandIDs::btnTabBass,
             KeyPressCommandIDs::btnTabSounds,
             KeyPressCommandIDs::btnTabEffects,
+            KeyPressCommandIDs::btnTabMonitor,
             KeyPressCommandIDs::btnPreset0,
             KeyPressCommandIDs::btnPreset1,
             KeyPressCommandIDs::btnPreset2,
@@ -709,6 +713,9 @@ public:
                 break;
             case KeyPressCommandIDs::btnTabEffects:
                 addShortcutInfo("Effects tab", "Show Effects tab");
+                break;
+            case KeyPressCommandIDs::btnTabMonitor:
+                addShortcutInfo("Monitor tab", "Show Monitor tab");
                 break;
             case KeyPressCommandIDs::btnPreset0:
                 addShortcutInfo("Manual preset", "Recall Manual preset");
@@ -779,6 +786,10 @@ public:
                 if (onTabEffects) onTabEffects();
                 else return false;
                 break;
+            case KeyPressCommandIDs::btnTabMonitor:
+                if (onTabMonitor) onTabMonitor();
+                else return false;
+                break;
             case KeyPressCommandIDs::btnPreset0:
                 if (onPresetRecall) onPresetRecall(0);
                 else return false;
@@ -839,6 +850,7 @@ public:
     std::function<void()> onTabBass;
     std::function<void()> onTabSounds;
     std::function<void()> onTabEffects;
+    std::function<void()> onTabMonitor;
     /** If set, Sounds/Effects tab hotkeys are ignored when this returns false (e.g. no voice selected yet). */
     std::function<bool()> onVoiceEditTabHotkeysAllowed;
     std::function<void(int)> onPresetRecall;

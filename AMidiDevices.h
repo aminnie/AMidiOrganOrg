@@ -281,20 +281,11 @@ public:
         if (testSendHook)
             testSendHook(msg);
 
-        std::function<void(const MidiMessage&)> monitorHookCopy;
+        std::function<void(const MidiMessage&, const juce::String&)> monitorHookCopy;
         {
             const juce::SpinLock::ScopedLockType hookLock(outgoingMonitorHookLock);
             monitorHookCopy = outgoingMonitorHook;
         }
-        if (monitorHookCopy)
-            monitorHookCopy(msg);
-
-        // Send msg to all active Outputs
-        //for (auto midiOutput : midiOutputs) {
-        //    if (midiOutput->outDevice != nullptr) {
-        //        midiOutput->outDevice->sendMessageNow(msg);
-        //    }
-        //}
 
         // Route Midi Message to appropriate channel
         int outchan = msg.getChannel();
@@ -302,7 +293,14 @@ public:
         if (outchan < 17)
             outmodidx = moduleout[outchan];
 
-        if (outmodidx < midiOutputs.size()) {
+        juce::String routedModuleName;
+        if (outmodidx >= 0 && outmodidx < midiOutputs.size())
+            routedModuleName = midiOutputs[outmodidx]->deviceInfo.name;
+
+        if (monitorHookCopy)
+            monitorHookCopy(msg, routedModuleName);
+
+        if (outmodidx >= 0 && outmodidx < midiOutputs.size()) {
             if (midiOutputs[outmodidx]->outDevice.get() != nullptr) {
                 midiOutputs[outmodidx]->outDevice->sendMessageNow(msg);
 
@@ -320,7 +318,7 @@ public:
         }
     }
 
-    void setOutgoingMidiMonitor(std::function<void(const MidiMessage&)> hook)
+    void setOutgoingMidiMonitor(std::function<void(const MidiMessage&, const juce::String&)> hook)
     {
         const juce::SpinLock::ScopedLockType hookLock(outgoingMonitorHookLock);
         outgoingMonitorHook = std::move(hook);
@@ -408,7 +406,7 @@ public:
     // Test hook for observing emitted output messages without hardware.
     std::function<void(const MidiMessage&)> testSendHook;
     juce::SpinLock outgoingMonitorHookLock;
-    std::function<void(const MidiMessage&)> outgoingMonitorHook;
+    std::function<void(const MidiMessage&, const juce::String&)> outgoingMonitorHook;
 
     //==============================================================================
     ReferenceCountedArray<MidiDeviceListEntry> midiInputs, midiOutputs;

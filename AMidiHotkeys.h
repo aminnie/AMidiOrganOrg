@@ -242,6 +242,7 @@ namespace hotkeyUiDetail
         "Bass tab",
         "Sounds tab",
         "Effects tab",
+        "Monitor tab",
         "Manual preset",
         "Preset 1",
         "Preset 2",

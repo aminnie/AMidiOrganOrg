@@ -352,6 +352,7 @@ struct ButtonGroup final : Component
     // Default Midi instrument module associated with Button Group.
     // To do: Support different midi out module by Button Group
     int moduleidx = 1;
+    String modulealias = "";
 
     int midikeyboard = KBDUPPER;
     String groupname = "Organ";
@@ -782,6 +783,7 @@ public:
             }
         }
 
+        appState.panelfname = panelFileName;
         appState.panelfullpathname = File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
             .getChildFile(organdir)
             .getChildFile(appState.paneldir)
@@ -848,6 +850,7 @@ public:
             }
         }
 
+        appState.panelfname = outputFile.getFileName();
         appState.panelfullpathname = outputFile.getFullPathName();
 
         appState.pnlconfigfname = appState.configfname;
@@ -2742,12 +2745,8 @@ struct KeyboardPanelPage final : public Component,
             // Load Button Group Details
             ButtonGroup* ptrbuttongroup = instrumentpanel->getButtonGroup(buttongroupidx);
             String buttongroupname = ptrbuttongroup->groupname;
-            int buttongroupmidiin = ptrbuttongroup->midiin;
             int buttongroupmidiout = ptrbuttongroup->midiout;
-            String buttongrouptitle = buttongroupname 
-                + " [In:" + std::to_string(buttongroupmidiin) 
-                + " | Out:" + std::to_string(buttongroupmidiout) 
-                + "]";
+            String buttongrouptitle = formatButtonGroupTitle(*ptrbuttongroup, false);
 
             // Create G1 volume slider so if can be referenced by the buttons.
             auto* g1svol = addToList(createVolSlider(false));
@@ -3130,12 +3129,8 @@ struct KeyboardPanelPage final : public Component,
             // Load Button Group Details
             ButtonGroup* ptrbuttongroup = instrumentpanel->getButtonGroup(buttongroupidx);
             String buttongroupname = ptrbuttongroup->groupname;
-            int buttongroupmidiin = ptrbuttongroup->midiin;
             int buttongroupmidiout = ptrbuttongroup->midiout;
-            String buttongrouptitle = buttongroupname 
-                + " [In:" + std::to_string(buttongroupmidiin) 
-                + " | Out:" + std::to_string(buttongroupmidiout) 
-                + "]";
+            String buttongrouptitle = formatButtonGroupTitle(*ptrbuttongroup, false);
 
             // Create the Group Volume slider as it is referenced by the Voice Buttons
             auto* g2svol = addToList(createVolSlider(false));
@@ -3510,12 +3505,8 @@ struct KeyboardPanelPage final : public Component,
             // Load Button Group Details
             ButtonGroup* ptrbuttongroup = instrumentpanel->getButtonGroup(buttongroupidx);
             String buttongroupname = ptrbuttongroup->groupname;
-            int buttongroupmidiin = ptrbuttongroup->midiin;
             int buttongroupmidiout = ptrbuttongroup->midiout;
-            String buttongrouptitle = buttongroupname 
-                + " [In:" + std::to_string(buttongroupmidiin) 
-                + " | Out:" + std::to_string(buttongroupmidiout) 
-                + "]";
+            String buttongrouptitle = formatButtonGroupTitle(*ptrbuttongroup, false);
 
             // Create the Group Volume slider as it is referenced by the Voice Buttons
             auto* g3svol = addToList(createVolSlider(false));
@@ -3893,23 +3884,8 @@ struct KeyboardPanelPage final : public Component,
             // Load Button Group Details
             ButtonGroup* ptrbuttongroup = instrumentpanel->getButtonGroup(buttongroupidx);
             String buttongroupname = ptrbuttongroup->groupname;
-            int buttongroupmidiin = ptrbuttongroup->midiin;
             int buttongroupmidiout = ptrbuttongroup->midiout;
-            String buttongroupsplitname = ptrbuttongroup->splitoutname;
-            String buttongrouptitle;
-            if (tabidx == PTBass) {
-                buttongrouptitle = buttongroupname
-                    + " [In:" + std::to_string(buttongroupmidiin)
-                    + " | Out:" + std::to_string(buttongroupmidiout)
-                    + "]";
-            }
-            else {
-                buttongrouptitle = buttongroupname
-                    + " [In:" + std::to_string(buttongroupmidiin)
-                    + " | Out:" + std::to_string(buttongroupmidiout)
-                    + " | Spl:" + buttongroupsplitname
-                    + "]";
-            }
+            String buttongrouptitle = formatButtonGroupTitle(*ptrbuttongroup, tabidx != PTBass);
 
             // Create the Group Volume slider as it is referenced by the Voice Buttons
             auto* g4svol = addToList(createVolSlider(false));
@@ -4862,6 +4838,7 @@ struct KeyboardPanelPage final : public Component,
                                             msgloaded = "Saved as: " + selectedfname + "\nConfig: " + appState.configfname;
                                             juce::Logger::writeToLog("*** KeyboardManualPage(): Saved as " + selectedfname
                                                 + " (embedded config: " + appState.configfname + ")");
+                                            updatePanelFileStatusLabel();
                                         }
 
                                         if (TextButton* focused = tbSaveAs)
@@ -5187,24 +5164,8 @@ struct KeyboardPanelPage final : public Component,
             for (int bgidx = 0; bgidx < numberbuttongroups; bgidx++) {
                 ButtonGroup* ptrbuttongroup = instrumentpanel->getButtonGroup(bgidx);
 
-                String buttongroupname = ptrbuttongroup->groupname;
-                int buttongroupmidiin = ptrbuttongroup->midiin;
-                int buttongroupmidiout = ptrbuttongroup->midiout;
-                String buttongroupsplitname = ptrbuttongroup->splitoutname;
-
-                String buttongrouptitle = buttongroupname 
-                    + " [In:" + std::to_string(buttongroupmidiin) 
-                    + " | Out:" + std::to_string(buttongroupmidiout) 
-                    + "]";
-
-                // Add Octave Split indicator
-                if ((bgidx == 3) || (bgidx == 7)) {
-                    buttongrouptitle = buttongroupname
-                        + " [In:" + std::to_string(buttongroupmidiin) 
-                        + " | Out:" + std::to_string(buttongroupmidiout)
-                        + " | Spl:" + buttongroupsplitname 
-                        + "]";
-                }
+                const bool includeSplit = ((bgidx == 3) || (bgidx == 7));
+                String buttongrouptitle = formatButtonGroupTitle(*ptrbuttongroup, includeSplit);
 
                 GroupComponent* ptrgroupcomponent = ptrbuttongroup->getGroupComponentPtr();
                 ptrgroupcomponent->setText(buttongrouptitle);
@@ -5350,6 +5311,23 @@ struct KeyboardPanelPage final : public Component,
     }
 
 private:
+    static String formatButtonGroupTitle(const ButtonGroup& buttonGroup, bool includeSplit)
+    {
+        String title = buttonGroup.groupname;
+        const String alias = buttonGroup.modulealias.trim().toUpperCase();
+        if (alias.isNotEmpty())
+            title += " " + alias;
+
+        title += " [In:" + juce::String(buttonGroup.midiin)
+            + " | Out:" + juce::String(buttonGroup.midiout);
+
+        if (includeSplit)
+            title += " | Spl:" + buttonGroup.splitoutname;
+
+        title += "]";
+        return title;
+    }
+
     void updatePanelFileStatusLabel()
     {
         if (lblpanelfile == nullptr)
@@ -7070,6 +7048,12 @@ public:
     }
 
 private:
+    struct MonitorMessageEntry
+    {
+        juce::MidiMessage message;
+        juce::String moduleName;
+    };
+
     void updateEnableButtonText(bool enabled)
     {
         enableButton.setButtonText(enabled ? "Enabled" : "Disabled");
@@ -7086,28 +7070,28 @@ private:
         if (mididevices != nullptr)
         {
             auto safeThis = juce::Component::SafePointer<MonitorPage>(this);
-            mididevices->setOutgoingMidiMonitor([safeThis](const juce::MidiMessage& message)
+            mididevices->setOutgoingMidiMonitor([safeThis](const juce::MidiMessage& message, const juce::String& routedModuleName)
                 {
                     if (safeThis == nullptr)
                         return;
                     if (!safeThis->monitorEnabled.load(std::memory_order_relaxed))
                         return;
-                    safeThis->enqueueMessage(message);
+                    safeThis->enqueueMessage(message, routedModuleName);
                 });
             monitorHookInstalled = true;
         }
     }
 
-    void enqueueMessage(const juce::MidiMessage& message)
+    void enqueueMessage(const juce::MidiMessage& message, const juce::String& routedModuleName)
     {
         const juce::ScopedLock lock(queueLock);
-        pendingMessages.add(message);
+        pendingMessages.add({ message, routedModuleName });
         triggerAsyncUpdate();
     }
 
     void handleAsyncUpdate() override
     {
-        juce::Array<juce::MidiMessage> flushMessages;
+        juce::Array<MonitorMessageEntry> flushMessages;
         {
             const juce::ScopedLock lock(queueLock);
             flushMessages.swapWith(pendingMessages);
@@ -7118,22 +7102,26 @@ private:
 
         juce::String lines;
         lines.preallocateBytes(flushMessages.size() * 48);
-        for (const auto& msg : flushMessages)
-            lines << formatMessage(msg) << "\n";
+        for (const auto& entry : flushMessages)
+            lines << formatMessage(entry) << "\n";
 
         monitorTextArea.moveCaretToEnd();
         monitorTextArea.insertTextAtCaret(lines);
     }
 
-    static juce::String formatMessage(const juce::MidiMessage& msg)
+    juce::String formatMessage(const MonitorMessageEntry& entry) const
     {
+        const auto& msg = entry.message;
         juce::String description = msg.getDescription();
         if (description.isEmpty())
             description = juce::String::toHexString(msg.getRawData(), msg.getRawDataSize());
 
         const int channel = msg.getChannel();
-        if (channel > 0)
+        if (channel > 0) {
+            if (entry.moduleName.isNotEmpty())
+                return "Ch " + juce::String(channel) + " | " + description + " (" + entry.moduleName + ")";
             return "Ch " + juce::String(channel) + " | " + description;
+        }
 
         return description;
     }
@@ -7146,7 +7134,7 @@ private:
     MidiDevices* mididevices = nullptr;
 
     juce::CriticalSection queueLock;
-    juce::Array<juce::MidiMessage> pendingMessages;
+    juce::Array<MonitorMessageEntry> pendingMessages;
 
     std::atomic<bool> monitorEnabled { false };
     bool isTabActive = false;
@@ -7221,6 +7209,7 @@ public:
 
             int locmoduleidx = instrumentpanel->getButtonGroup(i)->getMidiModule();
             SoundModule.setButtonText(instrumentmodules->getDisplayName(locmoduleidx));
+            txtModuleAlias.setText(instrumentpanel->getButtonGroup(i)->modulealias, juce::dontSendNotification);
 
             //textEditor3.setText(std::to_string(instrumentpanel->getButtonGroup(i)->buttoncount));
             label31.setText(std::to_string(instrumentpanel->getButtonGroup(i)->buttoncount), {});
@@ -7293,6 +7282,53 @@ public:
 
                         setConfigSaveButtonEnabled(true);
                     });
+            };
+
+        addAndMakeVisible(lblModuleAlias);
+        lblModuleAlias.setBounds(400, 75, 100, 24);
+        lblModuleAlias.setText("Module Alias", {});
+
+        addAndMakeVisible(txtModuleAlias);
+        txtModuleAlias.setBounds(560, 75, 80, 24);
+        txtModuleAlias.setInputRestrictions(2, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ");
+        txtModuleAlias.onFocusLost = [this]()
+            {
+                const int i = comboConfig.getSelectedId() - 1;   // Combobox is 1 based
+                if (i < 0 || i >= numberbuttongroups)
+                    return;
+
+                ButtonGroup* const bg = instrumentpanel->getButtonGroup(i);
+                const juce::String previousAlias = bg->modulealias;
+                const juce::String trimmed = txtModuleAlias.getText().trim();
+
+                if (trimmed.isEmpty())
+                {
+                    txtModuleAlias.setText("", juce::dontSendNotification);
+                    if (previousAlias.isNotEmpty())
+                    {
+                        bg->modulealias = "";
+                        appState.configchanged = true;
+                        setConfigSaveButtonEnabled(true);
+                    }
+                    return;
+                }
+
+                const bool validAlias = (trimmed.length() == 2) && trimmed.containsOnly("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ");
+                if (!validAlias)
+                {
+                    txtModuleAlias.setText(previousAlias, juce::dontSendNotification);
+                    return;
+                }
+
+                const juce::String normalized = trimmed.toUpperCase();
+                txtModuleAlias.setText(normalized, juce::dontSendNotification);
+
+                if (previousAlias != normalized)
+                {
+                    bg->modulealias = normalized;
+                    appState.configchanged = true;
+                    setConfigSaveButtonEnabled(true);
+                }
             };
 
         addAndMakeVisible(lblKeyboard);
@@ -7919,11 +7955,11 @@ private:
     GroupComponent effectsDefaultsGroup{ "effectsDefaultsGroup", "Effects Defaults" };
     GroupComponent globalConfigsGroup{ "globalConfigsGroup", "Global Configs" };
     juce::TextButton SoundModule;
-    juce::TextEditor txtGroupName, txtMidiIn, txtMidiOut, txtSplit, txtOctave;
+    juce::TextEditor txtGroupName, txtMidiIn, txtMidiOut, txtSplit, txtOctave, txtModuleAlias;
     juce::TextEditor txtDefaultEffectsVol, txtDefaultEffectsBri, txtDefaultEffectsExp, txtDefaultEffectsRev;
     juce::TextEditor txtDefaultEffectsCho, txtDefaultEffectsMod, txtDefaultEffectsTim, txtDefaultEffectsAtk;
     juce::TextEditor txtDefaultEffectsRel, txtDefaultEffectsPan;
-    juce::Label lblKeyboard, lblGroupName, lblButtonCount, lblMidiIn, lblMidiOut, lblSplit, lblOctave, lblModule;
+    juce::Label lblKeyboard, lblGroupName, lblButtonCount, lblMidiIn, lblMidiOut, lblSplit, lblOctave, lblModule, lblModuleAlias;
     juce::Label lblPassthrough, lblVelocity;
     juce::Label lblDefaultEffectsVol, lblDefaultEffectsBri, lblDefaultEffectsExp, lblDefaultEffectsRev;
     juce::Label lblDefaultEffectsCho, lblDefaultEffectsMod, lblDefaultEffectsTim, lblDefaultEffectsAtk;
@@ -8375,6 +8411,7 @@ private:
 
         static Identifier ispassthroughType("ispassthrough");
         static Identifier moduleidxType("moduleidx");
+        static Identifier modulealiasType("modulealias");
 
         // Configs ValueTree
         ValueTree configsTree(configsType);
@@ -8421,6 +8458,7 @@ private:
                 vtcfg.setProperty(ispassthroughType, false, nullptr);
             
             vtcfg.setProperty(moduleidxType, instrumentpanel->getButtonGroup(i)->moduleidx, nullptr);
+            vtcfg.setProperty(modulealiasType, instrumentpanel->getButtonGroup(i)->modulealias, nullptr);
 
             // Added new config to parent
             if (vtcfg.isValid()) {
@@ -8543,6 +8581,7 @@ private:
 
         static Identifier ispassthroughType("ispassthrough");
         static Identifier moduleidxType("moduleidx");
+        static Identifier modulealiasType("modulealias");
 
         if (!(vtconfigs.isValid() && (vtconfigs.getNumChildren() > 0))) {
             juce::Logger::writeToLog("*** loadVTConfigs(): An error occurred while reading temo Configs ValueTree...");
@@ -8635,6 +8674,14 @@ private:
 
             passthroughstate = vtcfg.getProperty(ispassthroughType);
             instrumentpanel->getButtonGroup(i)->moduleidx = vtcfg.getProperty(moduleidxType);
+
+            juce::String alias = vtcfg.getProperty(modulealiasType, "").toString().trim();
+            if (alias.isNotEmpty())
+            {
+                const bool validAlias = (alias.length() == 2) && alias.containsOnly("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ");
+                alias = validAlias ? alias.toUpperCase() : "";
+            }
+            instrumentpanel->getButtonGroup(i)->modulealias = alias;
         }
 
         return true;
@@ -9315,6 +9362,7 @@ public:
         keyTarget.onTabBass = [this] { tabs.setCurrentTabIndex(PTBass, true); };
         keyTarget.onTabSounds = [this] { tabs.setCurrentTabIndex(PTVoices, true); };
         keyTarget.onTabEffects = [this] { tabs.setCurrentTabIndex(PTEffects, true); };
+        keyTarget.onTabMonitor = [this] { tabs.setCurrentTabIndex(PTMonitor, true); };
         keyTarget.onVoiceEditTabHotkeysAllowed = [this] { return tabs.canOpenVoiceEditTabs(); };
         keyTarget.onPresetRecall = [this](int idx) { tabs.recallPresetFromHotkey(idx); };
         keyTarget.onPresetNext = [this] { tabs.triggerNextPresetHotkey(); };
