@@ -1,5 +1,7 @@
 # AMidiOrgan User Guide
 
+For the complete end-user operations manual (including packaged Windows/macOS installation), see `USER_MANUAL.md`.
+
 ## What This App Does
 AMidiOrgan is a live-performance MIDI controller built with JUCE and C++.
 It manages voice button groups across three keyboard panels, supports layering and split workflows,

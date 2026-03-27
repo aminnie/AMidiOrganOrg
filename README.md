@@ -2,6 +2,10 @@
 
 AMidiOrgan is a live-performance MIDI controller built with [JUCE](https://juce.com). It is designed for rigs with multiple MIDI keyboards and sound modules, bringing routing, layering, preset recall, voice editing, and effect control into one interface.
 
+For complete end-user operating instructions (installation, setup, and screen-by-screen usage), see [USER_MANUAL.md](USER_MANUAL.md).
+
+For architecture and implementation details, see [TECHNICAL_OVERVIEW.md](TECHNICAL_OVERVIEW.md).
+
 The application is organized around three performance panels:
 
 - `Upper`
