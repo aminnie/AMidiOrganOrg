@@ -193,11 +193,27 @@ public:
         if (passthroughin[inchan] == false)
             return;
 
-        // Send all Midi messages that are not Notes on to output with no change
-        if (!(message.isNoteOn()) && !(message.isNoteOff())) {
-            sendToOutputs(message);
+        // Route non-note channelized messages only to configured output channels.
+        if (!(message.isNoteOn()) && !(message.isNoteOff()))
+        {
+            bool routed = false;
+            for (int i = 0; i < 5; ++i)
+            {
+                const int outchan = iomap[inchan][i];
+                if (outchan == 0)
+                    break;
+                if (!isValidMidiChannel(outchan))
+                    continue;
 
-            DBG("*** handleIncomingMidiMessage(): Original midi message sent " + std::to_string(inchan));
+                auto routedMessage = message;
+                routedMessage.setChannel(outchan);
+                sendToOutputs(routedMessage);
+                routed = true;
+            }
+
+            if (routed)
+                DBG("*** handleIncomingMidiMessage(): Routed non-note message from " + std::to_string(inchan));
+            return;
         }
 
         // Route MIDI In Note Messages to the 1) designated output by rewriting and message and 2) 
@@ -355,18 +371,13 @@ public:
 
     // Prepare the Midi routng IO map
     // Note: Using array of 17 to accomodate lookups for channel 1 to 16
-    // Default to a OUT = IN mapping, and override with ButtonGroup config settings
+    // Default to no routes; Config writes allowed mappings explicitly.
     void clearMidiIOMap()
     {
         for (int i = 0; i < 17; i++) {
             for (int j = 0; j < 5; j++) {
                 iomap[i][j] = 0;
             }
-        }
-
-        // Preset In to Out Channel
-        for (int i = 0; i < 17; i++) {
-            iomap[i][0] = i;
         }
 
         // Preset Octave Transpose for Midi output channels
@@ -380,10 +391,9 @@ public:
         }
 
         // Preset Output MIDI Module(s) for Button Group output channels.
-        // Default route mirrors previous behavior (module index 1).
+        // Empty means "no configured module route".
         for (int i = 0; i < 17; i++) {
             moduleout[i].clearQuick();
-            moduleout[i].add(1);
         }
 
         // Turn pass through off for all MIDI IN channels by default. Updated

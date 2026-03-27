@@ -454,10 +454,7 @@ namespace
 
         for (int i = 0; i < 17; ++i)
         {
-            if (!expectEqual(devices->iomap[i][0], i, "iomap[i][0] identity map", details))
-                return false;
-
-            for (int j = 1; j < 5; ++j)
+            for (int j = 0; j < 5; ++j)
             {
                 if (!expectEqual(devices->iomap[i][j], 0, "iomap[i][j] cleared", details))
                     return false;
@@ -469,10 +466,7 @@ namespace
             if (!expectEqual(devices->splitout[i], 0, "splitout default", details))
                 return false;
 
-            if (!expectEqual(devices->moduleout[i].size(), 1, "moduleout default size", details))
-                return false;
-
-            if (!expectEqual(devices->moduleout[i][0], 1, "moduleout default value", details))
+            if (!expectEqual(devices->moduleout[i].size(), 0, "moduleout default empty", details))
                 return false;
 
             if (!expectEqual(devices->velocityout[i] ? 1 : 0, 1, "velocityout default true", details))
@@ -1286,6 +1280,55 @@ namespace
                            "rewrite/send accepts solo output", details);
     }
 
+    bool runChannelizedNonNoteStrictRouting(std::string& details)
+    {
+        auto* devices = MidiDevices::getInstance();
+        if (devices == nullptr)
+        {
+            details = "MidiDevices::getInstance() returned nullptr";
+            return false;
+        }
+
+        devices->clearMidiIOMap();
+        std::vector<MidiMessage> sentMessages;
+        devices->testSendHook = [&sentMessages](const MidiMessage& message)
+        {
+            sentMessages.push_back(message);
+        };
+
+        // Channel accepted in, but with no configured mapping it should not forward.
+        devices->passthroughin[3] = true;
+        const auto ccNoRoute = MidiMessage::controllerEvent(3, CCVol, 100);
+        devices->handleIncomingMidiMessage(nullptr, ccNoRoute);
+        if (!expectEqual(static_cast<int>(sentMessages.size()), 0, "unmapped non-note channel is blocked", details))
+        {
+            devices->testSendHook = nullptr;
+            return false;
+        }
+
+        // Configure two explicit routes and verify fan-out rewrites channel.
+        devices->iomap[3][0] = 4;
+        devices->iomap[3][1] = 15;
+        const auto ccMapped = MidiMessage::controllerEvent(3, CCExp, 91);
+        devices->handleIncomingMidiMessage(nullptr, ccMapped);
+
+        if (!expectEqual(static_cast<int>(sentMessages.size()), 2, "mapped non-note fan-out count", details))
+        {
+            devices->testSendHook = nullptr;
+            return false;
+        }
+
+        if (!expectEqual(sentMessages[0].getChannel(), 4, "first mapped non-note output channel", details) ||
+            !expectEqual(sentMessages[1].getChannel(), 15, "second mapped non-note output channel", details))
+        {
+            devices->testSendHook = nullptr;
+            return false;
+        }
+
+        devices->testSendHook = nullptr;
+        return true;
+    }
+
     bool runShortcutFocusDeferralGuard(std::string& details)
     {
         TextEditor editor;
@@ -1494,6 +1537,11 @@ int main()
     {
         std::string details;
         results.push_back({ "MIDI routing split/layer edge cases", runMidiRoutingSplitLayerEdgeCases(details), details });
+    }
+
+    {
+        std::string details;
+        results.push_back({ "MIDI non-note routing follows configured channels only", runChannelizedNonNoteStrictRouting(details), details });
     }
 
 
