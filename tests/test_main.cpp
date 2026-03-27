@@ -469,7 +469,10 @@ namespace
             if (!expectEqual(devices->splitout[i], 0, "splitout default", details))
                 return false;
 
-            if (!expectEqual(devices->moduleout[i], 1, "moduleout default", details))
+            if (!expectEqual(devices->moduleout[i].size(), 1, "moduleout default size", details))
+                return false;
+
+            if (!expectEqual(devices->moduleout[i][0], 1, "moduleout default value", details))
                 return false;
 
             if (!expectEqual(devices->velocityout[i] ? 1 : 0, 1, "velocityout default true", details))
@@ -620,6 +623,47 @@ namespace
 
         // If we reach here without crashing, the null-guard works.
         return expectEqual(1, 1, "MidiView duplication guard survives null outDevice", details);
+    }
+
+    bool runModuleFanoutByOutputChannel(std::string& details)
+    {
+        auto* devices = MidiDevices::getInstance();
+        if (devices == nullptr)
+        {
+            details = "MidiDevices::getInstance() returned nullptr";
+            return false;
+        }
+
+        devices->clearMidiIOMap();
+
+        MidiDeviceInfo outA;
+        outA.identifier = "fanout-out-1";
+        outA.name = "FanoutOut1";
+
+        MidiDeviceInfo outB;
+        outB.identifier = "fanout-out-2";
+        outB.name = "FanoutOut2";
+
+        devices->midiOutputs.clear();
+        devices->midiOutputs.add(new MidiDeviceListEntry(outA));
+        devices->midiOutputs.add(new MidiDeviceListEntry(outB));
+
+        devices->moduleout[1].clearQuick();
+        devices->moduleout[1].add(0);
+        devices->moduleout[1].add(1);
+
+        int monitorHits = 0;
+        devices->setOutgoingMidiMonitor([&monitorHits](const MidiMessage&, const juce::String&)
+            {
+                ++monitorHits;
+            });
+
+        const auto noteOn = MidiMessage::noteOn(1, 60, (juce::uint8)100);
+        devices->sendToOutputs(noteOn);
+
+        devices->setOutgoingMidiMonitor({});
+
+        return expectEqual(monitorHits, 2, "channel fanout emits one routed send per mapped module", details);
     }
 
     bool runPanelPresetBounds(std::string& details)
@@ -1395,6 +1439,11 @@ int main()
     {
         std::string details;
         results.push_back({ "MidiDevices MidiView duplication guard", runMidiViewDuplicationGuard(details), details });
+    }
+
+    {
+        std::string details;
+        results.push_back({ "MidiDevices fanout routes one channel to multiple modules", runModuleFanoutByOutputChannel(details), details });
     }
 
     {

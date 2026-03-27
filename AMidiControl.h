@@ -6635,10 +6635,9 @@ private:
 
         const ReferenceCountedArray<MidiDeviceListEntry>& midiDevices = mididevices->midiOutputs;
 
-        // Reset all Channel outputs. Note that any channel with device out 
-        // of 255 will not be output 
+        // Reset all channel output module mappings.
         for (int i = 0; i < 17; i++)
-            mididevices->moduleout[i] = 255;
+            mididevices->moduleout[i].clearQuick();
 
         // Update all the Channel outs for every Button Group
         for (int i = 0; i < numberbuttongroups; i++) {
@@ -6658,8 +6657,9 @@ private:
 
                 bfound = strdevicename.contains(modidstring);
                 if (bfound) {
-                    // Update the Midi send Channel to the Midi Out Modele confgured in Button Group
-                    mididevices->moduleout[grpmidichan] = outmod;
+                    // Route this output channel to the configured module (fan-out safe).
+                    if (grpmidichan > 0 && grpmidichan < 17)
+                        mididevices->moduleout[grpmidichan].addIfNotAlreadyThere(outmod);
 
                     juce::Logger::writeToLog("ModuleMapper: Out Device " + dev->deviceInfo.name
                         + " on Button Group " + ptrbuttongroup->groupname
@@ -6680,8 +6680,15 @@ private:
         }
 
         for (int i = 0; i < 17; i++) {
-            DBG("MIDI Out channel " + std::to_string(i)
-                + " to " + std::to_string(mididevices->moduleout[i])
+            juce::String mappedModules;
+            for (int j = 0; j < mididevices->moduleout[i].size(); ++j)
+            {
+                if (j > 0)
+                    mappedModules << ", ";
+                mappedModules << juce::String(mididevices->moduleout[i].getUnchecked(j));
+            }
+            DBG("MIDI Out channel " + juce::String(i)
+                + " to [" + mappedModules + "]"
             );
         }
 
@@ -8780,10 +8787,9 @@ private:
 
         const ReferenceCountedArray<MidiDeviceListEntry>& midiDevices = mididevices->midiOutputs;
 
-        // Reset all Channel outputs. Note that any channel with device out 
-        // of 255 will not be output 
+        // Reset all channel output module mappings.
         for (int i = 0; i < 17; i++)
-            mididevices->moduleout[i] = 255;
+            mididevices->moduleout[i].clearQuick();
 
         // Update all the Channel outs for every Button Group
         for (int i = 0; i < numberbuttongroups; i++) {
@@ -8803,8 +8809,9 @@ private:
 
                 bfound = strdevicename.contains(modidstring);
                 if (bfound) {
-                    // Update the Midi send Channel to the Midi Out Modele confgured in Button Group
-                    mididevices->moduleout[grpmidichan] = outmod;
+                    // Route this output channel to the configured module (fan-out safe).
+                    if (grpmidichan > 0 && grpmidichan < 17)
+                        mididevices->moduleout[grpmidichan].addIfNotAlreadyThere(outmod);
 
                     juce::Logger::writeToLog("*** ModulesToChannelMap: Out Device " + strdevicename
                         + " on Button Group " + ptrbuttongroup->groupname
@@ -8825,8 +8832,15 @@ private:
         }
 
         for (int i = 0; i < 17; i++) {
-            DBG("*** ModulesToChannelMap: MIDI Out channel " + std::to_string(i)
-                + " to " + std::to_string(mididevices->moduleout[i])
+            juce::String mappedModules;
+            for (int j = 0; j < mididevices->moduleout[i].size(); ++j)
+            {
+                if (j > 0)
+                    mappedModules << ", ";
+                mappedModules << juce::String(mididevices->moduleout[i].getUnchecked(j));
+            }
+            DBG("*** ModulesToChannelMap: MIDI Out channel " + juce::String(i)
+                + " to [" + mappedModules + "]"
             );
         }
 

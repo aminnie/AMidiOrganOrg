@@ -287,29 +287,39 @@ public:
             monitorHookCopy = outgoingMonitorHook;
         }
 
-        // Route Midi Message to appropriate channel
+        // Route MIDI message to all mapped output modules for this channel.
         int outchan = msg.getChannel();
-        int outmodidx = 0;
-        if (outchan < 17)
-            outmodidx = moduleout[outchan];
+        bool hasMappedRoute = false;
+        if (outchan > 0 && outchan < 17)
+        {
+            const auto& mappedModules = moduleout[outchan];
+            for (int i = 0; i < mappedModules.size(); ++i)
+            {
+                const int outmodidx = mappedModules.getUnchecked(i);
+                juce::String routedModuleName;
+                if (outmodidx >= 0 && outmodidx < midiOutputs.size())
+                    routedModuleName = midiOutputs[outmodidx]->deviceInfo.name;
 
-        juce::String routedModuleName;
-        if (outmodidx >= 0 && outmodidx < midiOutputs.size())
-            routedModuleName = midiOutputs[outmodidx]->deviceInfo.name;
+                if (monitorHookCopy)
+                    monitorHookCopy(msg, routedModuleName);
 
-        if (monitorHookCopy)
-            monitorHookCopy(msg, routedModuleName);
+                if (outmodidx >= 0 && outmodidx < midiOutputs.size()) {
+                    hasMappedRoute = true;
+                    if (midiOutputs[outmodidx]->outDevice.get() != nullptr) {
+                        midiOutputs[outmodidx]->outDevice->sendMessageNow(msg);
 
-        if (outmodidx >= 0 && outmodidx < midiOutputs.size()) {
-            if (midiOutputs[outmodidx]->outDevice.get() != nullptr) {
-                midiOutputs[outmodidx]->outDevice->sendMessageNow(msg);
-
-                DBG("*** sendToOutputs " << outchan << " to module " << outmodidx << " sent!");
-            }
-            else {
-                DBG("*** sendToOutputs " << outchan << " to module " << outmodidx << " failed!");
+                        DBG("*** sendToOutputs " << outchan << " to module " << outmodidx << " sent!");
+                    }
+                    else {
+                        DBG("*** sendToOutputs " << outchan << " to module " << outmodidx << " failed!");
+                    }
+                }
             }
         }
+
+        // Keep monitor visibility for unmapped channel traffic.
+        if (!hasMappedRoute && monitorHookCopy)
+            monitorHookCopy(msg, {});
 
         // If MidiView connected duplicate message for display in monitor
         if (midiviewidx < midiOutputs.size()) {
@@ -369,10 +379,11 @@ public:
             splitout[i] = 0;
         }
 
-        // Preset Output MIDI Module for Button Group output channels
-        // Updated by Button Group Midi Module selections in Config
+        // Preset Output MIDI Module(s) for Button Group output channels.
+        // Default route mirrors previous behavior (module index 1).
         for (int i = 0; i < 17; i++) {
-            moduleout[i] = 1;
+            moduleout[i].clearQuick();
+            moduleout[i].add(1);
         }
 
         // Turn pass through off for all MIDI IN channels by default. Updated
@@ -396,7 +407,7 @@ public:
     int iomap[17][5];
     int octxpose[17];
     int splitout[17];
-    int moduleout[17];
+    juce::Array<int> moduleout[17];
     bool passthroughin[17];
     bool velocityout[17];
 
