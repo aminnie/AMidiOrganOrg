@@ -5730,7 +5730,8 @@ class MidiStartPage final : public Component,
 public:
     MidiStartPage(TabbedComponent& tabs,
                   std::function<bool(const juce::String&)> loadConfigFromBasenameFn,
-                  std::function<void()> refreshKeyboardPanelSaveAvailabilityFn = {}) :
+                  std::function<void()> refreshKeyboardPanelSaveAvailabilityFn = {},
+                  std::shared_ptr<std::atomic<bool>> virtualKeyboardInputEnabledState = {}) :
         midiKeyboard(keyboardState, MidiKeyboardComponent::horizontalKeyboard),
         midiInputSelector(new MidiDeviceListBox("Midi Input Selector", *this, true)),
         midiOutputSelector(new MidiDeviceListBox("Midi Output Selector", *this, false)),
@@ -5740,7 +5741,8 @@ public:
         instrumentpanel(InstrumentPanel::getInstance()),
         appState(getAppState()),
         loadConfigFromBasename(std::move(loadConfigFromBasenameFn)),
-        refreshKeyboardPanelSaveAvailability(std::move(refreshKeyboardPanelSaveAvailabilityFn))
+        refreshKeyboardPanelSaveAvailability(std::move(refreshKeyboardPanelSaveAvailabilityFn)),
+        virtualKeyboardInputEnabled(std::move(virtualKeyboardInputEnabledState))
     {
         juce::Logger::writeToLog("== MidiStartPage(): Constructor " + std::to_string(zinstcntMidiStartPage++));
 
@@ -6222,9 +6224,38 @@ public:
     }
 
 private:
+    static constexpr const char* kVirtualKeyboardInputId = "virtual-keyboard-internal";
+    static constexpr const char* kVirtualKeyboardInputName = "Virtual Keyboard (Internal)";
 
     juce::StringArray stickyMidiInputIds;
     juce::StringArray stickyMidiOutputIds;
+
+    bool hasVirtualKeyboardInput() const
+    {
+        return (virtualKeyboardInputEnabled != nullptr);
+    }
+
+    int getVirtualKeyboardRowIndex() const
+    {
+        return mididevices->getNumMidiInputs();
+    }
+
+    bool isVirtualKeyboardRow(int rowNumber) const
+    {
+        return hasVirtualKeyboardInput() && rowNumber == getVirtualKeyboardRowIndex();
+    }
+
+    bool isVirtualKeyboardInputEnabled() const
+    {
+        return hasVirtualKeyboardInput() && virtualKeyboardInputEnabled->load(std::memory_order_relaxed);
+    }
+
+    void setVirtualKeyboardInputEnabled(bool enabled)
+    {
+        if (!hasVirtualKeyboardInput())
+            return;
+        virtualKeyboardInputEnabled->store(enabled, std::memory_order_relaxed);
+    }
 
     void loadStickyMidiPortsFromDisk()
     {
@@ -6237,6 +6268,8 @@ private:
         for (int i = 0; i < mididevices->midiInputs.size(); ++i)
             if (mididevices->midiInputs[i]->inDevice != nullptr)
                 inIds.add(mididevices->midiInputs[i]->deviceInfo.identifier);
+        if (isVirtualKeyboardInputEnabled())
+            inIds.add(kVirtualKeyboardInputId);
         for (int i = 0; i < mididevices->midiOutputs.size(); ++i)
             if (mididevices->midiOutputs[i]->outDevice != nullptr)
                 outIds.add(mididevices->midiOutputs[i]->deviceInfo.identifier);
@@ -6257,6 +6290,12 @@ private:
         {
             if (stickyId.isEmpty())
                 continue;
+
+            if (isInputDeviceList && stickyId == kVirtualKeyboardInputId)
+            {
+                setVirtualKeyboardInputEnabled(true);
+                continue;
+            }
 
             for (int i = 0; i < devices.size(); ++i)
             {
@@ -6388,7 +6427,10 @@ private:
 
         int getNumRows() override
         {
-            return lblmididevices->getNumDevices(isInput);
+            int rows = lblmididevices->getNumDevices(isInput);
+            if (isInput && parent.hasVirtualKeyboardInput())
+                rows += 1;
+            return rows;
         }
 
 
@@ -6405,7 +6447,11 @@ private:
             g.setFont((float)height * 0.7f);
             if (isInput)
             {
-                if (rowNumber < lblmididevices->getNumMidiInputs())
+                if (parent.isVirtualKeyboardRow(rowNumber))
+                    g.drawText(MidiStartPage::kVirtualKeyboardInputName,
+                        5, 0, width, height,
+                        Justification::centredLeft, true);
+                else if (rowNumber < lblmididevices->getNumMidiInputs())
                     g.drawText(lblmididevices->getMidiDevice(rowNumber, true)->deviceInfo.name,
                         5, 0, width, height,
                         Justification::centredLeft, true);
@@ -6429,13 +6475,23 @@ private:
                 for (auto i = 0; i < lastSelectedItems.size(); ++i)
                 {
                     if (!newSelectedItems.contains(lastSelectedItems[i]))
-                        lblmididevices->closeDevice(isInput, lastSelectedItems[i]);
+                    {
+                        if (isInput && parent.isVirtualKeyboardRow(lastSelectedItems[i]))
+                            parent.setVirtualKeyboardInputEnabled(false);
+                        else
+                            lblmididevices->closeDevice(isInput, lastSelectedItems[i]);
+                    }
                 }
 
                 for (auto i = 0; i < newSelectedItems.size(); ++i)
                 {
                     if (!lastSelectedItems.contains(newSelectedItems[i]))
-                        lblmididevices->openDevice(isInput, newSelectedItems[i]);
+                    {
+                        if (isInput && parent.isVirtualKeyboardRow(newSelectedItems[i]))
+                            parent.setVirtualKeyboardInputEnabled(true);
+                        else
+                            lblmididevices->openDevice(isInput, newSelectedItems[i]);
+                    }
                 }
 
                 lastSelectedItems = newSelectedItems;
@@ -6450,6 +6506,12 @@ private:
             for (auto i = 0; i < midiDevices.size(); ++i)
                 if (midiDevices[i]->inDevice != nullptr || midiDevices[i]->outDevice != nullptr)
                     selectedRows.addRange(Range<int>(i, i + 1));
+
+            if (isInput && parent.isVirtualKeyboardInputEnabled())
+            {
+                const int virtualRow = parent.getVirtualKeyboardRowIndex();
+                selectedRows.addRange(Range<int>(virtualRow, virtualRow + 1));
+            }
 
             lastSelectedItems = selectedRows;
             updateContent();
@@ -6792,6 +6854,7 @@ private:
     MidiInstruments* midiInstruments = nullptr;
     std::function<bool(const juce::String&)> loadConfigFromBasename;
     std::function<void()> refreshKeyboardPanelSaveAvailability;
+    std::shared_ptr<std::atomic<bool>> virtualKeyboardInputEnabled;
     AppState& appState;
     bool shutdownRequested = false;
 
@@ -6984,16 +7047,22 @@ private:
 };
 
 class MonitorPage final : public Component,
-                          private juce::AsyncUpdater
+                          private juce::AsyncUpdater,
+                          private juce::MidiKeyboardState::Listener
 {
 public:
-    MonitorPage()
-        : mididevices(MidiDevices::getInstance())
+    MonitorPage(std::shared_ptr<std::atomic<bool>> virtualKeyboardInputEnabledState = {})
+        : monitorKeyboardState(),
+          monitorKeyboard(monitorKeyboardState, juce::MidiKeyboardComponent::horizontalKeyboard),
+          mididevices(MidiDevices::getInstance()),
+          virtualKeyboardInputEnabled(std::move(virtualKeyboardInputEnabledState))
     {
         setOpaque(true);
 
         monitorGroup.setColour(juce::GroupComponent::outlineColourId, juce::Colours::grey.darker());
         addAndMakeVisible(monitorGroup);
+        keyboardGroup.setColour(juce::GroupComponent::outlineColourId, juce::Colours::grey.darker());
+        addAndMakeVisible(keyboardGroup);
 
         addAndMakeVisible(enableButton);
         enableButton.setClickingTogglesState(true);
@@ -7034,10 +7103,43 @@ public:
         monitorTextArea.setColour(juce::TextEditor::backgroundColourId, findColour(juce::ResizableWindow::backgroundColourId));
         monitorTextArea.setColour(juce::TextEditor::outlineColourId, juce::Colours::grey.withAlpha(0.35f));
         monitorTextArea.setTextToShowWhenEmpty("Enable monitoring to see outgoing MIDI messages.", juce::Colours::grey);
+
+        addAndMakeVisible(startOctaveLabel);
+        startOctaveLabel.setText("Start Octave", juce::dontSendNotification);
+        startOctaveLabel.setJustificationType(juce::Justification::centredLeft);
+
+        addAndMakeVisible(startOctaveCombo);
+        for (int octave = 1; octave <= 8; ++octave)
+            startOctaveCombo.addItem("C" + juce::String(octave), octave);
+        startOctaveCombo.setSelectedId(3, juce::dontSendNotification);
+        startOctaveCombo.onChange = [this]()
+            {
+                updateKeyboardRangeFromStartOctave();
+            };
+
+        addAndMakeVisible(midiChannelLabel);
+        midiChannelLabel.setText("MIDI Channel", juce::dontSendNotification);
+        midiChannelLabel.setJustificationType(juce::Justification::centredLeft);
+
+        addAndMakeVisible(midiChannelCombo);
+        for (int channel = 1; channel <= 16; ++channel)
+            midiChannelCombo.addItem(juce::String(channel), channel);
+        midiChannelCombo.setSelectedId(1, juce::dontSendNotification);
+        midiChannelCombo.onChange = [this]()
+            {
+                monitorKeyboard.setMidiChannel(juce::jlimit(1, 16, midiChannelCombo.getSelectedId()));
+            };
+
+        addAndMakeVisible(monitorKeyboard);
+        updateKeyboardRangeFromStartOctave();
+        monitorKeyboard.setMidiChannel(1);
+        monitorKeyboardState.addListener(this);
+        monitorKeyboard.setEnabled(isVirtualKeyboardInputEnabled());
     }
 
     ~MonitorPage() override
     {
+        monitorKeyboardState.removeListener(this);
         if (mididevices != nullptr)
             mididevices->setOutgoingMidiMonitor({});
     }
@@ -7050,29 +7152,49 @@ public:
     void resized() override
     {
         auto r = getLocalBounds().reduced(10);
-        monitorGroup.setBounds(r);
+        const int columnGap = 10;
+        auto left = r.removeFromLeft(r.getWidth() / 2);
+        r.removeFromLeft(columnGap);
+        auto right = r;
 
-        auto inner = r.reduced(12);
-        constexpr int topGapBelowTitle = 10;
-        inner.removeFromTop(topGapBelowTitle);
+        monitorGroup.setBounds(left);
+        keyboardGroup.setBounds(right);
 
-        const int monitorWidth = juce::jmax(300, inner.getWidth() / 2);
-        auto textAreaBounds = inner.removeFromLeft(monitorWidth);
-        monitorTextArea.setBounds(textAreaBounds);
+        auto leftInner = left.reduced(12);
+        leftInner.removeFromTop(10);
+        auto leftButtons = leftInner.removeFromTop(30);
+        enableButton.setBounds(leftButtons.removeFromLeft(100));
+        leftButtons.removeFromLeft(8);
+        clearButton.setBounds(leftButtons.removeFromLeft(90));
+        leftInner.removeFromTop(8);
+        monitorTextArea.setBounds(leftInner);
 
-        constexpr int gapBetweenTextAndControls = 16;
-        inner.removeFromLeft(gapBetweenTextAndControls);
-        auto controlsArea = inner;
-        auto controlsRow = controlsArea.removeFromTop(30);
-        enableButton.setBounds(controlsRow.removeFromLeft(90));
+        auto rightInner = right.reduced(12);
+        rightInner.removeFromTop(10);
+        auto labelsRow = rightInner.removeFromTop(22);
+        auto controlsRow = rightInner.removeFromTop(28);
+        rightInner.removeFromTop(8);
+
+        auto labelLeft = labelsRow.removeFromLeft(labelsRow.getWidth() / 2);
+        labelsRow.removeFromLeft(8);
+        auto labelRight = labelsRow;
+        startOctaveLabel.setBounds(labelLeft);
+        midiChannelLabel.setBounds(labelRight);
+
+        auto comboLeft = controlsRow.removeFromLeft(controlsRow.getWidth() / 2);
         controlsRow.removeFromLeft(8);
-        clearButton.setBounds(controlsRow.removeFromLeft(90));
+        auto comboRight = controlsRow;
+        startOctaveCombo.setBounds(comboLeft);
+        midiChannelCombo.setBounds(comboRight);
+
+        monitorKeyboard.setBounds(rightInner);
     }
 
     void setTabActive(bool active)
     {
         if (isTabActive == active) return;
         isTabActive = active;
+        monitorKeyboard.setEnabled(isVirtualKeyboardInputEnabled());
         ensureMonitorHookRegistered();
     }
 
@@ -7082,6 +7204,45 @@ private:
         juce::MidiMessage message;
         juce::String moduleName;
     };
+
+    bool isVirtualKeyboardInputEnabled() const
+    {
+        return virtualKeyboardInputEnabled != nullptr
+            && virtualKeyboardInputEnabled->load(std::memory_order_relaxed);
+    }
+
+    int getSelectedMidiChannel() const
+    {
+        return juce::jlimit(1, 16, midiChannelCombo.getSelectedId());
+    }
+
+    void updateKeyboardRangeFromStartOctave()
+    {
+        const int selectedOctave = juce::jlimit(1, 8, startOctaveCombo.getSelectedId());
+        const int startNote = juce::jlimit(0, 127, (selectedOctave + 1) * 12);
+        const int endNote = juce::jlimit(0, 127, startNote + 47);
+        monitorKeyboard.setAvailableRange(startNote, endNote);
+    }
+
+    void handleNoteOn(juce::MidiKeyboardState*, int, int midiNoteNumber, float velocity) override
+    {
+        if (mididevices == nullptr || !isVirtualKeyboardInputEnabled())
+            return;
+
+        juce::MidiMessage m(juce::MidiMessage::noteOn(getSelectedMidiChannel(), midiNoteNumber, velocity));
+        m.setTimeStamp(juce::Time::getMillisecondCounterHiRes() * 0.001);
+        mididevices->handleIncomingMidiMessage(nullptr, m);
+    }
+
+    void handleNoteOff(juce::MidiKeyboardState*, int, int midiNoteNumber, float velocity) override
+    {
+        if (mididevices == nullptr || !isVirtualKeyboardInputEnabled())
+            return;
+
+        juce::MidiMessage m(juce::MidiMessage::noteOff(getSelectedMidiChannel(), midiNoteNumber, velocity));
+        m.setTimeStamp(juce::Time::getMillisecondCounterHiRes() * 0.001);
+        mididevices->handleIncomingMidiMessage(nullptr, m);
+    }
 
     void updateEnableButtonText(bool enabled)
     {
@@ -7156,11 +7317,19 @@ private:
     }
 
     juce::GroupComponent monitorGroup{ "monitorGroup", "MIDI Out Monitor" };
+    juce::GroupComponent keyboardGroup{ "keyboardGroup", "Virtual Keyboard" };
     juce::TextButton enableButton{ "Enable" };
     juce::TextButton clearButton{ "Clear" };
     juce::TextEditor monitorTextArea;
+    juce::Label startOctaveLabel{ "startOctaveLabel", "Start Octave" };
+    juce::ComboBox startOctaveCombo;
+    juce::Label midiChannelLabel{ "midiChannelLabel", "MIDI Channel" };
+    juce::ComboBox midiChannelCombo;
+    juce::MidiKeyboardState monitorKeyboardState;
+    juce::MidiKeyboardComponent monitorKeyboard;
 
     MidiDevices* mididevices = nullptr;
+    std::shared_ptr<std::atomic<bool>> virtualKeyboardInputEnabled;
 
     juce::CriticalSection queueLock;
     juce::Array<MonitorMessageEntry> pendingMessages;
@@ -8950,7 +9119,8 @@ public:
         ConfigPage* configspage = new ConfigPage(*this, refreshKbPanelSaves);
         EffectsPage* effectspage = new EffectsPage(*this);
         VoicesPage* voicespage = new VoicesPage(*this);
-        MonitorPage* monitorpage = new MonitorPage();
+        auto virtualKeyboardInputEnabled = std::make_shared<std::atomic<bool>>(false);
+        MonitorPage* monitorpage = new MonitorPage(virtualKeyboardInputEnabled);
         effectsPageRef = effectspage;
         voicesPageRef = voicespage;
         monitorPageRef = monitorpage;
@@ -8959,7 +9129,7 @@ public:
         addTab("Start",        colour, new MidiStartPage(*this, [configspage](const juce::String& b)
             {
                 return configspage->loadConfigFileBasename(b);
-            }, refreshKbPanelSaves), true);
+            }, refreshKbPanelSaves, virtualKeyboardInputEnabled), true);
 
         // Create Upper, Lower and Bass&Drum Pages
         //KeyboardPanelPage* upperpanel = new KeyboardPanelPage(*this, PTUpper, *effectspage, *voicespage);
