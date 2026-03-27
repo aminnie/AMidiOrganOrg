@@ -67,6 +67,8 @@ Supported MIDI hardware and software sound modules:
 5. Confirm the panel and config labels match what you expect.
 6. Move to `Upper`, `Lower`, or `Bass&Drums` and begin playing.
 
+On startup, the app also attempts to auto-restore the last used panel and config when those files still exist.
+
 ### 2. Tab Guide
 
 #### Start
@@ -75,6 +77,7 @@ Supported MIDI hardware and software sound modules:
 - Your selected MIDI In and Out ports are remembered across launches (`Documents/AMidiOrgan/configs/midi_sticky_devices.json`, by JUCE device identifier).
 - Lets you choose the active sound module.
 - Loads panel and config files.
+- On launch, restores last used panel/config when available (`Documents/AMidiOrgan/configs/last_session.json`).
 - Checks config and panel pairing when loading, and can warn if the selected files do not belong together.
 
 #### Upper / Lower / Bass&Drums
@@ -84,14 +87,17 @@ Supported MIDI hardware and software sound modules:
 - `Upper` and `Lower` also include rotary controls.
 - `Save` and `Save As` write the current panel (`.pnl`) to disk.
 - The preset buttons are shared across all three keyboard tabs.
+- The `Voice Edits` row (`Sounds` / `Effects`) is enabled after selecting a voice button.
+- Risk warning: the `Effects` button turns orange when the selected voice has `VOL`, `EXP`, or `BRI` set to `0` (which can result in no audible sound).
 
 #### Sounds
 
 - Assigns an instrument voice to the currently selected voice button.
 - Select the target voice button on a keyboard tab before opening `Sounds`.
-- Browse in two levels inside the `Sounds for Voice Button` area:
+- Browse in two levels inside the `Voice Button Config` area:
   - Level 1: voice category buttons (for example `A-Piano`, `E-Piano`, `Organ`)
   - Level 2: voice buttons in the selected category
+- The group title is prefixed with the active sound module name when available.
 - Clicking a voice sends MSB/LSB/PC immediately on the button group's MIDI output channel for audition.
 - `Back` returns from Level 2 to Level 1.
 - `Prev` / `Next` paginate categories or voices when the list exceeds visible space.
@@ -101,6 +107,7 @@ Supported MIDI hardware and software sound modules:
 
 - Edits per-voice MIDI effect values in real time.
 - Select the target voice button on a keyboard tab before opening `Effects`.
+- The group title is prefixed with the active sound module name when available.
 - Effect changes are applied on the button group's MIDI output channel as you edit them.
 - Use `To Upper`, `To Lower`, or `To Bass` to return to the performance tab.
 - Current effect set:
@@ -140,6 +147,14 @@ Supported MIDI hardware and software sound modules:
 - `Cancel` restores the last applied shortcut map.
 - Duplicate non-empty shortcuts are blocked.
 
+#### Monitor
+
+- Shows outgoing MIDI messages in a live monitor view.
+- Capture is controlled by the `Enable` button and remains active globally while enabled.
+- `Clear` clears the visible monitor history.
+- Each line includes routed channel/message details and the routed sound module name.
+- The Monitor tab includes a virtual MIDI keyboard and an `Octave` control for range positioning.
+
 #### Help
 
 - Shows the embedded user guide.
@@ -170,7 +185,7 @@ Supported MIDI hardware and software sound modules:
 
 - Muting is used for fast live layering control.
 - When a group is muted, its volume slider and Up / Down controls are disabled.
-- While muted, new MIDI Note On events are blocked for that group's output channel (hard mute).
+- While muted, new MIDI Note On and Note Off events are blocked for that group's output channel (hard mute).
 - On mute, the app sends cleanup controllers to that output channel:
   - Sustain Off (`CC64=0`)
   - All Notes Off (`CC123=0`)
@@ -249,6 +264,7 @@ When the main window has focus:
 | Upper / Lower / Bass tab | A / S / D |
 | Sounds tab | Z |
 | Effects tab | X |
+| Monitor tab | M |
 | Upper rotary Fast/Slow | F |
 | Upper rotary Brake | B |
 | Lower rotary Fast/Slow | G |
@@ -258,7 +274,7 @@ Upper and Lower rotary keys always target their respective manuals, even when an
 
 ### Editing Shortcuts
 
-Use the `Hotkeys` tab (between `Config` and `Help`) to assign each command to a key from `A-Z` or `0-9`, or `(None)` for no mapping. `Save` writes `Documents/AMidiOrgan/configs/hotkeys.json` and applies the mapping; the app also loads that file on startup. If two or more commands share the same non-empty key, `Save` is blocked and a warning is shown. `Cancel` discards unsaved edits in the tab and restores the last applied bindings.
+Use the `Hotkeys` tab (between `Config` and `Monitor`) to assign each command to a key from `A-Z` or `0-9`, or `(None)` for no mapping. `Save` writes `Documents/AMidiOrgan/configs/hotkeys.json` and applies the mapping; the app also loads that file on startup. If two or more commands share the same non-empty key, `Save` is blocked and a warning is shown. `Cancel` discards unsaved edits in the tab and restores the last applied bindings.
 
 While a `TextEditor` or `ComboBox` has keyboard focus, including inside modal dialogs, global shortcuts are deferred so normal typing and selection still work.
 
@@ -335,7 +351,7 @@ ctest --test-dir build -C Debug --output-on-failure
 After a successful build, run this quick checklist (5-10 minutes):
 
 1. Launch the app and open each tab once:
-  - `Start`, `Upper`, `Lower`, `Bass&Drums`, `Sounds`, `Effects`, `Config`, `Help`.
+  - `Start`, `Upper`, `Lower`, `Bass&Drums`, `Sounds`, `Effects`, `Config`, `Hotkeys`, `Monitor`, `Help`.
 2. On `Start`:
   - Load a config file.
   - Load a panel file.
@@ -346,10 +362,15 @@ After a successful build, run this quick checklist (5-10 minutes):
 4. On `Sounds` and `Effects`:
   - Change a voice and a few effect values.
   - Return to a keyboard tab and confirm state is preserved.
-5. On `Config`:
+  - Confirm the keyboard-tab `Effects` shortcut button turns orange if the selected voice has `VOL`, `EXP`, or `BRI` set to `0`.
+5. On `Monitor`:
+  - Toggle `Enable` on and confirm outgoing MIDI traffic is appended.
+  - Toggle `Enable` off and confirm history remains visible.
+  - Click `Clear` and confirm the monitor view is cleared.
+6. On `Config`:
   - Change one mapping value, save, reload, and confirm it persists.
   - Click into a text field and type digits/letters; confirm **global shortcuts do not** change tabs or presets while typing. Click the tab bar or an empty area, then confirm shortcuts work again.
-6. If MIDI hardware is connected:
+7. If MIDI hardware is connected:
   - Open/close MIDI input and output devices and confirm no crash/hang.
 
 ### macOS (Xcode generator)
