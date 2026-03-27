@@ -3058,11 +3058,8 @@ struct KeyboardPanelPage final : public Component,
                         g1tbmute->setButtonText("Muted");
 
                         ButtonGroup* ptrbuttongroup = instrumentpanel->getButtonGroup(buttongroupidx);
-                        auto ccMessage = juce::MidiMessage::controllerEvent(ptrbuttongroup->midiout, 7, 0);
-                        // To do: Which one to use
-                        //ccMessage.setTimeStamp(juce::Time::getMillisecondCounterHiRes() * 0.001 - startTime);
-                        ccMessage.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
-                        mididevices->sendToOutputs(ccMessage);
+                        mididevices->setOutputChannelMuted(ptrbuttongroup->midiout, true);
+                        sendMuteCleanupControllers(ptrbuttongroup->midiout);
 
                         g1svol->setEnabled(false);
                         setArrowButtonsMutedState(g1bvup, g1bvdwn, true);
@@ -3080,6 +3077,7 @@ struct KeyboardPanelPage final : public Component,
 
                         ButtonGroup* ptrbuttongroup = instrumentpanel->getButtonGroup(buttongroupidx);
                         ptrbuttongroup->setMuteButtonStatus(false);
+                        mididevices->setOutputChannelMuted(ptrbuttongroup->midiout, false);
                         applyMutedGroupVisualCue(ptrbuttongroup, false);
                         g1svol->setEnabled(true);
                         setArrowButtonsMutedState(g1bvup, g1bvdwn, false);
@@ -3434,11 +3432,8 @@ struct KeyboardPanelPage final : public Component,
                         g2tbmute->setButtonText("Muted");
 
                         ButtonGroup* ptrbuttongroup = instrumentpanel->getButtonGroup(buttongroupidx);
-                        auto ccMessage = juce::MidiMessage::controllerEvent(ptrbuttongroup->midiout, 7, 0);
-                        // To do: Which one to use
-                        //ccMessage.setTimeStamp(juce::Time::getMillisecondCounterHiRes() * 0.001 - startTime);
-                        ccMessage.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
-                        mididevices->sendToOutputs(ccMessage);
+                        mididevices->setOutputChannelMuted(ptrbuttongroup->midiout, true);
+                        sendMuteCleanupControllers(ptrbuttongroup->midiout);
 
                         g2svol->setEnabled(false);
                         setArrowButtonsMutedState(g2bvup, g2bvdwn, true);
@@ -3456,6 +3451,7 @@ struct KeyboardPanelPage final : public Component,
 
                         ButtonGroup* ptrbuttongroup = instrumentpanel->getButtonGroup(buttongroupidx);
                         ptrbuttongroup->setMuteButtonStatus(false);
+                        mididevices->setOutputChannelMuted(ptrbuttongroup->midiout, false);
                         applyMutedGroupVisualCue(ptrbuttongroup, false);
                         g2svol->setEnabled(true);
                         setArrowButtonsMutedState(g2bvup, g2bvdwn, false);
@@ -3812,11 +3808,8 @@ struct KeyboardPanelPage final : public Component,
                         g3tbmute->setButtonText("Muted");
 
                         ButtonGroup* ptrbuttongroup = instrumentpanel->getButtonGroup(buttongroupidx);
-                        auto ccMessage = juce::MidiMessage::controllerEvent(ptrbuttongroup->midiout, 7, 0);
-                        // To do: Which one to use
-                        //ccMessage.setTimeStamp(juce::Time::getMillisecondCounterHiRes() * 0.001 - startTime);
-                        ccMessage.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
-                        mididevices->sendToOutputs(ccMessage);
+                        mididevices->setOutputChannelMuted(ptrbuttongroup->midiout, true);
+                        sendMuteCleanupControllers(ptrbuttongroup->midiout);
 
                         g3svol->setEnabled(false);
                         setArrowButtonsMutedState(g3bvup, g3bvdwn, true);
@@ -3834,6 +3827,7 @@ struct KeyboardPanelPage final : public Component,
 
                         ButtonGroup* ptrbuttongroup = instrumentpanel->getButtonGroup(buttongroupidx);
                         ptrbuttongroup->setMuteButtonStatus(false);
+                        mididevices->setOutputChannelMuted(ptrbuttongroup->midiout, false);
                         applyMutedGroupVisualCue(ptrbuttongroup, false);
                         g3svol->setEnabled(true);
                         setArrowButtonsMutedState(g3bvup, g3bvdwn, false);
@@ -4189,11 +4183,8 @@ struct KeyboardPanelPage final : public Component,
                         g4tbmute->setButtonText("Muted");
 
                         ButtonGroup* ptrbuttongroup = instrumentpanel->getButtonGroup(buttongroupidx);
-                        auto ccMessage = juce::MidiMessage::controllerEvent(ptrbuttongroup->midiout, 7, 0);
-                        // To do: Which one to use
-                        //ccMessage.setTimeStamp(juce::Time::getMillisecondCounterHiRes() * 0.001 - startTime);
-                        ccMessage.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
-                        mididevices->sendToOutputs(ccMessage);
+                        mididevices->setOutputChannelMuted(ptrbuttongroup->midiout, true);
+                        sendMuteCleanupControllers(ptrbuttongroup->midiout);
 
                         g4svol->setEnabled(false);
                         setArrowButtonsMutedState(g4bvup, g4bvdwn, true);
@@ -4211,6 +4202,7 @@ struct KeyboardPanelPage final : public Component,
 
                         ButtonGroup* ptrbuttongroup = instrumentpanel->getButtonGroup(buttongroupidx);
                         ptrbuttongroup->setMuteButtonStatus(false);
+                        mididevices->setOutputChannelMuted(ptrbuttongroup->midiout, false);
                         applyMutedGroupVisualCue(ptrbuttongroup, false);
                         g4svol->setEnabled(true);
                         setArrowButtonsMutedState(g4bvup, g4bvdwn, false);
@@ -4968,12 +4960,13 @@ struct KeyboardPanelPage final : public Component,
                 DBG("*** loadPreset(): Mute Button " + std::to_string(i));
             }
             else if (bmuted) {
-                // Voice triggerClick above may have sent non-zero volume; model/UI already say
-                // muted so the inequality branch skipped. Re-assert CC7=0 (same as Mute onClick).
-                auto ccMessage = juce::MidiMessage::controllerEvent(ptrbuttongroup->midiout, 7, 0);
-                ccMessage.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
-                mididevices->sendToOutputs(ccMessage);
+                // Keep hard-mute gate active even if UI state did not toggle in this load pass.
+                mididevices->setOutputChannelMuted(ptrbuttongroup->midiout, true);
+                sendMuteCleanupControllers(ptrbuttongroup->midiout);
             }
+
+            // Keep device-side mute gate synchronized with preset state.
+            mididevices->setOutputChannelMuted(ptrbuttongroup->midiout, bmuted);
         }
 
         // Activate Rotary for every Button Group (snapshot + MIDI + Upper/Lower UI)
@@ -5611,6 +5604,8 @@ private:
     {
         if (buttonGroup == nullptr)
             return;
+        if (buttonGroup->getMuteButtonStatus())
+            return;
 
         const int clampedCc7 = juce::jlimit(0, 127, effectiveCc7);
         if (!buttonGroup->isEffectDirty(0, clampedCc7))
@@ -5619,6 +5614,21 @@ private:
         auto ccMessage = juce::MidiMessage::controllerEvent(midiOut, CCVol, clampedCc7);
         ccMessage.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
         mididevices->sendToOutputs(ccMessage);
+    }
+
+    void sendMuteCleanupControllers(int midiOut)
+    {
+        if (mididevices == nullptr || midiOut <= 0 || midiOut >= 17)
+            return;
+
+        // Sustain Off first, then All Notes Off for deterministic cleanup.
+        auto sustainOff = juce::MidiMessage::controllerEvent(midiOut, 64, 0);
+        sustainOff.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
+        mididevices->sendToOutputs(sustainOff);
+
+        auto allNotesOff = juce::MidiMessage::controllerEvent(midiOut, 123, 0);
+        allNotesOff.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
+        mididevices->sendToOutputs(allNotesOff);
     }
 
     void updateVolumeSliderDebugText(Slider* slider, int effectiveCc7) const
@@ -7293,13 +7303,25 @@ private:
         juce::String lines;
         lines.preallocateBytes(flushMessages.size() * 48);
         for (const auto& entry : flushMessages)
-            lines << formatMessage(entry) << "\n";
+            lines << formatMessage(entry, updateAndGetCurrentVolume(entry.message)) << "\n";
 
         monitorTextArea.moveCaretToEnd();
         monitorTextArea.insertTextAtCaret(lines);
     }
 
-    juce::String formatMessage(const MonitorMessageEntry& entry) const
+    int updateAndGetCurrentVolume(const juce::MidiMessage& msg)
+    {
+        const int channel = msg.getChannel();
+        if (channel <= 0 || channel >= 17)
+            return -1;
+
+        if (msg.isController() && msg.getControllerNumber() == CCVol)
+            currentVolumeByChannel[channel] = msg.getControllerValue();
+
+        return currentVolumeByChannel[channel];
+    }
+
+    juce::String formatMessage(const MonitorMessageEntry& entry, int currentVolume) const
     {
         const auto& msg = entry.message;
         juce::String description = msg.getDescription();
@@ -7308,9 +7330,12 @@ private:
 
         const int channel = msg.getChannel();
         if (channel > 0) {
+            const juce::String volumeSuffix = currentVolume >= 0
+                ? " | Vol: " + juce::String(currentVolume)
+                : " | Vol: --";
             if (entry.moduleName.isNotEmpty())
-                return "Ch " + juce::String(channel) + " | " + description + " (" + entry.moduleName + ")";
-            return "Ch " + juce::String(channel) + " | " + description;
+                return "Ch " + juce::String(channel) + " | " + description + volumeSuffix + " (" + entry.moduleName + ")";
+            return "Ch " + juce::String(channel) + " | " + description + volumeSuffix;
         }
 
         return description;
@@ -7333,6 +7358,7 @@ private:
 
     juce::CriticalSection queueLock;
     juce::Array<MonitorMessageEntry> pendingMessages;
+    int currentVolumeByChannel[17] { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 };
 
     std::atomic<bool> monitorEnabled { false };
     bool isTabActive = false;

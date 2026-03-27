@@ -174,6 +174,20 @@ public:
         return true;
     }
 
+    void setOutputChannelMuted(int outchan, bool muted) noexcept
+    {
+        if (!isValidMidiChannel(outchan))
+            return;
+        outputChannelMuted[outchan] = muted;
+    }
+
+    bool isOutputChannelMuted(int outchan) const noexcept
+    {
+        if (!isValidMidiChannel(outchan))
+            return false;
+        return outputChannelMuted[outchan];
+    }
+
     //-------------------------------------------------------------------------
     // Process Inbound Midi Messages and Send to Output
     //-------------------------------------------------------------------------
@@ -227,6 +241,13 @@ public:
 
             const int note = message.getNoteNumber();
             const int outchan = iomap[inchan][i];
+
+            // Hard mute: suppress all note traffic while output channel is muted.
+            if (message.isNoteOnOrOff() && isOutputChannelMuted(outchan))
+            {
+                i++;
+                continue;
+            }
 
             if (!shouldRouteLayeredNote(inchan, note, outchan))
             {
@@ -294,6 +315,12 @@ public:
     // Send Midi Messages to all connected Output Devices
     void sendToOutputs(const MidiMessage& msg)
     {
+        const int outchan = msg.getChannel();
+
+        // Hard mute gate for any direct channelized note emissions.
+        if (msg.isNoteOnOrOff() && isValidMidiChannel(outchan) && isOutputChannelMuted(outchan))
+            return;
+
         if (testSendHook)
             testSendHook(msg);
 
@@ -304,7 +331,6 @@ public:
         }
 
         // Route MIDI message to all mapped output modules for this channel.
-        int outchan = msg.getChannel();
         bool hasMappedRoute = false;
         if (outchan > 0 && outchan < 17)
         {
@@ -411,6 +437,11 @@ public:
         for (int i = 0; i < 17; i++) {
             velocityout[i] = true;
         }
+
+        // Output-channel hard mute state defaults to unmuted.
+        for (int i = 0; i < 17; i++) {
+            outputChannelMuted[i] = false;
+        }
     };
 
     // Array 17, so that we can keep mapping at the 1 -16 channels instead of zero based
@@ -420,6 +451,7 @@ public:
     juce::Array<int> moduleout[17];
     bool passthroughin[17];
     bool velocityout[17];
+    bool outputChannelMuted[17];
 
     // Remember the MidiView monitoring output channel for message duplication
     int midiviewidx = 255;
