@@ -15,6 +15,7 @@
 #include "AMidiRotors.h"
 
 #include <functional>
+#include <atomic>
 #include <map>
 #include <memory>
 #include <vector>
@@ -6975,6 +6976,183 @@ private:
     //JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(HelpPage)
 };
 
+class MonitorPage final : public Component,
+                          private juce::AsyncUpdater
+{
+public:
+    MonitorPage()
+        : mididevices(MidiDevices::getInstance())
+    {
+        setOpaque(true);
+
+        monitorGroup.setColour(juce::GroupComponent::outlineColourId, juce::Colours::grey.darker());
+        addAndMakeVisible(monitorGroup);
+
+        addAndMakeVisible(enableButton);
+        enableButton.setClickingTogglesState(true);
+        enableButton.setColour(juce::TextButton::textColourOffId, juce::Colours::white);
+        enableButton.setColour(juce::TextButton::textColourOnId, juce::Colours::black);
+        enableButton.setColour(juce::TextButton::buttonColourId, juce::Colours::black.darker());
+        enableButton.setColour(juce::TextButton::buttonOnColourId, juce::Colours::antiquewhite);
+        enableButton.setToggleState(false, juce::dontSendNotification);
+        enableButton.setTooltip("Monitoring appends MIDI rows globally while enabled.");
+        updateEnableButtonText(false);
+        enableButton.onClick = [this]()
+            {
+                const bool enabled = enableButton.getToggleState();
+                monitorEnabled.store(enabled, std::memory_order_relaxed);
+                updateEnableButtonText(enabled);
+                ensureMonitorHookRegistered();
+            };
+
+        addAndMakeVisible(clearButton);
+        clearButton.setClickingTogglesState(false);
+        clearButton.setColour(juce::TextButton::textColourOffId, juce::Colours::white);
+        clearButton.setColour(juce::TextButton::textColourOnId, juce::Colours::white);
+        clearButton.setColour(juce::TextButton::buttonColourId, juce::Colours::black.darker());
+        clearButton.setColour(juce::TextButton::buttonOnColourId, juce::Colours::black.brighter());
+        clearButton.setTooltip("Clear monitor text history.");
+        clearButton.onClick = [this]()
+            {
+                monitorTextArea.clear();
+            };
+
+        addAndMakeVisible(monitorTextArea);
+        monitorTextArea.setMultiLine(true, true);
+        monitorTextArea.setReadOnly(true);
+        monitorTextArea.setScrollbarsShown(true);
+        monitorTextArea.setCaretVisible(false);
+        monitorTextArea.setPopupMenuEnabled(true);
+        monitorTextArea.setColour(juce::TextEditor::textColourId, juce::Colours::whitesmoke);
+        monitorTextArea.setColour(juce::TextEditor::backgroundColourId, findColour(juce::ResizableWindow::backgroundColourId));
+        monitorTextArea.setColour(juce::TextEditor::outlineColourId, juce::Colours::grey.withAlpha(0.35f));
+        monitorTextArea.setTextToShowWhenEmpty("Enable monitoring to see outgoing MIDI messages.", juce::Colours::grey);
+    }
+
+    ~MonitorPage() override
+    {
+        if (mididevices != nullptr)
+            mididevices->setOutgoingMidiMonitor({});
+    }
+
+    void paint(juce::Graphics& g) override
+    {
+        g.fillAll(findColour(juce::ResizableWindow::backgroundColourId));
+    }
+
+    void resized() override
+    {
+        auto r = getLocalBounds().reduced(10);
+        monitorGroup.setBounds(r);
+
+        auto inner = r.reduced(12);
+        constexpr int topGapBelowTitle = 10;
+        inner.removeFromTop(topGapBelowTitle);
+
+        const int monitorWidth = juce::jmax(300, inner.getWidth() / 2);
+        auto textAreaBounds = inner.removeFromLeft(monitorWidth);
+        monitorTextArea.setBounds(textAreaBounds);
+
+        constexpr int gapBetweenTextAndControls = 16;
+        inner.removeFromLeft(gapBetweenTextAndControls);
+        auto controlsArea = inner;
+        auto controlsRow = controlsArea.removeFromTop(30);
+        enableButton.setBounds(controlsRow.removeFromLeft(90));
+        controlsRow.removeFromLeft(8);
+        clearButton.setBounds(controlsRow.removeFromLeft(90));
+    }
+
+    void setTabActive(bool active)
+    {
+        if (isTabActive == active) return;
+        isTabActive = active;
+        ensureMonitorHookRegistered();
+    }
+
+private:
+    void updateEnableButtonText(bool enabled)
+    {
+        enableButton.setButtonText(enabled ? "Enabled" : "Disabled");
+    }
+
+    void ensureMonitorHookRegistered()
+    {
+        if (monitorHookInstalled)
+            return;
+
+        if (mididevices == nullptr)
+            mididevices = MidiDevices::getInstance();
+
+        if (mididevices != nullptr)
+        {
+            auto safeThis = juce::Component::SafePointer<MonitorPage>(this);
+            mididevices->setOutgoingMidiMonitor([safeThis](const juce::MidiMessage& message)
+                {
+                    if (safeThis == nullptr)
+                        return;
+                    if (!safeThis->monitorEnabled.load(std::memory_order_relaxed))
+                        return;
+                    safeThis->enqueueMessage(message);
+                });
+            monitorHookInstalled = true;
+        }
+    }
+
+    void enqueueMessage(const juce::MidiMessage& message)
+    {
+        const juce::ScopedLock lock(queueLock);
+        pendingMessages.add(message);
+        triggerAsyncUpdate();
+    }
+
+    void handleAsyncUpdate() override
+    {
+        juce::Array<juce::MidiMessage> flushMessages;
+        {
+            const juce::ScopedLock lock(queueLock);
+            flushMessages.swapWith(pendingMessages);
+        }
+
+        if (flushMessages.isEmpty())
+            return;
+
+        juce::String lines;
+        lines.preallocateBytes(flushMessages.size() * 48);
+        for (const auto& msg : flushMessages)
+            lines << formatMessage(msg) << "\n";
+
+        monitorTextArea.moveCaretToEnd();
+        monitorTextArea.insertTextAtCaret(lines);
+    }
+
+    static juce::String formatMessage(const juce::MidiMessage& msg)
+    {
+        juce::String description = msg.getDescription();
+        if (description.isEmpty())
+            description = juce::String::toHexString(msg.getRawData(), msg.getRawDataSize());
+
+        const int channel = msg.getChannel();
+        if (channel > 0)
+            return "Ch " + juce::String(channel) + " | " + description;
+
+        return description;
+    }
+
+    juce::GroupComponent monitorGroup{ "monitorGroup", "MIDI Out Monitor" };
+    juce::TextButton enableButton{ "Enable" };
+    juce::TextButton clearButton{ "Clear" };
+    juce::TextEditor monitorTextArea;
+
+    MidiDevices* mididevices = nullptr;
+
+    juce::CriticalSection queueLock;
+    juce::Array<juce::MidiMessage> pendingMessages;
+
+    std::atomic<bool> monitorEnabled { false };
+    bool isTabActive = false;
+    bool monitorHookInstalled = false;
+};
+
 
 //==============================================================================
 // Class: Config Page
@@ -8668,8 +8846,10 @@ public:
         ConfigPage* configspage = new ConfigPage(*this, refreshKbPanelSaves);
         EffectsPage* effectspage = new EffectsPage(*this);
         VoicesPage* voicespage = new VoicesPage(*this);
+        MonitorPage* monitorpage = new MonitorPage();
         effectsPageRef = effectspage;
         voicesPageRef = voicespage;
+        monitorPageRef = monitorpage;
 
         // Create MidiStart Page
         addTab("Start",        colour, new MidiStartPage(*this, [configspage](const juce::String& b)
@@ -8689,9 +8869,10 @@ public:
         addTab("Sounds",       colour, voicespage, true);
         addTab("Effects",      colour, effectspage, true);
 
-        // Create Config, Hotkeys, Help, Exit
+        // Create Config, Hotkeys, Monitor, Help, Exit
         addTab("Config",       colour, configspage, true);
         addTab("Hotkeys",      colour, new HotkeysPage(commandManager, keyPressTarget), true);
+        addTab("Monitor",      colour, monitorpage, true);
         addTab("Help",         colour, new HelpPage(), true);
         addTab("Exit",         colour, new Component(), true);
 
@@ -8840,6 +9021,9 @@ public:
 
     void currentTabChanged(int newCurrentTabIndex, const String& newCurrentTabName) override
     {
+        if (monitorPageRef != nullptr)
+            monitorPageRef->setTabActive(newCurrentTabIndex == PTMonitor);
+
         updateVoiceEditTabAccessUi();
 
         if (newCurrentTabIndex == PTVoices || newCurrentTabIndex == PTEffects)
@@ -9091,6 +9275,7 @@ private:
     int lastNonExitTabIndex = PTStart;
     VoicesPage* voicesPageRef = nullptr;
     EffectsPage* effectsPageRef = nullptr;
+    MonitorPage* monitorPageRef = nullptr;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MenuTabs)
 };

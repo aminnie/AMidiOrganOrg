@@ -439,8 +439,9 @@ enum PanelTabsType {
     PTEffects = 5,
     PTConfig = 6,
     PTHotkeys = 7,
-    PTHelp = 8,
-    PTExit = 9
+    PTMonitor = 8,
+    PTHelp = 9,
+    PTExit = 10
 };
 
 enum EffectsMap {

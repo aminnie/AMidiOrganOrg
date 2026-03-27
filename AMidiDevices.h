@@ -281,6 +281,14 @@ public:
         if (testSendHook)
             testSendHook(msg);
 
+        std::function<void(const MidiMessage&)> monitorHookCopy;
+        {
+            const juce::SpinLock::ScopedLockType hookLock(outgoingMonitorHookLock);
+            monitorHookCopy = outgoingMonitorHook;
+        }
+        if (monitorHookCopy)
+            monitorHookCopy(msg);
+
         // Send msg to all active Outputs
         //for (auto midiOutput : midiOutputs) {
         //    if (midiOutput->outDevice != nullptr) {
@@ -310,6 +318,12 @@ public:
             if (midiOutputs[midiviewidx]->outDevice.get() != nullptr)
                 midiOutputs[midiviewidx]->outDevice->sendMessageNow(msg);
         }
+    }
+
+    void setOutgoingMidiMonitor(std::function<void(const MidiMessage&)> hook)
+    {
+        const juce::SpinLock::ScopedLockType hookLock(outgoingMonitorHookLock);
+        outgoingMonitorHook = std::move(hook);
     }
 
     void resetAllControllers()
@@ -393,6 +407,8 @@ public:
 
     // Test hook for observing emitted output messages without hardware.
     std::function<void(const MidiMessage&)> testSendHook;
+    juce::SpinLock outgoingMonitorHookLock;
+    std::function<void(const MidiMessage&)> outgoingMonitorHook;
 
     //==============================================================================
     ReferenceCountedArray<MidiDeviceListEntry> midiInputs, midiOutputs;
