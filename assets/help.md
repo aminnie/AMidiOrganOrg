@@ -1,6 +1,6 @@
 # AMidiOrgan User Guide
 
-For the complete end-user operations manual (including packaged Windows/macOS installation), see `USER_MANUAL.md`.
+For the complete end-user operations manual (including packaged Windows/macOS installation), open `USER_MANUAL.md` included in the release package (same folder level as the app package contents).
 
 ## What This App Does
 AMidiOrgan is a live-performance MIDI controller built with JUCE and C++.

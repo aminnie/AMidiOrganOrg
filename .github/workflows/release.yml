@@ -1,0 +1,176 @@
+name: Release Packages
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  package-windows:
+    name: Package Windows
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Checkout JUCE
+        uses: actions/checkout@v4
+        with:
+          repository: juce-framework/JUCE
+          path: juce
+          fetch-depth: 1
+
+      - name: Resolve release version
+        id: version
+        shell: pwsh
+        run: |
+          if ("${{ github.ref_type }}" -eq "tag") {
+            $version = "${{ github.ref_name }}"
+          } else {
+            $version = "manual-${{ github.run_number }}"
+          }
+          "value=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+      - name: Configure (Release)
+        shell: pwsh
+        run: |
+          cmake -S . -B build -DJUCE_ROOT="${{ github.workspace }}/juce"
+
+      - name: Build app (Release)
+        shell: pwsh
+        run: |
+          cmake --build build --config Release --target AMidiOrgan
+
+      - name: Build package
+        shell: pwsh
+        run: |
+          ./scripts/package-windows.ps1 -Version "${{ steps.version.outputs.value }}" -BuildDir "build"
+
+      - name: Verify package manifest
+        shell: pwsh
+        run: |
+          $zipPath = "dist/AMidiOrgan-${{ steps.version.outputs.value }}-windows-x64.zip"
+          if (!(Test-Path $zipPath)) { throw "Package not found: $zipPath" }
+
+          $extractPath = Join-Path $env:RUNNER_TEMP "amidiorgan-win-check"
+          if (Test-Path $extractPath) { Remove-Item -Recurse -Force $extractPath }
+          Expand-Archive -Path $zipPath -DestinationPath $extractPath -Force
+
+          $root = Join-Path $extractPath "AMidiOrgan-${{ steps.version.outputs.value }}-windows-x64"
+          $required = @(
+            (Join-Path $root "AMidiOrgan.exe"),
+            (Join-Path $root "USER_MANUAL.md"),
+            (Join-Path $root "README-USER.txt"),
+            (Join-Path $root "docs")
+          )
+
+          foreach ($path in $required) {
+            if (!(Test-Path $path)) { throw "Missing required package content: $path" }
+          }
+
+      - name: Upload package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AMidiOrgan-${{ steps.version.outputs.value }}-windows-x64
+          path: dist/AMidiOrgan-${{ steps.version.outputs.value }}-windows-x64.zip
+          if-no-files-found: error
+
+  package-macos:
+    name: Package macOS
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Checkout JUCE
+        uses: actions/checkout@v4
+        with:
+          repository: juce-framework/JUCE
+          path: juce
+          fetch-depth: 1
+
+      - name: Resolve release version
+        id: version
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            VERSION="${GITHUB_REF_NAME}"
+          else
+            VERSION="manual-${GITHUB_RUN_NUMBER}"
+          fi
+          echo "value=${VERSION}" >> "${GITHUB_OUTPUT}"
+
+      - name: Configure (Release)
+        shell: bash
+        run: |
+          cmake -S . -B build -DJUCE_ROOT="${{ github.workspace }}/juce" -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build app (Release)
+        shell: bash
+        run: |
+          cmake --build build --target AMidiOrgan
+
+      - name: Build package
+        shell: bash
+        run: |
+          chmod +x scripts/package-macos.sh
+          ./scripts/package-macos.sh --version "${{ steps.version.outputs.value }}" --build-dir "build"
+
+      - name: Verify package manifest
+        shell: bash
+        run: |
+          ZIP_PATH="dist/AMidiOrgan-${{ steps.version.outputs.value }}-macos.zip"
+          if [[ ! -f "${ZIP_PATH}" ]]; then
+            echo "Package not found: ${ZIP_PATH}" >&2
+            exit 1
+          fi
+
+          EXTRACT_PATH="${RUNNER_TEMP}/amidiorgan-mac-check"
+          rm -rf "${EXTRACT_PATH}"
+          mkdir -p "${EXTRACT_PATH}"
+          unzip -q "${ZIP_PATH}" -d "${EXTRACT_PATH}"
+
+          ROOT="${EXTRACT_PATH}/AMidiOrgan-${{ steps.version.outputs.value }}-macos"
+          [[ -d "${ROOT}/AMidiOrgan.app" ]] || { echo "Missing app bundle"; exit 1; }
+          [[ -f "${ROOT}/USER_MANUAL.md" ]] || { echo "Missing USER_MANUAL.md"; exit 1; }
+          [[ -f "${ROOT}/README-USER.txt" ]] || { echo "Missing README-USER.txt"; exit 1; }
+          [[ -d "${ROOT}/docs" ]] || { echo "Missing docs/ seed directory"; exit 1; }
+
+      - name: Upload package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AMidiOrgan-${{ steps.version.outputs.value }}-macos
+          path: dist/AMidiOrgan-${{ steps.version.outputs.value }}-macos.zip
+          if-no-files-found: error
+
+  publish-release:
+    name: Publish GitHub Release
+    runs-on: ubuntu-latest
+    needs:
+      - package-windows
+      - package-macos
+    if: github.ref_type == 'tag'
+
+    steps:
+      - name: Download packaged artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+
+      - name: Generate checksums
+        shell: bash
+        run: |
+          find release-assets -type f -name "*.zip" -print0 | sort -z | xargs -0 sha256sum > release-assets/checksums.txt
+
+      - name: Publish release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release-assets/**/*.zip
+            release-assets/checksums.txt
