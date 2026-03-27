@@ -1314,11 +1314,6 @@ public:
         addLabelAndSetStyle(lblsvoicetxt, false);
         lblsvoicetxt.setBounds(margin, margin + 110, 160, 50);
 
-        lblsvendornametxt.setText("Sound Filename", {});
-        addLabelAndSetStyle(lblsvendornametxt, false);
-        // Keep module/vendor context in the left column to free horizontal space for voice buttons.
-        lblsvendornametxt.setBounds(margin, margin + 150, 180, 24);
-
         tbroute = addToList(new TextButton("To Upper"));
         tbroute->setColour(TextButton::textColourOffId, Colours::black);
         tbroute->setColour(TextButton::textColourOnId, Colours::black);
@@ -1531,7 +1526,10 @@ public:
 
             midiInstruments->loadMidiInstruments(instrumentfname);
         }
-        lblsvendornametxt.setText(midiInstruments->getVendor(), {});
+        const juce::String moduleName = midiInstruments->getVendor().trim();
+        group->setText(moduleName.isNotEmpty()
+            ? (moduleName + " - Voice Button Config")
+            : "Voice Button Config");
 
         setVoiceBrowserInteractive(true);
         browserLevel = BrowserLevel::categories;
@@ -1689,7 +1687,6 @@ private:
     juce::Label lblsgrouptxt{ "No Group" };
     juce::Label lblsvoice{ "Button Voice" };
     juce::Label lblsvoicetxt{ "No Voice" };
-    juce::Label lblsvendornametxt{ "Sound File" };
     juce::GroupComponent voiceBrowserGroup{ "voiceBrowser", "Voice Categories" };
     juce::TextButton browserBackButton{ "Back" };
     juce::TextButton browserPrevButton{ "Prev" };
@@ -1916,7 +1913,8 @@ public:
     EffectsPage(TabbedComponent& tabs) :
         startTime(juce::Time::getMillisecondCounterHiRes() * 0.001),
         mididevices(MidiDevices::getInstance()), // Creates the singleton if there isn't already one
-        instrumentpanel(InstrumentPanel::getInstance())
+        instrumentpanel(InstrumentPanel::getInstance()),
+        instrumentmodules(InstrumentModules::getInstance())
     {
         juce::Logger::writeToLog("== EffectsPage(): Constructor " + std::to_string(zinstcnteffects++));
 
@@ -2393,6 +2391,17 @@ public:
                 group->setColour(GroupComponent::outlineColourId, Colours::palevioletred.darker());
         }
 
+        const int panelgroup = lookupPanelGroup(panelbtnidx);
+        juce::String moduleName;
+        if (panelgroup >= 0 && panelgroup < numberbuttongroups && instrumentmodules != nullptr)
+        {
+            const int moduleIdx = instrumentpanel->getButtonGroup(panelgroup)->getMidiModule();
+            moduleName = instrumentmodules->getDisplayName(moduleIdx).trim();
+        }
+        group->setText(moduleName.isNotEmpty()
+            ? (moduleName + " - Effects for Voice Button")
+            : "Effects for Voice Button");
+
         lblsgrouptxt.setText(sgroup, {});
 
         String totabtext;
@@ -2433,6 +2442,7 @@ private:
 
     MidiDevices* mididevices = nullptr;
     InstrumentPanel* instrumentpanel = nullptr;
+    InstrumentModules* instrumentmodules = nullptr;
 
     juce::GroupComponent* group;
 
@@ -5357,6 +5367,7 @@ private:
         appState.lastSelectedPanelButtonIdx = selectedPanelButtonIdx;
         appState.hasExplicitVoiceSelection = true;
         enableVoiceEditShortcutButtons();
+        updateVoiceEditEffectsRiskStyle();
     }
 
     /** Sounds / Effects shortcut buttons in "Voice Edits"; enabled after user selects a voice in any group. */
@@ -5366,12 +5377,48 @@ private:
             voiceEditSoundsButton->setEnabled(true);
         if (voiceEditEffectsButton != nullptr)
             voiceEditEffectsButton->setEnabled(true);
+        updateVoiceEditEffectsRiskStyle();
         if (gNotifyVoiceEditTabAccessChanged)
             gNotifyVoiceEditTabAccessChanged();
     }
 
     juce::TextButton* voiceEditSoundsButton = nullptr;
     juce::TextButton* voiceEditEffectsButton = nullptr;
+
+    bool selectedVoiceHasSilentEffectRisk()
+    {
+        if (panelbuttonidx < 0 || panelbuttonidx >= numbervoicebuttons)
+            return false;
+        if (instrumentpanel == nullptr)
+            return false;
+
+        auto* vb = instrumentpanel->getVoiceButton(panelbuttonidx);
+        if (vb == nullptr)
+            return false;
+
+        auto inst = vb->getInstrument();
+        return inst.getVol() == 0 || inst.getExp() == 0 || inst.getBri() == 0;
+    }
+
+    void updateVoiceEditEffectsRiskStyle()
+    {
+        if (voiceEditEffectsButton == nullptr)
+            return;
+
+        voiceEditEffectsButton->setColour(TextButton::textColourOffId, Colours::black);
+        voiceEditEffectsButton->setColour(TextButton::textColourOnId, Colours::black);
+
+        if (voiceEditEffectsButton->isEnabled() && selectedVoiceHasSilentEffectRisk())
+        {
+            voiceEditEffectsButton->setColour(TextButton::buttonColourId, Colours::orange.darker(0.2f));
+            voiceEditEffectsButton->setColour(TextButton::buttonOnColourId, Colours::orange.brighter(0.2f));
+        }
+        else
+        {
+            voiceEditEffectsButton->setColour(TextButton::buttonColourId, Colours::lightgrey);
+            voiceEditEffectsButton->setColour(TextButton::buttonOnColourId, Colours::antiquewhite);
+        }
+    }
 
     void applyRotaryUiSnapshot(bool wantFast, bool wantBrake, bool sendMidi)
     {
