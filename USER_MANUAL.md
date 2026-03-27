@@ -120,6 +120,15 @@ Expected result:
 
 Primary use: startup and system setup.
 
+Reference image:
+
+![Start Tab](docs/images/tab-start.png)
+
+Quick read (look here first):
+
+- Focus first on the top area for MIDI device and module selection.
+- Then confirm panel/config status in the middle/lower area before moving on.
+
 You can:
 
 - Select MIDI input and output devices
@@ -143,6 +152,19 @@ Expected result:
 ## 6.2 Upper / Lower / Bass&Drums Tabs
 
 Primary use: live play and switching.
+
+Reference images:
+
+![Upper Tab](docs/images/tab-upper.png)
+
+![Lower Tab](docs/images/tab-lower.png)
+
+![Bass&Drums Tab](docs/images/tab-bass.png)
+
+Quick read (look here first):
+
+- Focus first on the large button grids; these are your active playable voices.
+- Then use side controls for per-group level/mute, and row buttons to open Sounds/Effects editing.
 
 Each tab contains:
 
@@ -176,6 +198,15 @@ Expected result:
 
 Primary use: assign instrument voice to selected voice button.
 
+Reference image:
+
+![Sounds Tab](docs/images/tab-sounds.png)
+
+Quick read (look here first):
+
+- Focus first on the left-side controls to navigate categories and pages.
+- Then choose the target voice from the main content area.
+
 How to use:
 
 1. Select target voice button from a performance tab first.
@@ -197,6 +228,15 @@ Expected result:
 ## 6.4 Effects Tab
 
 Primary use: edit per-voice effects in real time.
+
+Reference image:
+
+![Effects Tab](docs/images/tab-effects.png)
+
+Quick read (look here first):
+
+- Focus first on the slider/control section; it edits the selected voice's effect values.
+- Then check low-audibility settings first (`VOL`, `EXP`, `BRI`) when troubleshooting sound.
 
 How to use:
 
@@ -220,6 +260,15 @@ Expected result:
 ## 6.5 Config Tab
 
 Primary use: routing and behavior setup.
+
+Reference image:
+
+![Config Tab](docs/images/tab-config.png)
+
+Quick read (look here first):
+
+- Focus first on each row/group block; it defines routing and module/channel behavior.
+- Then use Save/Apply actions and retest performance tabs after changes.
 
 You can configure:
 
@@ -246,6 +295,15 @@ Expected result:
 ## 6.6 Hotkeys Tab
 
 Primary use: keyboard shortcut customization.
+
+Reference image:
+
+![Hotkeys Tab](docs/images/tab-hotkeys.png)
+
+Quick read (look here first):
+
+- Focus first on command rows; each row maps one action to one key.
+- Then use Save/Cancel to apply or discard shortcut edits.
 
 You can:
 
@@ -291,6 +349,15 @@ Expected result:
 - You can see outgoing MIDI lines while enabled and retain history until cleared.
 
 ## 6.8 Help Tab
+
+Reference image:
+
+![Help Tab](docs/images/tab-help.png)
+
+Quick read (look here first):
+
+- Focus first on this tab as your in-app quick reference during setup/performance.
+- Then keep it available for fast reminders without leaving the application.
 
 - Displays in-app user guidance.
 - Use it for quick reference during setup/performance.

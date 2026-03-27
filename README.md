@@ -48,6 +48,10 @@ Each panel uses the active configuration and panel data to determine which voice
 
 ![Config Tab](docs/images/tab-hotkeys.png)
 
+### Monitor Tab
+
+![Config Tab](docs/images/tab-monitor.png)
+
 ### Help Tab
 
 ![Config Tab](docs/images/tab-help.png)
