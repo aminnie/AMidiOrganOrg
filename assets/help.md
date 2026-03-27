@@ -123,8 +123,11 @@ Contact the developer for additional module support.
 
 - Muting is used for fast live layering control.
 - When a group is muted, its volume slider and Up / Down controls are disabled.
-- MIDI notes from the group's input are still transmitted to the group's output.
-- This allows layered note routing while keeping the group's audible level at zero until you need it.
+- While muted, new MIDI Note On events are blocked for that group's output channel (hard mute).
+- On mute, the app sends cleanup controllers to that output channel:
+  - Sustain Off (`CC64=0`)
+  - All Notes Off (`CC123=0`)
+- Mute does not send `CC7=0`; channel volume is restored by the normal volume path on unmute.
 
 ### Presets
 
