@@ -326,6 +326,15 @@ Expected result:
 
 Primary use: troubleshoot outgoing MIDI.
 
+Reference image:
+
+![Monitor Tab](docs/images/tab-monitor.png)
+
+Quick read (look here first):
+
+- Focus first on the capture controls (`Enable`/`Disabled`, `Clear`) at the top of the section.
+- Then watch the monitor text area to confirm real-time outgoing MIDI activity.
+
 Controls:
 
 - `Enable` / `Disabled` toggle for capture
