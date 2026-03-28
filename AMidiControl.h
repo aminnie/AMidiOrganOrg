@@ -4629,11 +4629,20 @@ struct KeyboardPanelPage final : public Component,
 
                     if (tbrotbrake->getToggleState())
                     {
+                        const int rotorType = instrumentmodules->getRotorType(buttongroupmoduleidx);
+                        if (rotorType == 2)
+                            rotorsarray.clear(true);
                         // Set Rotor Brake on
-                        RotaryFastSlow(buttongroupmidiout,
-                            instrumentmodules->getRotorCC(buttongroupmoduleidx),        //74
-                            instrumentmodules->getRotorOff(buttongroupmoduleidx)
-                        );
+                        if (rotorType == 2) {
+                            // Type-2 rotary is modeled by CC74 step ramps; Brake On should force an immediate stop.
+                            RotaryFastSlow(buttongroupmidiout, CCBri, 0);
+                        }
+                        else {
+                            RotaryFastSlow(buttongroupmidiout,
+                                instrumentmodules->getRotorCC(buttongroupmoduleidx),
+                                instrumentmodules->getRotorOff(buttongroupmoduleidx)
+                            );
+                        }
 
                         tbrotbrake->setButtonText("Brake On");
                         rotarybrake = true;
@@ -4642,18 +4651,30 @@ struct KeyboardPanelPage final : public Component,
                     }
                     else
                     {
+                        const int rotorType = instrumentmodules->getRotorType(buttongroupmoduleidx);
                         // Set Rotor Brake off and restart Rotor at previous Fast or Slow
-                        if (isFastUpper) {
-                            RotaryFastSlow(buttongroupmidiout,
-                                instrumentmodules->getRotorCC(buttongroupmoduleidx),
-                                instrumentmodules->getRotorFast(buttongroupmoduleidx)
-                            );
+                        if (rotorType == 2) {
+                            rotorsarray.clear(true);
+                            if (isFastUpper)
+                                rotorsarray.add(new RotaryFastThread(*this, buttongroupmidiout));
+                            else {
+                                // For type-2 slow restore after Brake On, avoid a transient jump to 63.
+                                RotaryFastSlow(buttongroupmidiout, CCBri, 10);
+                            }
                         }
                         else {
-                            RotaryFastSlow(buttongroupmidiout,
-                                instrumentmodules->getRotorCC(buttongroupmoduleidx),
-                                instrumentmodules->getRotorSlow(buttongroupmoduleidx)
-                            );
+                            if (isFastUpper) {
+                                RotaryFastSlow(buttongroupmidiout,
+                                    instrumentmodules->getRotorCC(buttongroupmoduleidx),
+                                    instrumentmodules->getRotorFast(buttongroupmoduleidx)
+                                );
+                            }
+                            else {
+                                RotaryFastSlow(buttongroupmidiout,
+                                    instrumentmodules->getRotorCC(buttongroupmoduleidx),
+                                    instrumentmodules->getRotorSlow(buttongroupmoduleidx)
+                                );
+                            }
                         }
 
                         tbrotbrake->setButtonText("Brake Off");
