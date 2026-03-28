@@ -92,3 +92,66 @@ Phase 1 bindings and focus behavior are documented in `README.md`. Optional late
 - [ ] Standardize section heading contrast and label font hierarchy for faster visual scan.
 - [ ] Group Hotkeys rows visually by function clusters (tabs, presets, rotary) without changing bindings.
 - [ ] Add consistent disabled-state tooltip language across guarded tabs/actions.
+
+## Two-screen-size support (proposal)
+
+Target profiles:
+- Current: `1480 x 320`
+- Large: `2560 x 720`
+
+Guiding decision:
+- [ ] Support exactly two named UI layouts first; do not expose freeform resize or independent X/Y stretching in the initial implementation.
+
+### Phase 1: Window/profile infrastructure
+- [ ] Add shared UI profile definitions for `1480 x 320` and `2560 x 720`.
+- [ ] Centralize window/profile selection logic in `Main.cpp` and `AMidiControl.h` so the app can open in either supported size.
+- [ ] Keep the current size as the default profile until the large profile is visually validated.
+- [ ] Optionally plan later persistence of the last-used profile, but keep it out of the first implementation pass.
+
+### Phase 2: Shared layout metrics
+- [ ] Introduce a shared `UiMetrics`/layout-profile struct for margins, gutters, button sizes, label heights, slider sizes, tab depth, and font scaling.
+- [ ] Replace new magic numbers with metrics helpers rather than adding more page-local literals.
+- [ ] Use the current layout as the baseline reference, then define a tuned large-profile metric set instead of mathematically stretching everything.
+
+### Phase 3: Move layout into `resized()`
+- [ ] Refactor targeted pages so constructors create controls and `resized()` computes bounds from active metrics.
+- [ ] Avoid relying on transform-only scaling for the `2560 x 720` profile because width/height growth is not proportional to the current layout.
+- [ ] Keep behavior, routing, and persistence unchanged while moving geometry logic.
+
+### Phase 4: Convert pages in recommended order
+- [ ] Convert `MidiStartPage` first as the proving ground for profile-driven layout.
+- [ ] Convert `VoicesPage` next and validate browser/group/action-row spacing at both sizes.
+- [ ] Convert `EffectsPage` next and validate rotary control sizing, text boxes, and route/cancel controls at both sizes.
+- [ ] Convert `KeyboardPanelPage` after the pattern is stable; expect this to be the largest part of the work due to dense hard-coded group/button geometry.
+- [ ] Convert `ConfigPage` after the keyboard layout approach is proven.
+- [ ] Leave `MonitorPage`, `HelpPage`, and `HotkeysPage` mostly intact unless profile-specific tuning is actually needed.
+
+### Phase 5: Large-profile tuning
+- [ ] Tune the `2560 x 720` profile intentionally for larger controls, fonts, gutters, and group spacing so it feels designed rather than stretched.
+- [ ] Decide how extra vertical space should be used on the large profile instead of merely centering the old 320px-tall layout.
+- [ ] Review status/file labels, tab-bar depth, quick-navigation buttons, and footer alignment for large-screen readability.
+
+### Phase 6: Validation
+- [ ] Verify both supported profiles launch correctly and preserve the same tab order, workflows, and MIDI behavior.
+- [ ] Manually smoke-test Start, Upper, Lower, Bass&Drums, Sounds, Effects, Config, Hotkeys, Monitor, and Help at both sizes.
+- [ ] Validate combo boxes, popup menus, bubble messages, viewport pages, and window-drag behavior in both profiles.
+- [ ] Confirm panel/config save-reload, voice selection, effect sends, and preset flows remain unchanged after layout refactors.
+
+### Phase 7: Go/no-go checkpoints
+- [ ] After `MidiStartPage`, decide whether the metrics/profile approach is clean enough to continue.
+- [ ] After `VoicesPage` and `EffectsPage`, decide whether the large profile still looks intentional without page-specific hacks.
+- [ ] Before starting `KeyboardPanelPage`, confirm the project is worth the remaining effort; this page will likely determine the real total cost.
+
+### Effort and risk note
+- [ ] Expect low effort for window/profile shell changes alone, but those changes are not enough to deliver a good `2560 x 720` UI by themselves.
+- [ ] Expect medium effort for the shared metrics infrastructure plus conversion of `MidiStartPage`, `VoicesPage`, and `EffectsPage`; this is the best prototype milestone.
+- [ ] Expect high effort for full delivery because `KeyboardPanelPage` contains the densest hard-coded geometry and will likely dominate the schedule.
+- [ ] Primary risk: the large profile can devolve into page-specific exceptions unless the metrics/resized pattern stays disciplined.
+- [ ] Recommended stop point: if `VoicesPage` and `EffectsPage` still need too many one-off adjustments, reconsider whether a full second layout is worth completing.
+
+### Recommended first milestone
+- [ ] Implement only the profile shell plus shared `UiMetrics` infrastructure first.
+- [ ] Convert `MidiStartPage`, `VoicesPage`, and `EffectsPage` to metrics-driven `resized()` layout.
+- [ ] Defer `KeyboardPanelPage` and `ConfigPage` until the first three pages prove the approach is maintainable.
+- [ ] Treat the milestone as successful only if both `1480 x 320` and `2560 x 720` feel intentional without blurry scaling or page-specific hacks.
+- [ ] Re-evaluate scope before continuing into `KeyboardPanelPage`.
