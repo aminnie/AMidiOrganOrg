@@ -1,0 +1,5 @@
+# Hashes of file build rules.
+9afe02f822e8139c1b466b0f2e8c59e1 AMidiOrganTests_artefacts/JuceLibraryCode/JuceHeader.h
+f381f055ba8fbf3edfdcac6a0b183111 AMidiOrgan_artefacts/JuceLibraryCode/AMidiOrgan/PkgInfo
+8b190e76125247779b9220cd848ec554 AMidiOrgan_artefacts/JuceLibraryCode/JuceHeader.h
+73e15e62131b1c72c6c70dd610ddd5b5 juce_binarydata_AMidiOrganBinaryData/JuceLibraryCode/BinaryData1.cpp
