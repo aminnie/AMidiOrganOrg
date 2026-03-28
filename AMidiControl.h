@@ -5848,19 +5848,16 @@ public:
 
         addAndMakeVisible(loadConfigButton);
         loadConfigButton.setButtonText("Load Config");
-        loadConfigButton.setColour(TextButton::textColourOffId, Colours::white);
-        loadConfigButton.setColour(TextButton::textColourOnId, Colours::white);
-        loadConfigButton.setColour(TextButton::buttonColourId, Colours::black);
-        loadConfigButton.setColour(TextButton::buttonOnColourId, Colours::black);
+        loadConfigButton.setColour(TextButton::textColourOffId, Colours::black);
+        loadConfigButton.setColour(TextButton::textColourOnId, Colours::black);
+        loadConfigButton.setColour(TextButton::buttonColourId, juce::Colour(0xffa3b68a));
+        loadConfigButton.setColour(TextButton::buttonOnColourId, juce::Colour(0xffa3b68a).interpolatedWith(juce::Colours::black, 0.10f));
         loadConfigButton.setToggleState(true, dontSendNotification);
         loadConfigButton.onClick = [this]()
             {
-                // 6-arg ctor: explicit useOSNativeDialogBox=false => JUCE FileBrowser (not OS shell dialog).
                 filechooser.reset(new FileChooser(
                     "Select Config file to load",
-                    File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
-                        .getChildFile(organdir)
-                        .getChildFile(appState.configdir),
+                    getConfigsDirectory(),
                     "*.cfg",
                     false,
                     false,
@@ -5885,91 +5882,19 @@ public:
                                 result.toString(false);
                         }
 
-                        if (selectedfname == "") return;
-
-                        juce::Logger::writeToLog("*** MidiStartPage(): Loading Config: " + selectedfname);
-
-                        auto refreshConfigLabel = [this]()
-                            {
-                                appState.configreload = (appState.configfname.compare(appState.pnlconfigfname) != 0);
-                                configfileLabel.setText(appState.configfname, {});
-                                if (appState.configreload == true)
-                                    configfileLabel.setColour(juce::Label::textColourId, juce::Colours::red.darker());
-                                else
-                                    configfileLabel.setColour(juce::Label::textColourId, juce::Colours::grey);
-                            };
-
-                        auto performLoad = [this, selectedfname, refreshConfigLabel]()
-                            {
-                                if (!loadConfigFromBasename)
-                                {
-                                    juce::Logger::writeToLog("*** MidiStartPage(): Load Config: loader not available");
-                                    return;
-                                }
-                                const bool bloaded = loadConfigFromBasename(selectedfname);
-                                if (bloaded)
-                                    saveLastSessionStateToFile(appState);
-                                refreshConfigLabel();
-                                const String msgloaded = bloaded ? ("Loaded: " + appState.configfname)
-                                    : ("Load failed: " + selectedfname);
-                                if (TextButton* focused = &loadConfigButton)
-                                    BubbleMessage(*focused, msgloaded, this->bubbleMessage);
-                                if (refreshKeyboardPanelSaveAvailability)
-                                    refreshKeyboardPanelSaveAvailability();
-                            };
-
-                        if (selectedfname == appState.pnlconfigfname)
-                        {
-                            appState.configPanelPairingMismatchAcknowledged = false;
-                            performLoad();
+                        if (selectedfname.isEmpty())
                             return;
-                        }
 
-                        const String msg = juce::String("The current instrument panel was saved with \"") + appState.pnlconfigfname
-                            + "\".\nYou selected \"" + selectedfname + "\".\n\n"
-                            "Routing may not match this song/style until configs align.\n\n"
-                            "Load anyway?";
-
-                        auto safeStart = juce::Component::SafePointer<MidiStartPage>(this);
-                        juce::AlertWindow::showOkCancelBox(
-                            juce::AlertWindow::WarningIcon,
-                            "Config / panel mismatch",
-                            msg,
-                            "Load anyway",
-                            "Abort",
-                            this,
-                            juce::ModalCallbackFunction::create([safeStart, selectedfname](int result)
-                                {
-                                    if (safeStart == nullptr || result != 1)
-                                        return;
-                                    safeStart->appState.configPanelPairingMismatchAcknowledged = true;
-                                    if (!safeStart->loadConfigFromBasename)
-                                        return;
-                                    const bool bloaded = safeStart->loadConfigFromBasename(selectedfname);
-                                    if (bloaded)
-                                        saveLastSessionStateToFile(safeStart->appState);
-                                    safeStart->appState.configreload = (safeStart->appState.configfname.compare(safeStart->appState.pnlconfigfname) != 0);
-                                    safeStart->configfileLabel.setText(safeStart->appState.configfname, {});
-                                    if (safeStart->appState.configreload == true)
-                                        safeStart->configfileLabel.setColour(juce::Label::textColourId, juce::Colours::red.darker());
-                                    else
-                                        safeStart->configfileLabel.setColour(juce::Label::textColourId, juce::Colours::grey);
-                                    const juce::String msgloaded = bloaded ? ("Loaded: " + safeStart->appState.configfname)
-                                        : ("Load failed: " + selectedfname);
-                                    if (juce::TextButton* focused = &safeStart->loadConfigButton)
-                                        BubbleMessage(*focused, msgloaded, safeStart->bubbleMessage);
-                                    if (safeStart->refreshKeyboardPanelSaveAvailability)
-                                        safeStart->refreshKeyboardPanelSaveAvailability();
-                                }));
+                        loadConfigBasenameWithMismatchPrompt(selectedfname, loadConfigButton);
                     });
             };
 
         addAndMakeVisible(loadPanelButton);
         loadPanelButton.setButtonText("Load Panel");
-        loadPanelButton.setColour(TextButton::textColourOffId, Colours::white);
-        loadPanelButton.setColour(TextButton::textColourOnId, Colours::white);
-        loadPanelButton.setColour(TextButton::buttonColourId, Colours::black);
-        loadPanelButton.setColour(TextButton::buttonOnColourId, Colours::black);
+        loadPanelButton.setColour(TextButton::textColourOffId, Colours::black);
+        loadPanelButton.setColour(TextButton::textColourOnId, Colours::black);
+        loadPanelButton.setColour(TextButton::buttonColourId, juce::Colour(0xffa3b68a));
+        loadPanelButton.setColour(TextButton::buttonOnColourId, juce::Colour(0xffa3b68a).interpolatedWith(juce::Colours::black, 0.10f));
         loadPanelButton.setToggleState(true, dontSendNotification);
         loadPanelButton.onClick = [this]()
             {
@@ -6012,15 +5937,28 @@ public:
 
         addAndMakeVisible(newPanelButton);
         newPanelButton.setButtonText("New Panel");
-        newPanelButton.setColour(TextButton::textColourOffId, Colours::white);
-        newPanelButton.setColour(TextButton::textColourOnId, Colours::white);
-        newPanelButton.setColour(TextButton::buttonColourId, Colours::black);
-        newPanelButton.setColour(TextButton::buttonOnColourId, Colours::black);
+        newPanelButton.setColour(TextButton::textColourOffId, Colours::black);
+        newPanelButton.setColour(TextButton::textColourOnId, Colours::black);
+        newPanelButton.setColour(TextButton::buttonColourId, juce::Colour(0xffc7b793));
+        newPanelButton.setColour(TextButton::buttonOnColourId, juce::Colour(0xffc7b793).interpolatedWith(juce::Colours::black, 0.10f));
         newPanelButton.setToggleState(true, dontSendNotification);
         newPanelButton.setTooltip("Create a new panel prefilled from the current module's first voice.");
         newPanelButton.onClick = [this]()
             {
                 launchNewPanelCreationFlow();
+            };
+
+        addAndMakeVisible(newConfigButton);
+        newConfigButton.setButtonText("New Config");
+        newConfigButton.setColour(TextButton::textColourOffId, Colours::black);
+        newConfigButton.setColour(TextButton::textColourOnId, Colours::black);
+        newConfigButton.setColour(TextButton::buttonColourId, juce::Colour(0xffc7b793));
+        newConfigButton.setColour(TextButton::buttonOnColourId, juce::Colour(0xffc7b793).interpolatedWith(juce::Colours::black, 0.10f));
+        newConfigButton.setToggleState(true, dontSendNotification);
+        newConfigButton.setTooltip("Create a new config from midigm.cfg using the current Start-tab module.");
+        newConfigButton.onClick = [this]()
+            {
+                launchNewConfigCreationFlow();
             };
 
         addAndMakeVisible(exitButton);
@@ -6286,17 +6224,18 @@ public:
 
         // Keep Load Panel aligned with Instruments/Config actions.
         loadPanelButton.setBounds(280, margin + 205, 90, 50);
-        newPanelButton.setBounds(380, margin + 205, 90, 50);
+        newConfigButton.setBounds(380, margin + 205, 90, 50);
+        newPanelButton.setBounds(480, margin + 205, 90, 50);
         toConfig.setBounds(820, margin + 200, 90, 50);
 
         // Place Exit in the top-right header area for faster access.
         exitButton.setBounds(getWidth() - 90, 4, 80, 24);
 
-        panelPrefixLabel.setBounds(480, margin + 210, 70, 20);
-        panelfileLabel.setBounds(550, margin + 210, 280, 20);
+        panelPrefixLabel.setBounds(580, margin + 210, 70, 20);
+        panelfileLabel.setBounds(650, margin + 210, 280, 20);
 
-        configPrefixLabel.setBounds(480, margin + 230, 70, 20);
-        configfileLabel.setBounds(550, margin + 230, 280, 20);
+        configPrefixLabel.setBounds(580, margin + 230, 70, 20);
+        configfileLabel.setBounds(650, margin + 230, 280, 20);
 
         statusLabel.setBounds(1180, margin + 200, 250, 20);
         buildInfoLabel.setBounds(getWidth() - 290, getHeight() - 24, 280, 20);
@@ -6410,6 +6349,261 @@ private:
                 break;
             }
         }
+    }
+
+    juce::File getConfigsDirectory() const
+    {
+        juce::File dir = juce::File::getSpecialLocation(juce::File::SpecialLocationType::userDocumentsDirectory)
+            .getChildFile(organdir)
+            .getChildFile(appState.configdir);
+        if (!dir.isDirectory())
+            dir.createDirectory();
+        return dir;
+    }
+
+    void refreshConfigFileLabel()
+    {
+        appState.configreload = (appState.configfname.compare(appState.pnlconfigfname) != 0);
+        configfileLabel.setText(appState.configfname, {});
+        if (appState.configreload == true)
+            configfileLabel.setColour(juce::Label::textColourId, juce::Colours::red.darker());
+        else
+            configfileLabel.setColour(juce::Label::textColourId, juce::Colours::grey);
+    }
+
+    void loadConfigBasenameWithMismatchPrompt(const juce::String& selectedfname, juce::TextButton& bubbleAnchor)
+    {
+        if (selectedfname.isEmpty())
+            return;
+
+        juce::Logger::writeToLog("*** MidiStartPage(): Loading Config: " + selectedfname);
+        juce::TextButton* bubbleButton = &bubbleAnchor;
+
+        auto performLoad = [this, selectedfname, bubbleButton]()
+            {
+                if (!loadConfigFromBasename)
+                {
+                    juce::Logger::writeToLog("*** MidiStartPage(): Load Config: loader not available");
+                    return;
+                }
+                const bool bloaded = loadConfigFromBasename(selectedfname);
+                if (bloaded)
+                    saveLastSessionStateToFile(appState);
+                refreshConfigFileLabel();
+                const String msgloaded = bloaded ? ("Loaded: " + appState.configfname)
+                    : ("Load failed: " + selectedfname);
+                if (bubbleButton != nullptr)
+                    BubbleMessage(*bubbleButton, msgloaded, this->bubbleMessage);
+                if (refreshKeyboardPanelSaveAvailability)
+                    refreshKeyboardPanelSaveAvailability();
+            };
+
+        if (selectedfname == appState.pnlconfigfname)
+        {
+            appState.configPanelPairingMismatchAcknowledged = false;
+            performLoad();
+            return;
+        }
+
+        const String msg = juce::String("The current instrument panel was saved with \"") + appState.pnlconfigfname
+            + "\".\nYou selected \"" + selectedfname + "\".\n\n"
+            "Routing may not match this song/style until configs align.\n\n"
+            "Load anyway?";
+
+        auto safeStart = juce::Component::SafePointer<MidiStartPage>(this);
+        juce::AlertWindow::showOkCancelBox(
+            juce::AlertWindow::WarningIcon,
+            "Config / panel mismatch",
+            msg,
+            "Load anyway",
+            "Abort",
+            this,
+            juce::ModalCallbackFunction::create([safeStart, selectedfname, bubbleButton](int result)
+                {
+                    if (safeStart == nullptr || result != 1)
+                        return;
+                    safeStart->appState.configPanelPairingMismatchAcknowledged = true;
+                    if (!safeStart->loadConfigFromBasename)
+                        return;
+                    const bool bloaded = safeStart->loadConfigFromBasename(selectedfname);
+                    if (bloaded)
+                        saveLastSessionStateToFile(safeStart->appState);
+                    safeStart->refreshConfigFileLabel();
+                    const juce::String msgloaded = bloaded ? ("Loaded: " + safeStart->appState.configfname)
+                        : ("Load failed: " + selectedfname);
+                    if (bubbleButton != nullptr)
+                        BubbleMessage(*bubbleButton, msgloaded, safeStart->bubbleMessage);
+                    if (safeStart->refreshKeyboardPanelSaveAvailability)
+                        safeStart->refreshKeyboardPanelSaveAvailability();
+                }));
+    }
+
+    juce::String normalizeConfigFileName(juce::String proposedName) const
+    {
+        proposedName = proposedName.trim();
+        if (proposedName.isEmpty())
+            return {};
+
+        if (!proposedName.endsWithIgnoreCase(".cfg"))
+            proposedName += ".cfg";
+
+        return proposedName;
+    }
+
+    bool buildNewConfigValueTreeFromMidigm(juce::ValueTree& outTree, juce::String& errorText)
+    {
+        static const juce::Identifier moduleidxType("moduleidx");
+        static const juce::Identifier modulealiasType("modulealias");
+
+        if (instrumentmodules == nullptr)
+        {
+            errorText = "Module service is unavailable.";
+            return false;
+        }
+
+        const int moduleCount = instrumentmodules->getNumModules();
+        if (appState.moduleidx < 0 || appState.moduleidx >= moduleCount)
+        {
+            errorText = "Current Start-tab module selection is invalid.";
+            return false;
+        }
+
+        const juce::File sourceFile = getConfigsDirectory().getChildFile("midigm.cfg");
+        if (!sourceFile.existsAsFile())
+        {
+            errorText = "Template config midigm.cfg was not found.";
+            return false;
+        }
+
+        juce::FileInputStream input(sourceFile);
+        if (!input.openedOk())
+        {
+            errorText = "Template config midigm.cfg could not be opened.";
+            return false;
+        }
+
+        juce::ValueTree tempConfig;
+        tempConfig = tempConfig.readFromStream(input);
+        if (!(tempConfig.isValid() && tempConfig.getNumChildren() > 0))
+        {
+            errorText = "Template config midigm.cfg is invalid.";
+            return false;
+        }
+
+        const int childCount = tempConfig.getNumChildren();
+        for (int i = 0; i < childCount; ++i)
+        {
+            auto child = tempConfig.getChild(i);
+            if (!child.isValid())
+                continue;
+            child.setProperty(moduleidxType, appState.moduleidx, nullptr);
+            child.setProperty(modulealiasType, "", nullptr);
+        }
+
+        outTree = tempConfig.createCopy();
+        return true;
+    }
+
+    bool writeConfigValueTreeToFile(const juce::ValueTree& tree, const juce::File& outputFile, juce::String& errorText)
+    {
+        if (!tree.isValid())
+        {
+            errorText = "Generated config data is invalid.";
+            return false;
+        }
+
+        if (!outputFile.getParentDirectory().isDirectory() && !outputFile.getParentDirectory().createDirectory())
+        {
+            errorText = "Failed to create config directory.";
+            return false;
+        }
+
+        if (outputFile.existsAsFile() && !outputFile.deleteFile())
+        {
+            errorText = "Failed to replace existing config file.";
+            return false;
+        }
+
+        juce::FileOutputStream output(outputFile);
+        if (!output.openedOk())
+        {
+            errorText = "Failed to open output config file.";
+            return false;
+        }
+
+        tree.writeToStream(output);
+        output.flush();
+        if (output.getStatus().failed())
+        {
+            errorText = "Failed while writing config file.";
+            return false;
+        }
+
+        return true;
+    }
+
+    void launchNewConfigCreationFlow()
+    {
+        const bool useNativeVersion = false;
+        const juce::File proposed = getConfigsDirectory().getChildFile("newconfig.cfg");
+        filechooser.reset(new FileChooser(
+            "Create New Config: Enter new *.cfg file name",
+            proposed,
+            "*.cfg",
+            useNativeVersion));
+
+        filechooser->launchAsync(
+            juce::FileBrowserComponent::saveMode
+            | juce::FileBrowserComponent::canSelectFiles
+            | juce::FileBrowserComponent::warnAboutOverwriting,
+            [this](const juce::FileChooser& chooser)
+            {
+                juce::String selectedFileName;
+                auto results = chooser.getURLResults();
+                for (auto result : results)
+                    selectedFileName << (result.isLocalFile() ? result.getLocalFile().getFileName()
+                        : result.toString(false));
+
+                if (selectedFileName.isEmpty())
+                    return;
+
+                const juce::String normalizedFileName = normalizeConfigFileName(selectedFileName);
+                if (normalizedFileName.isEmpty())
+                    return;
+
+                const juce::File target = getConfigsDirectory().getChildFile(normalizedFileName);
+                if (target.existsAsFile())
+                {
+                    juce::AlertWindow::showMessageBoxAsync(
+                        juce::AlertWindow::WarningIcon,
+                        "Config already exists",
+                        "A config file named \"" + normalizedFileName
+                        + "\" already exists. Choose a different file name.");
+                    return;
+                }
+
+                juce::ValueTree seededConfig;
+                juce::String errorText;
+                if (!buildNewConfigValueTreeFromMidigm(seededConfig, errorText))
+                {
+                    juce::AlertWindow::showMessageBoxAsync(
+                        juce::AlertWindow::WarningIcon,
+                        "Cannot create config",
+                        errorText.isNotEmpty() ? errorText : "Could not create config from template.");
+                    return;
+                }
+
+                if (!writeConfigValueTreeToFile(seededConfig, target, errorText))
+                {
+                    juce::AlertWindow::showMessageBoxAsync(
+                        juce::AlertWindow::WarningIcon,
+                        "Config save failed",
+                        errorText.isNotEmpty() ? errorText : "Failed to save new config file.");
+                    return;
+                }
+
+                loadConfigBasenameWithMismatchPrompt(normalizedFileName, newConfigButton);
+            });
     }
 
     juce::String normalizePanelFileName(juce::String proposedName) const
@@ -7079,6 +7273,7 @@ private:
     TextButton loadConfigButton{ "Load Config" };
     TextButton loadPanelButton{ "Load Panel" };
     TextButton newPanelButton{ "New Panel" };
+    TextButton newConfigButton{ "New Config" };
 
     TextButton toModule{ "To Modules" };
     TextButton toHelp{ "To Help" };
