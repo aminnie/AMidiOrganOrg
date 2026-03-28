@@ -1425,6 +1425,9 @@ public:
         tbcancel->setBounds(margin + 100, 225, 80, 30);
         tbcancel->onClick = [=, &tabs]()
             {
+                // Canceling out of Sounds should not leave Save/Save As in pending state.
+                clearPendingSoundEditPrompt();
+
                 // Populate the Effects Page with last Button Instrument pressed and switch to tab
                 tabs.setCurrentTabIndex(currenttabidx, true);
                 //String sname = tabs.getCurrentTabName();
@@ -2198,6 +2201,9 @@ public:
         tbcancel->setBounds(margin + 100, 2 * margin + 140, 80, 30);
         tbcancel->onClick = [=, &tabs]()
             {
+                // Canceling out of Effects should not leave Save/Save As in pending state.
+                clearPendingEffectsEditPrompt();
+
                 // Populate the Effects Page with last Button Instrument pressed and switch to tab
                 tabs.setCurrentTabIndex(currenttabidx, true);
 

@@ -49,6 +49,16 @@ static bool hasPendingExitSavePrompt()
     return bpendingSoundEdit || bpendingEffectsEdit || bpendingPresetSet;
 }
 
+static void clearPendingSoundEditPrompt()
+{
+    bpendingSoundEdit = false;
+}
+
+static void clearPendingEffectsEditPrompt()
+{
+    bpendingEffectsEdit = false;
+}
+
 static void clearPendingExitSavePrompt()
 {
     bpendingSoundEdit = false;
