@@ -5939,8 +5939,8 @@ public:
         newPanelButton.setButtonText("New Panel");
         newPanelButton.setColour(TextButton::textColourOffId, Colours::black);
         newPanelButton.setColour(TextButton::textColourOnId, Colours::black);
-        newPanelButton.setColour(TextButton::buttonColourId, juce::Colour(0xffc7b793));
-        newPanelButton.setColour(TextButton::buttonOnColourId, juce::Colour(0xffc7b793).interpolatedWith(juce::Colours::black, 0.10f));
+        newPanelButton.setColour(TextButton::buttonColourId, juce::Colour(0xff8aa3b6));
+        newPanelButton.setColour(TextButton::buttonOnColourId, juce::Colour(0xff8aa3b6).interpolatedWith(juce::Colours::black, 0.10f));
         newPanelButton.setToggleState(true, dontSendNotification);
         newPanelButton.setTooltip("Create a new panel prefilled from the current module's first voice.");
         newPanelButton.onClick = [this]()
@@ -5952,8 +5952,8 @@ public:
         newConfigButton.setButtonText("New Config");
         newConfigButton.setColour(TextButton::textColourOffId, Colours::black);
         newConfigButton.setColour(TextButton::textColourOnId, Colours::black);
-        newConfigButton.setColour(TextButton::buttonColourId, juce::Colour(0xffc7b793));
-        newConfigButton.setColour(TextButton::buttonOnColourId, juce::Colour(0xffc7b793).interpolatedWith(juce::Colours::black, 0.10f));
+        newConfigButton.setColour(TextButton::buttonColourId, juce::Colour(0xff8aa3b6));
+        newConfigButton.setColour(TextButton::buttonOnColourId, juce::Colour(0xff8aa3b6).interpolatedWith(juce::Colours::black, 0.10f));
         newConfigButton.setToggleState(true, dontSendNotification);
         newConfigButton.setTooltip("Create a new config from midigm.cfg using the current Start-tab module.");
         newConfigButton.onClick = [this]()
