@@ -30,6 +30,24 @@
 #define AMIDIORGAN_BUILD_NUMBER "local"
 #endif
 
+enum class Type2RotaryAction
+{
+    hardStop,
+    startFastRamp,
+    restoreSlowTarget
+};
+
+inline constexpr int kType2RotorSlowRestoreValue = 10;
+
+inline Type2RotaryAction resolveType2RotaryAction(bool wantFast, bool wantBrake)
+{
+    if (wantBrake)
+        return Type2RotaryAction::hardStop;
+    if (wantFast)
+        return Type2RotaryAction::startFastRamp;
+    return Type2RotaryAction::restoreSlowTarget;
+}
+
 // Logging to a file
 // https://forum.juce.com/t/logging-to-file-in-plugin/30950
 // Widgets to use in future release
@@ -4559,6 +4577,7 @@ struct KeyboardPanelPage final : public Component,
                             );
                         }
                         else if (instrumentmodules->getRotorType(buttongroupmoduleidx) == 2) {
+                            rotorsarray.clear(true);
                             rotorsarray.add(new RotaryFastThread(*this, buttongroupmidiout));
                         }
 
@@ -4577,6 +4596,7 @@ struct KeyboardPanelPage final : public Component,
                             );
                         }
                         else if (instrumentmodules->getRotorType(buttongroupmoduleidx) == 2) {
+                            rotorsarray.clear(true);
                             rotorsarray.add(new RotarySlowThread(*this, buttongroupmidiout));
                         }
 
@@ -4655,11 +4675,18 @@ struct KeyboardPanelPage final : public Component,
                         // Set Rotor Brake off and restart Rotor at previous Fast or Slow
                         if (rotorType == 2) {
                             rotorsarray.clear(true);
-                            if (isFastUpper)
-                                rotorsarray.add(new RotaryFastThread(*this, buttongroupmidiout));
-                            else {
-                                // For type-2 slow restore after Brake On, avoid a transient jump to 63.
-                                RotaryFastSlow(buttongroupmidiout, CCBri, 10);
+                            switch (resolveType2RotaryAction(isFastUpper, false))
+                            {
+                                case Type2RotaryAction::startFastRamp:
+                                    rotorsarray.add(new RotaryFastThread(*this, buttongroupmidiout));
+                                    break;
+                                case Type2RotaryAction::restoreSlowTarget:
+                                    // For type-2 slow restore after Brake On, avoid a transient jump to 63.
+                                    RotaryFastSlow(buttongroupmidiout, CCBri, kType2RotorSlowRestoreValue);
+                                    break;
+                                case Type2RotaryAction::hardStop:
+                                    RotaryFastSlow(buttongroupmidiout, CCBri, 0);
+                                    break;
                             }
                         }
                         else {
@@ -5456,10 +5483,26 @@ private:
         {
             if (sendMidi)
             {
-                RotaryFastSlow(buttongroupmidiout,
-                    instrumentmodules->getRotorCC(buttongroupmoduleidx),
-                    instrumentmodules->getRotorOff(buttongroupmoduleidx)
-                );
+                if (rotorType == 2)
+                {
+                    switch (resolveType2RotaryAction(wantFast, true))
+                    {
+                        case Type2RotaryAction::hardStop:
+                            rotorsarray.clear(true);
+                            RotaryFastSlow(buttongroupmidiout, CCBri, 0);
+                            break;
+                        case Type2RotaryAction::startFastRamp:
+                        case Type2RotaryAction::restoreSlowTarget:
+                            break;
+                    }
+                }
+                else
+                {
+                    RotaryFastSlow(buttongroupmidiout,
+                        instrumentmodules->getRotorCC(buttongroupmoduleidx),
+                        instrumentmodules->getRotorOff(buttongroupmoduleidx)
+                    );
+                }
             }
             tbrotbrake->setToggleState(true, dontSendNotification);
             tbrotbrake->setButtonText("Brake On");
@@ -5486,7 +5529,21 @@ private:
                         );
                     }
                     else if (rotorType == 2) {
-                        rotorsarray.add(new RotaryFastThread(*this, buttongroupmidiout));
+                        switch (resolveType2RotaryAction(true, false))
+                        {
+                            case Type2RotaryAction::startFastRamp:
+                                rotorsarray.clear(true);
+                                rotorsarray.add(new RotaryFastThread(*this, buttongroupmidiout));
+                                break;
+                            case Type2RotaryAction::restoreSlowTarget:
+                                rotorsarray.clear(true);
+                                RotaryFastSlow(buttongroupmidiout, CCBri, kType2RotorSlowRestoreValue);
+                                break;
+                            case Type2RotaryAction::hardStop:
+                                rotorsarray.clear(true);
+                                RotaryFastSlow(buttongroupmidiout, CCBri, 0);
+                                break;
+                        }
                     }
                 }
                 tbrotslow->setToggleState(false, dontSendNotification);
@@ -5504,7 +5561,21 @@ private:
                         );
                     }
                     else if (rotorType == 2) {
-                        rotorsarray.add(new RotarySlowThread(*this, buttongroupmidiout));
+                        switch (resolveType2RotaryAction(false, false))
+                        {
+                            case Type2RotaryAction::restoreSlowTarget:
+                                rotorsarray.clear(true);
+                                RotaryFastSlow(buttongroupmidiout, CCBri, kType2RotorSlowRestoreValue);
+                                break;
+                            case Type2RotaryAction::startFastRamp:
+                                rotorsarray.clear(true);
+                                rotorsarray.add(new RotaryFastThread(*this, buttongroupmidiout));
+                                break;
+                            case Type2RotaryAction::hardStop:
+                                rotorsarray.clear(true);
+                                RotaryFastSlow(buttongroupmidiout, CCBri, 0);
+                                break;
+                        }
                     }
                 }
                 tbrotslow->setToggleState(true, dontSendNotification);

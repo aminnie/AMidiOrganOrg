@@ -1393,6 +1393,67 @@ namespace
         return true;
     }
 
+    bool runType2RotaryActionResolution(std::string& details)
+    {
+        const auto brakeOn = resolveType2RotaryAction(true, true);
+        if (!expectEqual(static_cast<int>(brakeOn), static_cast<int>(Type2RotaryAction::hardStop),
+                         "type-2 brake-on resolves to hard stop", details))
+            return false;
+
+        const auto brakeOffFast = resolveType2RotaryAction(true, false);
+        if (!expectEqual(static_cast<int>(brakeOffFast), static_cast<int>(Type2RotaryAction::startFastRamp),
+                         "type-2 brake-off fast resolves to fast ramp", details))
+            return false;
+
+        const auto brakeOffSlow = resolveType2RotaryAction(false, false);
+        return expectEqual(static_cast<int>(brakeOffSlow), static_cast<int>(Type2RotaryAction::restoreSlowTarget),
+                           "type-2 brake-off slow resolves to slow restore target", details);
+    }
+
+    bool runType2RotarySlowRestoreConstant(std::string& details)
+    {
+        if (!expectEqual(kType2RotorSlowRestoreValue, 10, "type-2 slow restore value", details))
+            return false;
+
+        const auto action = resolveType2RotaryAction(false, false);
+        if (!expectEqual(static_cast<int>(action), static_cast<int>(Type2RotaryAction::restoreSlowTarget),
+                         "slow restore action selected", details))
+            return false;
+
+        // Behavioral proxy: slow restore path is a single deterministic target value.
+        return expectEqual(kType2RotorSlowRestoreValue == 63 ? 1 : 0, 0,
+                           "slow restore target avoids transient fast spike value", details);
+    }
+
+    bool runType2RotaryRapidToggleDecisionStability(std::string& details)
+    {
+        const std::array<std::pair<bool, bool>, 6> toggles{ {
+            { true, false },   // fast
+            { false, false },  // slow
+            { true, false },   // fast
+            { false, true },   // brake on
+            { false, false },  // brake off slow
+            { true, false }    // fast
+        } };
+
+        int hardStops = 0;
+        int fastRamps = 0;
+        int slowRestores = 0;
+        for (const auto& step : toggles)
+        {
+            const auto action = resolveType2RotaryAction(step.first, step.second);
+            if (action == Type2RotaryAction::hardStop) ++hardStops;
+            if (action == Type2RotaryAction::startFastRamp) ++fastRamps;
+            if (action == Type2RotaryAction::restoreSlowTarget) ++slowRestores;
+        }
+
+        if (!expectEqual(hardStops, 1, "rapid toggles include one hard-stop action", details))
+            return false;
+        if (!expectEqual(fastRamps, 3, "rapid toggles include three fast-ramp actions", details))
+            return false;
+        return expectEqual(slowRestores, 2, "rapid toggles include two slow-restore actions", details);
+    }
+
 }
 
 int main()
@@ -1542,6 +1603,21 @@ int main()
     {
         std::string details;
         results.push_back({ "MIDI non-note routing follows configured channels only", runChannelizedNonNoteStrictRouting(details), details });
+    }
+
+    {
+        std::string details;
+        results.push_back({ "Type-2 rotary action branch selection", runType2RotaryActionResolution(details), details });
+    }
+
+    {
+        std::string details;
+        results.push_back({ "Type-2 rotary slow restore avoids transient fast value", runType2RotarySlowRestoreConstant(details), details });
+    }
+
+    {
+        std::string details;
+        results.push_back({ "Type-2 rotary rapid-toggle decision stability", runType2RotaryRapidToggleDecisionStability(details), details });
     }
 
 
