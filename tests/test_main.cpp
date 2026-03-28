@@ -1393,6 +1393,40 @@ namespace
         return true;
     }
 
+    bool runPendingExitSavePromptHelpers(std::string& details)
+    {
+        clearPendingExitSavePrompt();
+
+        bpendingSoundEdit = true;
+        bpendingEffectsEdit = true;
+        bpendingPresetSet = true;
+        if (!expectEqual(hasPendingExitSavePrompt() ? 1 : 0, 1, "pending prompt starts true", details))
+            return false;
+
+        clearPendingSoundEditPrompt();
+        if (!expectEqual(bpendingSoundEdit ? 1 : 0, 0, "clearPendingSoundEditPrompt clears sound flag", details))
+            return false;
+        if (!expectEqual(bpendingEffectsEdit ? 1 : 0, 1, "clearPendingSoundEditPrompt preserves effects flag", details))
+            return false;
+        if (!expectEqual(bpendingPresetSet ? 1 : 0, 1, "clearPendingSoundEditPrompt preserves preset flag", details))
+            return false;
+
+        clearPendingEffectsEditPrompt();
+        if (!expectEqual(bpendingEffectsEdit ? 1 : 0, 0, "clearPendingEffectsEditPrompt clears effects flag", details))
+            return false;
+        if (!expectEqual(bpendingPresetSet ? 1 : 0, 1, "clearPendingEffectsEditPrompt preserves preset flag", details))
+            return false;
+
+        if (!expectEqual(hasPendingExitSavePrompt() ? 1 : 0, 1, "pending still true while preset pending", details))
+            return false;
+
+        clearPendingExitSavePrompt();
+        if (!expectEqual(hasPendingExitSavePrompt() ? 1 : 0, 0, "clearPendingExitSavePrompt clears all flags", details))
+            return false;
+
+        return true;
+    }
+
     bool runType2RotaryActionResolution(std::string& details)
     {
         const auto brakeOn = resolveType2RotaryAction(true, true);
@@ -1513,6 +1547,11 @@ int main()
     {
         std::string details;
         results.push_back({ "Hotkey duplicate detection (non-empty vs (None))", runHotkeyDuplicateAssignmentGuard(details), details });
+    }
+
+    {
+        std::string details;
+        results.push_back({ "Pending-save helper flags clear only intended scopes", runPendingExitSavePromptHelpers(details), details });
     }
 
     {

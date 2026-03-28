@@ -723,7 +723,7 @@ public:
                 // static ValueTree ValueTree::readFromStream(InputStream & input)
                 temp_vtinstrumentpanel = temp_vtinstrumentpanel.readFromStream(input);
 
-                if ((!temp_vtinstrumentpanel.isValid()) | !(temp_vtinstrumentpanel.getNumChildren() > 0))
+                if ((!temp_vtinstrumentpanel.isValid()) || !(temp_vtinstrumentpanel.getNumChildren() > 0))
                 {
                     juce::Logger::writeToLog("loadInstrumentPanel(): Panel file read into temp ValueTree failed! No change to panel");
 
@@ -1345,6 +1345,9 @@ public:
             // Check if we still waiting for async voice select
             if ((selvoicebank < 0) || (selvoice < 0)) return;
 
+            // Commit route from Sounds tab should arm panel Save/Save As.
+            bpendingSoundEdit = true;
+
             // Prepare to enable play testing of the selected instrument
             Instrument instrument;
             instrument.setMSB(midiInstruments->getMSB(selvoicebank, selvoice));
@@ -1411,6 +1414,8 @@ public:
             selvoice = -1;
             selvoicebank = -1;
             updateVoicesRouteButtonDirtyStyle();
+            if (gNotifyPanelSaveAvailabilityChanged)
+                gNotifyPanelSaveAvailabilityChanged();
         };
         // Disable the button until Voice or Effects button selected in Keyboard Panels
         tbroute->setEnabled(false);
@@ -2178,6 +2183,9 @@ public:
         tbroute->setBounds(margin, 2 * margin + 140, 80, 30);
         tbroute->onClick = [=, &tabs]()
             {
+                // Commit route from Effects tab should arm panel Save/Save As.
+                bpendingEffectsEdit = true;
+
                 // Treat current instrument as the new baseline (same as after setEffects).
                 syncEffectsSnapshotFromInstrument();
                 updateToRouteButtonDirtyStyle();
@@ -2303,6 +2311,12 @@ public:
             default:
                 break;
         }
+
+        // Effects changes are applied immediately; mark panel save pending even if user
+        // leaves the Effects tab via tab header/hotkeys instead of route/cancel buttons.
+        bpendingEffectsEdit = true;
+        if (gNotifyPanelSaveAvailabilityChanged)
+            gNotifyPanelSaveAvailabilityChanged();
 
         updateToRouteButtonDirtyStyle();
         return true;
@@ -4268,7 +4282,7 @@ struct KeyboardPanelPage final : public Component,
         // --------------------------------------------------------------------
         // Button Voices and Effects Changes Group
         // Establish if on Upper or Lower Tabs to enable correct out channel
-        if ((tabidx != PTUpper) || (tabidx != PTLower) || (tabidx != PTBass))
+        if ((tabidx == PTUpper) || (tabidx == PTLower) || (tabidx == PTBass))
         {
             String buttongrouptitle = "Voice Edits";
 
@@ -4294,9 +4308,6 @@ struct KeyboardPanelPage final : public Component,
             gxtbchange->setToggleState(false, dontSendNotification);
             gxtbchange->onClick = [=, &tabs, &voicespage]()
                 {
-                    bpendingSoundEdit = true;
-                    refreshPanelSaveAvailability();
-
                     //String strstatus = "Change Sound Button";
                     //statusLabel->setText(strstatus, juce::dontSendNotification);
 
@@ -4329,9 +4340,6 @@ struct KeyboardPanelPage final : public Component,
             gxtbedit->setToggleState(false, dontSendNotification);
             gxtbedit->onClick = [=, &tabs, &effectspage]()
                 {
-                    bpendingEffectsEdit = true;
-                    refreshPanelSaveAvailability();
-
                     //String strstatus = "Edit Sound Button";
                     //statusLabel->setText(strstatus, juce::dontSendNotification);
 
@@ -4798,7 +4806,7 @@ struct KeyboardPanelPage final : public Component,
 
         // --------------------------------------------------------------------
         // Instrument Panel Save and Save As Buttons
-        if ((tabidx != PTUpper) || (tabidx != PTLower) || (tabidx != PTBass))
+        if ((tabidx == PTUpper) || (tabidx == PTLower) || (tabidx == PTBass))
         {
             auto* tbSave = addToList(new CommandButton());
             cbSave = tbSave;
