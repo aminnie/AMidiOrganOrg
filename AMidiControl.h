@@ -999,10 +999,14 @@ private:
         static const juce::Identifier manualRotaryUpperBrakeId("manualRotaryUpperBrake");
         static const juce::Identifier manualRotaryLowerFastId("manualRotaryLowerFast");
         static const juce::Identifier manualRotaryLowerBrakeId("manualRotaryLowerBrake");
+        static const juce::Identifier manualRotaryUpperTargetGroupId("manualRotaryUpperTargetGroup");
+        static const juce::Identifier manualRotaryLowerTargetGroupId("manualRotaryLowerTargetGroup");
         panelTree.setProperty(manualRotaryUpperFastId, appState.upperManualRotaryFast, nullptr);
         panelTree.setProperty(manualRotaryUpperBrakeId, appState.upperManualRotaryBrake, nullptr);
         panelTree.setProperty(manualRotaryLowerFastId, appState.lowerManualRotaryFast, nullptr);
         panelTree.setProperty(manualRotaryLowerBrakeId, appState.lowerManualRotaryBrake, nullptr);
+        panelTree.setProperty(manualRotaryUpperTargetGroupId, juce::jlimit(1, 2, appState.upperManualRotaryTargetGroup), nullptr);
+        panelTree.setProperty(manualRotaryLowerTargetGroupId, juce::jlimit(1, 2, appState.lowerManualRotaryTargetGroup), nullptr);
 
         // Add VoiceButton Instruments from Panel to ValueTree
         for (int i = 0; i < numbervoicebuttons; i++)
@@ -1153,10 +1157,14 @@ private:
         static const juce::Identifier manualRotaryUpperBrakeId("manualRotaryUpperBrake");
         static const juce::Identifier manualRotaryLowerFastId("manualRotaryLowerFast");
         static const juce::Identifier manualRotaryLowerBrakeId("manualRotaryLowerBrake");
+        static const juce::Identifier manualRotaryUpperTargetGroupId("manualRotaryUpperTargetGroup");
+        static const juce::Identifier manualRotaryLowerTargetGroupId("manualRotaryLowerTargetGroup");
         appState.upperManualRotaryFast = (bool) vtinstrumentpanel.getProperty(manualRotaryUpperFastId, true);
         appState.upperManualRotaryBrake = (bool) vtinstrumentpanel.getProperty(manualRotaryUpperBrakeId, false);
         appState.lowerManualRotaryFast = (bool) vtinstrumentpanel.getProperty(manualRotaryLowerFastId, true);
         appState.lowerManualRotaryBrake = (bool) vtinstrumentpanel.getProperty(manualRotaryLowerBrakeId, false);
+        appState.upperManualRotaryTargetGroup = juce::jlimit(1, 2, (int) vtinstrumentpanel.getProperty(manualRotaryUpperTargetGroupId, 1));
+        appState.lowerManualRotaryTargetGroup = juce::jlimit(1, 2, (int) vtinstrumentpanel.getProperty(manualRotaryLowerTargetGroupId, 1));
 
         panelbuttonidx = 0;
 
@@ -3148,6 +3156,30 @@ struct KeyboardPanelPage final : public Component,
 
                 };
 
+            if (tabidx != PTBass)
+            {
+                rotaryTargetGroup1Toggle = addToList(new juce::ToggleButton("Rotary"));
+                rotaryTargetGroup1Toggle->setBounds(g1xoffset + mgroup,
+                    ygroup + mgroup * 2 + bheight * rbuttons + 2,
+                    bwidth,
+                    sbheight);
+                rotaryTargetGroup1Toggle->setTooltip("Route this manual's rotary controls to Button Group 1.");
+                rotaryTargetGroup1Toggle->setToggleState(true, dontSendNotification);
+                rotaryTargetGroup1Toggle->onClick = [this]()
+                    {
+                        if (rotaryTargetGroup1Toggle == nullptr)
+                            return;
+
+                        if (!rotaryTargetGroup1Toggle->getToggleState())
+                        {
+                            rotaryTargetGroup1Toggle->setToggleState(true, dontSendNotification);
+                            return;
+                        }
+
+                        setManualRotaryTargetGroupSelection(1, true);
+                    };
+            }
+
             // Mute Button: Toggle Initial Button Mute Status keeping in mind Button Group and Tab Index
             int bmgroupidx = 0;
             if (tabidx == PTLower) { bmgroupidx = 4; }
@@ -3534,6 +3566,30 @@ struct KeyboardPanelPage final : public Component,
             ptrbuttongroup = instrumentpanel->getButtonGroup(bmgroupidx);
             if (ptrbuttongroup->muted)
                 g2tbmute->triggerClick();
+
+            if (tabidx != PTBass)
+            {
+                rotaryTargetGroup2Toggle = addToList(new juce::ToggleButton("Rotary"));
+                rotaryTargetGroup2Toggle->setBounds(g2xoffset + mgroup,
+                    ygroup + mgroup * 2 + bheight * rbuttons + 2,
+                    bwidth,
+                    sbheight);
+                rotaryTargetGroup2Toggle->setTooltip("Route this manual's rotary controls to Button Group 2.");
+                rotaryTargetGroup2Toggle->setToggleState(false, dontSendNotification);
+                rotaryTargetGroup2Toggle->onClick = [this]()
+                    {
+                        if (rotaryTargetGroup2Toggle == nullptr)
+                            return;
+
+                        if (!rotaryTargetGroup2Toggle->getToggleState())
+                        {
+                            rotaryTargetGroup2Toggle->setToggleState(true, dontSendNotification);
+                            return;
+                        }
+
+                        setManualRotaryTargetGroupSelection(2, true);
+                    };
+            }
         }   // End of Button Group 2
 
         // --------------------------------------------------------------------
@@ -4533,18 +4589,7 @@ struct KeyboardPanelPage final : public Component,
         // Do not show on Bass Keyboard
         if  (tabidx != PTBass)
         {
-            int buttongroupidx = 0;
-            if (tabidx == PTLower) {
-                buttongroupidx = 4;
-            }
-            else if (tabidx == PTUpper) {
-                buttongroupidx = 0;
-            }
-            else {
-                //// To do: Add back after testing and remove the line below! Replace with return to 
-                //// not show Rotary on Bass&Drums tab;
-                buttongroupidx = 8;
-            }
+            const int buttongroupidx = getRotaryTargetButtonGroupIndex();
 
             // Load Button Group Details for In and Out Channels
             ButtonGroup* ptrbuttongroup = instrumentpanel->getButtonGroup(buttongroupidx);
@@ -4558,8 +4603,8 @@ struct KeyboardPanelPage final : public Component,
             int g5width = mgroup + bwidth * 2 + mgroup;
             int g5height = mgroup * 3 + bheight;
             {
-                auto* group = addToList(new GroupComponent("group", buttongrouptitle));
-                group->setBounds(g5xoffset, ygroup, g5width, g5height);
+                rotaryGroupComponent = addToList(new GroupComponent("group", buttongrouptitle));
+                rotaryGroupComponent->setBounds(g5xoffset, ygroup, g5width, g5height);
             }
 
             tbrotslow = addToList(new CommandButton());
@@ -4574,13 +4619,7 @@ struct KeyboardPanelPage final : public Component,
             tbrotslow->setToggleState(false, dontSendNotification);
             tbrotslow->onClick = [=]()
                 {
-                    int buttongroupidx = 0;
-                    if (tabidx == PTLower) {
-                        buttongroupidx = 4;
-                    }
-                    else if (tabidx == PTUpper) {
-                        buttongroupidx = 0;
-                    }
+                    const int buttongroupidx = getRotaryTargetButtonGroupIndex();
 
                     ButtonGroup* ptrbuttongroup = instrumentpanel->getButtonGroup(buttongroupidx);
                     int buttongroupmoduleidx = ptrbuttongroup->moduleidx;
@@ -4662,13 +4701,7 @@ struct KeyboardPanelPage final : public Component,
             tbrotbrake->setToggleState(false, dontSendNotification);
             tbrotbrake->onClick = [=]()
                 {
-                    int buttongroupidx = 0;
-                    if (tabidx == PTLower) {
-                        buttongroupidx = 4;
-                    }
-                    else if (tabidx == PTUpper) {
-                        buttongroupidx = 0;
-                    }
+                    const int buttongroupidx = getRotaryTargetButtonGroupIndex();
 
                     ButtonGroup* ptrbuttongroup = instrumentpanel->getButtonGroup(buttongroupidx);
                     int buttongroupmoduleidx = ptrbuttongroup->moduleidx;
@@ -4757,6 +4790,8 @@ struct KeyboardPanelPage final : public Component,
                     }
                 };
 
+            syncRotaryTargetToggleStates();
+            refreshRotaryGroupTitle();
             applyManualRotaryFromAppState();
         }   // End - Rotary Group
 
@@ -5326,13 +5361,13 @@ struct KeyboardPanelPage final : public Component,
         updatePanelSaveButtonsPendingStyle();
     }
 
-    /** After preset recall: update this tab's rotary controls from ButtonGroup::rotary (Upper=0, Lower=4). */
+    /** After preset recall: update this tab's rotary controls from the currently selected rotary target group. */
     void applyPresetRotaryUiFromStoredGroups()
     {
         if (currenttabidx == PTBass || tbrotslow == nullptr || tbrotbrake == nullptr)
             return;
 
-        const int g = (currenttabidx == PTLower) ? 4 : 0;
+        const int g = getRotaryTargetButtonGroupIndex();
         bool wantFast = false;
         bool wantBrake = false;
         decodePresetRotary(instrumentpanel->getButtonGroup(g)->rotary, wantFast, wantBrake);
@@ -5344,6 +5379,9 @@ struct KeyboardPanelPage final : public Component,
     {
         if (currenttabidx == PTBass || tbrotslow == nullptr || tbrotbrake == nullptr)
             return;
+
+        syncRotaryTargetToggleStates();
+        refreshRotaryGroupTitle();
 
         const bool wantFast = (currenttabidx == PTUpper) ? appState.upperManualRotaryFast : appState.lowerManualRotaryFast;
         const bool wantBrake = (currenttabidx == PTUpper) ? appState.upperManualRotaryBrake : appState.lowerManualRotaryBrake;
@@ -5390,6 +5428,67 @@ struct KeyboardPanelPage final : public Component,
     }
 
 private:
+    int getManualRotaryTargetGroupSelection() const
+    {
+        if (currenttabidx == PTLower)
+            return juce::jlimit(1, 2, appState.lowerManualRotaryTargetGroup);
+        if (currenttabidx == PTUpper)
+            return juce::jlimit(1, 2, appState.upperManualRotaryTargetGroup);
+        return 1;
+    }
+
+    void storeManualRotaryTargetGroupSelection(int targetGroup)
+    {
+        const int clamped = juce::jlimit(1, 2, targetGroup);
+        if (currenttabidx == PTLower)
+            appState.lowerManualRotaryTargetGroup = clamped;
+        else if (currenttabidx == PTUpper)
+            appState.upperManualRotaryTargetGroup = clamped;
+    }
+
+    int getRotaryTargetButtonGroupIndex() const
+    {
+        if (currenttabidx == PTLower)
+            return getManualRotaryTargetGroupSelection() == 2 ? 5 : 4;
+        if (currenttabidx == PTUpper)
+            return getManualRotaryTargetGroupSelection() == 2 ? 1 : 0;
+        return 8;
+    }
+
+    void syncRotaryTargetToggleStates()
+    {
+        if (currenttabidx == PTBass || rotaryTargetGroup1Toggle == nullptr || rotaryTargetGroup2Toggle == nullptr)
+            return;
+
+        const int selected = getManualRotaryTargetGroupSelection();
+        rotaryTargetGroup1Toggle->setToggleState(selected == 1, dontSendNotification);
+        rotaryTargetGroup2Toggle->setToggleState(selected == 2, dontSendNotification);
+    }
+
+    void refreshRotaryGroupTitle()
+    {
+        if (currenttabidx == PTBass || rotaryGroupComponent == nullptr)
+            return;
+
+        ButtonGroup* ptrbuttongroup = instrumentpanel->getButtonGroup(getRotaryTargetButtonGroupIndex());
+        if (ptrbuttongroup == nullptr)
+            return;
+
+        rotaryGroupComponent->setText("Rotary   [In:" + std::to_string(ptrbuttongroup->midiin)
+            + " | Out:" + std::to_string(ptrbuttongroup->midiout) + "]");
+    }
+
+    void setManualRotaryTargetGroupSelection(int targetGroup, bool sendMidi)
+    {
+        if (currenttabidx == PTBass)
+            return;
+
+        storeManualRotaryTargetGroupSelection(targetGroup);
+        syncRotaryTargetToggleStates();
+        refreshRotaryGroupTitle();
+        applyManualRotaryFromAppState(sendMidi);
+    }
+
     static String formatButtonGroupTitle(const ButtonGroup& buttonGroup, bool includeSplit)
     {
         String title = buttonGroup.groupname;
@@ -5501,7 +5600,7 @@ private:
         if (currenttabidx == PTBass || tbrotslow == nullptr || tbrotbrake == nullptr)
             return;
 
-        const int buttongroupidx = (currenttabidx == PTLower) ? 4 : 0;
+        const int buttongroupidx = getRotaryTargetButtonGroupIndex();
         ButtonGroup* ptrbuttongroup = instrumentpanel->getButtonGroup(buttongroupidx);
         const int buttongroupmoduleidx = ptrbuttongroup->moduleidx;
         const int buttongroupmidiout = ptrbuttongroup->midiout;
@@ -5635,6 +5734,9 @@ private:
 
     TextButton* tbrotslow;
     TextButton* tbrotbrake;
+    juce::ToggleButton* rotaryTargetGroup1Toggle = nullptr;
+    juce::ToggleButton* rotaryTargetGroup2Toggle = nullptr;
+    juce::GroupComponent* rotaryGroupComponent = nullptr;
 
     Label* lblpanelfile;
     CommandButton* cbSave = nullptr;

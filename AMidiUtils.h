@@ -120,9 +120,13 @@ struct AppState final
     /** Manual Leslie Fast/Slow + Brake UI on Upper keyboard tab (saved on panel root). */
     bool upperManualRotaryFast = true;
     bool upperManualRotaryBrake = false;
+    /** Upper manual rotary target group selector (1=Group 1, 2=Group 2), saved on panel root. */
+    int upperManualRotaryTargetGroup = 1;
     /** Manual Leslie Fast/Slow + Brake UI on Lower keyboard tab (saved on panel root). */
     bool lowerManualRotaryFast = true;
     bool lowerManualRotaryBrake = false;
+    /** Lower manual rotary target group selector (1=Group 1, 2=Group 2), saved on panel root. */
+    int lowerManualRotaryTargetGroup = 1;
     /** Runtime-only last voice button selected on keyboard tabs; used to hydrate Sounds/Effects context. */
     int lastSelectedPanelButtonIdx = -1;
     /** True only after an explicit user click on a keyboard voice button. */

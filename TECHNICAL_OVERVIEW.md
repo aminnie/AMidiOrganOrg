@@ -49,7 +49,7 @@ Primary implementation files:
   - Main performance tabs with voice button groups
   - Per-group volume and mute controls
   - Preset recall/write flows
-  - Rotary controls on Upper/Lower
+  - Rotary controls on Upper/Lower with per-manual target selection between group 1 and group 2
   - Panel save/save-as
 - **Sounds**
   - Two-level button browser (`Category -> Voice`) with pagination
@@ -172,6 +172,7 @@ flowchart TD
 - **Panel**: Collection of groups/voices/presets across Upper/Lower/Bass
 - **Config**: Routing and default behavior rules
 - **AppState**: Current filenames/paths/session flags/shared runtime state
+- **Manual rotary target**: Per-manual selector (`1` or `2`) mapping rotary routing to group 1 or group 2
 
 ### Data Constraints
 

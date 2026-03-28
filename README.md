@@ -239,8 +239,13 @@ On startup, the app also attempts to auto-restore the last used panel and config
 
 - Rotary controls are available on `Upper` and `Lower`.
 - Rotary supports `Fast/Slow` and `Brake`.
+- Each manual has a `Rotary` selector checkbox in Button Group 1 and Button Group 2 (inside each group border, lower-left area below row 2 voice 1).
+- Exactly one selector is active per manual:
+  - Group 1 checked routes rotary to that manual's first group.
+  - Group 2 checked routes rotary to that manual's second group.
+- Changing the selector immediately rebinds rotary MIDI route and module behavior (including type-specific implementation) to the selected group.
 - Switching between `Upper`, `Lower`, and `Bass&Drums` refreshes the rotary controls from saved manual state without sending extra MIDI on tab change.
-- Upper and Lower manual rotary states are saved with the panel.
+- Upper and Lower manual rotary states, including the selected rotary target group (1 or 2), are saved with the panel.
 - Presets also store per-group rotary values for recall.
 
 ### 8. Config and Panel Save Behavior

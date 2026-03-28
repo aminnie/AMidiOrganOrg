@@ -191,6 +191,12 @@ Rotary controls:
 
 - Available on `Upper` and `Lower`.
 - Use Fast/Slow and Brake according to your module settings.
+- Each manual includes `Rotary` selector checkboxes in Button Group 1 and Button Group 2 (inside each group border, lower-left open area below the first voice in row 2).
+- Only one selector can be active per manual:
+  - Group 1 selected: rotary follows Button Group 1 routing/module.
+  - Group 2 selected: rotary follows Button Group 2 routing/module.
+- Selector changes immediately retarget rotary behavior for that manual.
+- Rotary selector choice is saved with the panel and restored when the panel is loaded.
 
 Expected result:
 

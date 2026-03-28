@@ -32,8 +32,13 @@ Optional:
 6. Use `New Panel` on `Start`, enter a new `.pnl` name, and confirm it saves + auto-loads.
 7. Retry with the same name and confirm duplicate warning/no overwrite.
 8. Open `Upper` and confirm voice selection + playback.
-9. Open `Monitor`, enable capture, and verify outgoing MIDI lines appear.
-10. Confirm `USER_MANUAL.md` opens from package folder.
+9. In `Upper`, toggle the new Group 1/Group 2 `Rotary` selector checkboxes (inside each group border, lower-left area), and confirm:
+   - only one checkbox stays selected
+   - rotary Fast/Slow/Brake follows the selected group's module/routing
+10. Repeat rotary selector validation on `Lower`.
+11. Save panel, reload panel, and confirm Upper/Lower rotary target selections persist.
+12. Open `Monitor`, enable capture, and verify outgoing MIDI lines appear.
+13. Confirm `USER_MANUAL.md` opens from package folder.
 
 ## 3) Runtime Checks (macOS)
 
@@ -45,13 +50,19 @@ Optional:
 6. Use `New Panel` on `Start`, enter a new `.pnl` name, and confirm it saves + auto-loads.
 7. Retry with the same name and confirm duplicate warning/no overwrite.
 8. Open `Upper` and confirm voice selection + playback.
-9. Open `Monitor`, enable capture, and verify outgoing MIDI lines appear.
-10. Confirm `USER_MANUAL.md` opens from package folder.
+9. In `Upper`, toggle the new Group 1/Group 2 `Rotary` selector checkboxes (inside each group border, lower-left area), and confirm:
+   - only one checkbox stays selected
+   - rotary Fast/Slow/Brake follows the selected group's module/routing
+10. Repeat rotary selector validation on `Lower`.
+11. Save panel, reload panel, and confirm Upper/Lower rotary target selections persist.
+12. Open `Monitor`, enable capture, and verify outgoing MIDI lines appear.
+13. Confirm `USER_MANUAL.md` opens from package folder.
 
 ## 4) Behavior Verification
 
 - Startup restore works when last session files exist.
 - Hard mute behavior blocks Note On/Off while muted.
+- Upper/Lower rotary selector (Group 1/2) remains mutually exclusive and restores from saved panel state.
 - `Help` tab wording points to packaged `USER_MANUAL.md`.
 - No obvious mismatch between `README.md`, `assets/help.md`, and `USER_MANUAL.md`.
 

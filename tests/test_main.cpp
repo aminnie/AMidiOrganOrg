@@ -65,8 +65,10 @@ namespace
         bool configPanelPairingMismatchAcknowledged = false;
         bool upperManualRotaryFast = true;
         bool upperManualRotaryBrake = false;
+        int upperManualRotaryTargetGroup = 1;
         bool lowerManualRotaryFast = true;
         bool lowerManualRotaryBrake = false;
+        int lowerManualRotaryTargetGroup = 1;
     };
 
     AppStateSnapshot takeAppStateSnapshot()
@@ -93,8 +95,10 @@ namespace
         snapshot.configPanelPairingMismatchAcknowledged = state.configPanelPairingMismatchAcknowledged;
         snapshot.upperManualRotaryFast = state.upperManualRotaryFast;
         snapshot.upperManualRotaryBrake = state.upperManualRotaryBrake;
+        snapshot.upperManualRotaryTargetGroup = state.upperManualRotaryTargetGroup;
         snapshot.lowerManualRotaryFast = state.lowerManualRotaryFast;
         snapshot.lowerManualRotaryBrake = state.lowerManualRotaryBrake;
+        snapshot.lowerManualRotaryTargetGroup = state.lowerManualRotaryTargetGroup;
         return snapshot;
     }
 
@@ -121,8 +125,18 @@ namespace
         state.configPanelPairingMismatchAcknowledged = snapshot.configPanelPairingMismatchAcknowledged;
         state.upperManualRotaryFast = snapshot.upperManualRotaryFast;
         state.upperManualRotaryBrake = snapshot.upperManualRotaryBrake;
+        state.upperManualRotaryTargetGroup = snapshot.upperManualRotaryTargetGroup;
         state.lowerManualRotaryFast = snapshot.lowerManualRotaryFast;
         state.lowerManualRotaryBrake = snapshot.lowerManualRotaryBrake;
+        state.lowerManualRotaryTargetGroup = snapshot.lowerManualRotaryTargetGroup;
+    }
+
+    bool runManualRotaryTargetDefaults(std::string& details)
+    {
+        auto& state = getAppState();
+        if (!expectEqual(state.upperManualRotaryTargetGroup, 1, "upper rotary target defaults to group 1", details))
+            return false;
+        return expectEqual(state.lowerManualRotaryTargetGroup, 1, "lower rotary target defaults to group 1", details);
     }
 
     bool prepareTestInstrumentJson(const String& testDirName, const String& fileName, std::string& details)
@@ -741,6 +755,8 @@ namespace
         state.configfname = "integration_config_A.cfg";
         state.pnlconfigfname = "";
         state.configreload = false;
+        state.upperManualRotaryTargetGroup = 2;
+        state.lowerManualRotaryTargetGroup = 1;
 
         if (!instrumentPanel->initInstrumentPanel(testDir, testPanelFile, false))
         {
@@ -758,6 +774,15 @@ namespace
 
         if (!expectEqualStr(state.pnlconfigfname, "integration_config_A.cfg",
                             "panel stores config file name", details))
+        {
+            restoreAppState(snapshot);
+            return false;
+        }
+
+        if (!expectEqual(state.upperManualRotaryTargetGroup, 2,
+                         "panel restores upper rotary target group", details) ||
+            !expectEqual(state.lowerManualRotaryTargetGroup, 1,
+                         "panel restores lower rotary target group", details))
         {
             restoreAppState(snapshot);
             return false;
@@ -1608,6 +1633,11 @@ int main()
     {
         std::string details;
         results.push_back({ "PanelPresets validates group/button bounds", runPanelPresetGroupAndButtonBounds(details), details });
+    }
+
+    {
+        std::string details;
+        results.push_back({ "Manual rotary target defaults to group 1", runManualRotaryTargetDefaults(details), details });
     }
 
     {
