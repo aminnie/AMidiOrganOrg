@@ -147,6 +147,9 @@ On startup, the app also attempts to auto-restore the last used panel and config
 - When it is **ON**, all incoming MIDI channels are allowed through.
 - When it is **OFF**, only MIDI input channels assigned to button groups are allowed through; other incoming channels are blocked.
 - MIDI channel `16` is still allowed for controller-style traffic even when pass-through is off.
+- `Startup Monitor` is a global config option saved in the `.cfg` file.
+- When `Startup Monitor` is **ON**, outgoing MIDI monitoring is enabled automatically during startup so initialization traffic can be reviewed later in the `Monitor` tab.
+- Startup auto-enable does **not** switch the visible tab; the app continues normal startup and you open `Monitor` manually when needed.
 - **Default Effects** fields (Vol, Bri, Exp, Rev, Cho, Mod, Tim, Atk, Rel, Pan) set starting MIDI CC values for new voice assignments (Sounds tab route and fresh panel initialization). They are saved in the config file. Defaults match a new `Instrument`: Vol 100, Bri 30, Exp 127, Rev 20, Cho 10, Mod/Tim/Atk/Rel 0, Pan 64. Each field accepts **0–127** only (digits-only entry; invalid or out-of-range values are rejected on focus loss). Volume scaling still treats a default Vol of **0** like **1** when computing effective CC7.
 - Re-using the same **MIDI Out channel** across button groups that target different sound modules is supported: that output channel fans out to each mapped module.
 - Saving config is blocked if two or more button groups share the same **MIDI sound module** and the same **MIDI Out channel** (duplicate module/channel entries are treated as redundant/ambiguous and must be unique).
@@ -164,6 +167,7 @@ On startup, the app also attempts to auto-restore the last used panel and config
 
 - Shows outgoing MIDI messages in a live monitor view.
 - Capture is controlled by the `Enable` button and remains active globally while enabled.
+- If Config `Startup Monitor` is enabled, capture also starts automatically during app startup before the user opens the `Monitor` tab.
 - `Clear` clears the visible monitor history.
 - Each line includes routed channel/message details and the routed sound module name.
 - The Monitor tab includes a virtual MIDI keyboard and an `Octave` control for range positioning.
@@ -251,6 +255,7 @@ On startup, the app also attempts to auto-restore the last used panel and config
 ### 8. Config and Panel Save Behavior
 
 - Config settings apply globally to the app and are separate from the currently loaded panel.
+- Changing `Startup Monitor` is treated like any other Config edit and marks Config `Save` / `Save As` as pending until written.
 - Panels and configs are related: a panel stores the config name it expects.
 - If you load a panel and config that do not match, the app can warn and let you abort or continue.
 - While a config and panel mismatch is acknowledged, normal panel `Save` may stay disabled until the relationship is resolved.

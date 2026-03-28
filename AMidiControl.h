@@ -7725,10 +7725,7 @@ public:
         updateEnableButtonText(false);
         enableButton.onClick = [this]()
             {
-                const bool enabled = enableButton.getToggleState();
-                monitorEnabled.store(enabled, std::memory_order_relaxed);
-                updateEnableButtonText(enabled);
-                ensureMonitorHookRegistered();
+                setMonitoringEnabled(enableButton.getToggleState());
             };
 
         addAndMakeVisible(clearButton);
@@ -7845,6 +7842,14 @@ public:
         if (isTabActive == active) return;
         isTabActive = active;
         monitorKeyboard.setEnabled(isVirtualKeyboardInputEnabled());
+        ensureMonitorHookRegistered();
+    }
+
+    void setMonitoringEnabled(bool enabled)
+    {
+        enableButton.setToggleState(enabled, juce::dontSendNotification);
+        monitorEnabled.store(enabled, std::memory_order_relaxed);
+        updateEnableButtonText(enabled);
         ensureMonitorHookRegistered();
     }
 
@@ -8620,7 +8625,7 @@ public:
 
         addAndMakeVisible(globalConfigsGroup);
         globalConfigsGroup.setColour(GroupComponent::outlineColourId, Colours::grey.darker());
-        globalConfigsGroup.setBounds(1135, 8, 305, 60);
+        globalConfigsGroup.setBounds(1135, 8, 305, 88);
 
         addAndMakeVisible(lblPassthrough);
         lblPassthrough.setBounds(1150, 32, 135, 24);
@@ -8636,6 +8641,18 @@ public:
 
             juce::String stateString = passthroughstate ? "ON" : "OFF";
             juce::Logger::outputDebugString("Passthrough changed to " + stateString);
+            };
+
+        addAndMakeVisible(lblStartupMonitor);
+        lblStartupMonitor.setBounds(1150, 54, 135, 24);
+        lblStartupMonitor.setText("Startup Monitor", {});
+
+        addAndMakeVisible(toggleStartupMonitor);
+        toggleStartupMonitor.setBounds(1295, 54, 50, 24);
+        toggleStartupMonitor.onClick = [this]()
+            {
+                appState.startupMonitorEnabled = toggleStartupMonitor.getToggleState();
+                setConfigSaveButtonEnabled(true);
             };
 
         addAndMakeVisible(resetButton);
@@ -8824,12 +8841,12 @@ private:
     juce::TextEditor txtDefaultEffectsCho, txtDefaultEffectsMod, txtDefaultEffectsTim, txtDefaultEffectsAtk;
     juce::TextEditor txtDefaultEffectsRel, txtDefaultEffectsPan;
     juce::Label lblKeyboard, lblGroupName, lblButtonCount, lblMidiIn, lblMidiOut, lblSplit, lblOctave, lblModule, lblModuleAlias;
-    juce::Label lblPassthrough, lblVelocity;
+    juce::Label lblPassthrough, lblStartupMonitor, lblVelocity;
     juce::Label lblDefaultEffectsVol, lblDefaultEffectsBri, lblDefaultEffectsExp, lblDefaultEffectsRev;
     juce::Label lblDefaultEffectsCho, lblDefaultEffectsMod, lblDefaultEffectsTim, lblDefaultEffectsAtk;
     juce::Label lblDefaultEffectsRel, lblDefaultEffectsPan;
     juce::Label lblconfigfileprefix, lblconfigfile, label11, label31;
-    juce::ToggleButton togglePassthrough, toggleVelocity;
+    juce::ToggleButton togglePassthrough, toggleStartupMonitor, toggleVelocity;
     juce::TextButton loadConfigButton, saveButton, saveAsButton, resetButton, exitButton;
     juce::TextButton toUpperKBD, toLowerKBD, toBassKBD;
     bool mutestate, velocitystate, passthroughstate;
@@ -9258,6 +9275,7 @@ private:
         static Identifier defaultEffectsAtkType("defaultEffectsAtk");
         static Identifier defaultEffectsRelType("defaultEffectsRel");
         static Identifier defaultEffectsPanType("defaultEffectsPan");
+        static Identifier startupMonitorEnabledType("startupMonitorEnabled");
 
         static Identifier indexType("index");               // Child Properties
         static Identifier midikeyboardType("keyboard");
@@ -9288,6 +9306,7 @@ private:
         configsTree.setProperty(defaultEffectsAtkType, appState.defaultEffectsAtk, nullptr);
         configsTree.setProperty(defaultEffectsRelType, appState.defaultEffectsRel, nullptr);
         configsTree.setProperty(defaultEffectsPanType, appState.defaultEffectsPan, nullptr);
+        configsTree.setProperty(startupMonitorEnabledType, appState.startupMonitorEnabled, nullptr);
 
         for (int i = 0; i < numberbuttongroups; i++) {
             ValueTree vtcfg(buttongroupType);
@@ -9428,6 +9447,7 @@ private:
         static Identifier defaultEffectsAtkType("defaultEffectsAtk");
         static Identifier defaultEffectsRelType("defaultEffectsRel");
         static Identifier defaultEffectsPanType("defaultEffectsPan");
+        static Identifier startupMonitorEnabledType("startupMonitorEnabled");
 
         static Identifier indexType("index");           // Child Properties
         static Identifier midikeyboardType("keyboard");
@@ -9505,6 +9525,10 @@ private:
             appState.defaultEffectsPan = juce::jlimit(0, 127, (int)vtconfigs.getProperty(defaultEffectsPanType));
         else
             appState.defaultEffectsPan = 64;
+
+        appState.startupMonitorEnabled = vtconfigs.hasProperty(startupMonitorEnabledType)
+            ? static_cast<bool>(vtconfigs.getProperty(startupMonitorEnabledType))
+            : false;
 
         for (int i = 0; i < numberbuttongroups; i++) {
             ValueTree vtcfg = vtconfigs.getChild(i);
@@ -9617,6 +9641,8 @@ private:
         else {
             togglePassthrough.setToggleState(false, dontSendNotification);
         }
+
+        toggleStartupMonitor.setToggleState(appState.startupMonitorEnabled, dontSendNotification);
 
         refreshDefaultEffectsEditorsFromAppState();
 
@@ -9790,6 +9816,8 @@ public:
         VoicesPage* voicespage = new VoicesPage(*this);
         auto virtualKeyboardInputEnabled = std::make_shared<std::atomic<bool>>(false);
         MonitorPage* monitorpage = new MonitorPage(virtualKeyboardInputEnabled);
+        if (getAppState().startupMonitorEnabled)
+            monitorpage->setMonitoringEnabled(true);
         effectsPageRef = effectspage;
         voicesPageRef = voicespage;
         monitorPageRef = monitorpage;

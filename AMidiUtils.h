@@ -94,6 +94,7 @@ struct AppState final
     int defaultEffectsAtk = 0;
     int defaultEffectsRel = 0;
     int defaultEffectsPan = 64;
+    bool startupMonitorEnabled = false;
     bool configchanged = false;
     bool configreload = false;
     /** User chose "Load anyway" when cfg vs panel embedded name differed; gates panel Save until confirmed or realigned. */
@@ -153,6 +154,7 @@ inline String& pnlconfigfname = getAppState().pnlconfigfname;
 inline String& configdir = getAppState().configdir;
 inline int& defaultEffectsVol = getAppState().defaultEffectsVol;
 inline int& defaultEffectsBri = getAppState().defaultEffectsBri;
+inline bool& startupMonitorEnabled = getAppState().startupMonitorEnabled;
 inline bool& configchanged = getAppState().configchanged;
 inline bool& configreload = getAppState().configreload;
 inline bool& configPanelPairingMismatchAcknowledged = getAppState().configPanelPairingMismatchAcknowledged;
