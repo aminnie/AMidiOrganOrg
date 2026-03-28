@@ -34,6 +34,37 @@ static const int numberpresets = 7;
 static const int defvelocityout = 64;
 
 static const int numbermodules = 6;
+static constexpr int kProjectMiddleCOctave = 4; // Project-wide convention: MIDI 60 == C4
+
+inline juce::String getProjectMidiNoteName(int noteNumber)
+{
+    return juce::MidiMessage::getMidiNoteName(noteNumber, true, true, kProjectMiddleCOctave);
+}
+
+inline juce::String getProjectMidiMessageDescription(const juce::MidiMessage& message)
+{
+    if (message.isNoteOn())           return "Note on " + getProjectMidiNoteName(message.getNoteNumber());
+    if (message.isNoteOff())          return "Note off " + getProjectMidiNoteName(message.getNoteNumber());
+    if (message.isProgramChange())    return "Program change " + juce::String(message.getProgramChangeNumber());
+    if (message.isPitchWheel())       return "Pitch wheel " + juce::String(message.getPitchWheelValue());
+    if (message.isAftertouch())       return "After touch " + getProjectMidiNoteName(message.getNoteNumber()) + ": " + juce::String(message.getAfterTouchValue());
+    if (message.isChannelPressure())  return "Channel pressure " + juce::String(message.getChannelPressureValue());
+    if (message.isAllNotesOff())      return "All notes off";
+    if (message.isAllSoundOff())      return "All sound off";
+    if (message.isMetaEvent())        return "Meta event";
+
+    if (message.isController())
+    {
+        juce::String name(juce::MidiMessage::getControllerName(message.getControllerNumber()));
+
+        if (name.isEmpty())
+            name = "[" + juce::String(message.getControllerNumber()) + "]";
+
+        return "Controller " + name + ": " + juce::String(message.getControllerValue());
+    }
+
+    return juce::String::toHexString(message.getRawData(), message.getRawDataSize());
+}
 
 // Tracking switching between tabs to trigger updates, e.g. from Sounds tab back to Upper
 static int lasttabidx = 1;

@@ -65,6 +65,7 @@ Primary implementation files:
   - Default effects values
   - Module alias fields
   - Global startup-monitor toggle persisted in config
+  - Solo split note naming uses project convention `C4 = 60`
   - Validation rules for module/channel uniqueness
 - **Hotkeys**
   - User-editable key mapping persisted to `hotkeys.json`
@@ -76,6 +77,7 @@ Primary implementation files:
   - History retention and clear action
   - Includes routed module name and current volume context
   - Virtual MIDI keyboard with octave control
+  - Shares the same `C4 = 60` note-label convention as Config split values
 - **Help**
   - In-app guide sourced from `assets/help.md`
 
@@ -176,6 +178,7 @@ flowchart TD
 - **Config**: Routing and default behavior rules
 - **AppState**: Current filenames/paths/session flags/shared runtime state
 - **Startup Monitor**: Config-persisted flag that auto-enables outgoing MIDI capture during startup without forcing the Monitor tab visible
+- **Project note naming**: Shared octave convention where MIDI note `60` is displayed as `C4`
 - **Manual rotary target**: Per-manual selector (`1` or `2`) mapping rotary routing to group 1 or group 2
 
 ### Data Constraints

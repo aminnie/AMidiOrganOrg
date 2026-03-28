@@ -303,6 +303,7 @@ Global options note:
 - `Allow all MIDI In` controls global input pass-through filtering.
 - `Startup Monitor` enables outgoing monitor capture automatically during app startup so initialization MIDI can be inspected later.
 - Enabling `Startup Monitor` does **not** open the `Monitor` tab automatically; startup continues normally on the usual tab.
+- Solo split note names use the project-wide `C4 = 60` convention.
 
 Expected result:
 
@@ -363,6 +364,7 @@ Behavior:
 - If Config `Startup Monitor` is enabled, capture begins automatically during startup and keeps buffering history until you open `Monitor`.
 - Disabling capture keeps existing history until manually cleared.
 - Monitor lines include message/channel details and routed module context.
+- Monitor note names and the virtual keyboard use the same `C4 = 60` octave naming as Solo split values in Config.
 
 Use cases:
 

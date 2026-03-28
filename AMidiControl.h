@@ -5921,27 +5921,7 @@ private:
 
     static juce::String getMidiMessageDescription(const juce::MidiMessage& m)
     {
-        if (m.isNoteOn())           return "Note on " + juce::MidiMessage::getMidiNoteName(m.getNoteNumber(), true, true, 3);
-        if (m.isNoteOff())          return "Note off " + juce::MidiMessage::getMidiNoteName(m.getNoteNumber(), true, true, 3);
-        if (m.isProgramChange())    return "Program change " + juce::String(m.getProgramChangeNumber());
-        if (m.isPitchWheel())       return "Pitch wheel " + juce::String(m.getPitchWheelValue());
-        if (m.isAftertouch())       return "After touch " + juce::MidiMessage::getMidiNoteName(m.getNoteNumber(), true, true, 3) + ": " + juce::String(m.getAfterTouchValue());
-        if (m.isChannelPressure())  return "Channel pressure " + juce::String(m.getChannelPressureValue());
-        if (m.isAllNotesOff())      return "All notes off";
-        if (m.isAllSoundOff())      return "All sound off";
-        if (m.isMetaEvent())        return "Meta event";
-
-        if (m.isController())
-        {
-            juce::String name(juce::MidiMessage::getControllerName(m.getControllerNumber()));
-
-            if (name.isEmpty())
-                name = "[" + juce::String(m.getControllerNumber()) + "]";
-
-            return "Controller " + name + ": " + juce::String(m.getControllerValue());
-        }
-
-        return juce::String::toHexString(m.getRawData(), m.getRawDataSize());
+        return getProjectMidiMessageDescription(m);
     }
 
     //-----------------------------------------------------------------------------
@@ -6028,6 +6008,7 @@ public:
         virtualKeyboardInputEnabled(std::move(virtualKeyboardInputEnabledState))
     {
         juce::Logger::writeToLog("== MidiStartPage(): Constructor " + std::to_string(zinstcntMidiStartPage++));
+        midiKeyboard.setOctaveForMiddleC(kProjectMiddleCOctave);
 
         addLabelAndSetStyle(midiInputLabel);
         addLabelAndSetStyle(midiOutputLabel);
@@ -7708,6 +7689,7 @@ public:
           virtualKeyboardInputEnabled(std::move(virtualKeyboardInputEnabledState))
     {
         setOpaque(true);
+        monitorKeyboard.setOctaveForMiddleC(kProjectMiddleCOctave);
 
         monitorGroup.setColour(juce::GroupComponent::outlineColourId, juce::Colours::grey.darker());
         addAndMakeVisible(monitorGroup);
@@ -7969,9 +7951,7 @@ private:
     juce::String formatMessage(const MonitorMessageEntry& entry, int currentVolume) const
     {
         const auto& msg = entry.message;
-        juce::String description = msg.getDescription();
-        if (description.isEmpty())
-            description = juce::String::toHexString(msg.getRawData(), msg.getRawDataSize());
+        const juce::String description = getProjectMidiMessageDescription(msg);
 
         const int channel = msg.getChannel();
         if (channel > 0) {
@@ -9157,7 +9137,7 @@ private:
         }
         if (bnotefount == false) return notenumber;
 
-        notenumber = noteinoctave + (noteoctave + 1) * 12;
+        notenumber = noteinoctave + (noteoctave + (5 - kProjectMiddleCOctave)) * 12;
 
         return notenumber;
     }
@@ -9166,7 +9146,7 @@ private:
 
         String notename = "0";
 
-        int octave = (notenumber / 12) - 1;
+        int octave = (notenumber / 12) - (5 - kProjectMiddleCOctave);
         if ((octave > 1) && (octave < 8)) {
             int noteinoctave = notenumber % 12;
             notename = notenames[noteinoctave] + std::to_string(octave);
