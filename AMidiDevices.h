@@ -955,7 +955,7 @@ private:
         instrumentmodules.add(new InstrumentModule());
         createInstrumentModule(1, "Deebach BlackBox", "BlackBox", "maxplus.json", "Blackbox",
             "Deebach Grand 1", 121, 8, 0, true, 
-            true, 2, 0x74, 0, 0, 0);
+            true, 2, 0x74, 0, 20, 63);
 
         instrumentmodules.add(new InstrumentModule());
         createInstrumentModule(2, "Roland Integra7", "Integra7", "integra7.json", "INTEGRA",

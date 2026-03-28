@@ -1446,7 +1446,18 @@ namespace
 
     bool runType2RotarySlowRestoreConstant(std::string& details)
     {
-        if (!expectEqual(kType2RotorSlowRestoreValue, 10, "type-2 slow restore value", details))
+        auto* modules = InstrumentModules::getInstance();
+        if (modules == nullptr)
+        {
+            details = "InstrumentModules::getInstance() returned nullptr";
+            return false;
+        }
+
+        constexpr int kDeebachModuleId = 1;
+        const int type2SlowValue = modules->getRotorSlow(kDeebachModuleId);
+        const int type2FastValue = modules->getRotorFast(kDeebachModuleId);
+
+        if (!expectEqual(type2SlowValue, 20, "type-2 slow restore value", details))
             return false;
 
         const auto action = resolveType2RotaryAction(false, false);
@@ -1455,7 +1466,7 @@ namespace
             return false;
 
         // Behavioral proxy: slow restore path is a single deterministic target value.
-        return expectEqual(kType2RotorSlowRestoreValue == 63 ? 1 : 0, 0,
+        return expectEqual(type2SlowValue == type2FastValue ? 1 : 0, 0,
                            "slow restore target avoids transient fast spike value", details);
     }
 

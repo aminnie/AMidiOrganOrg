@@ -50,12 +50,13 @@ class RotarySlowThread final : public Rotors,
     public Thread
 {
 public:
-    RotarySlowThread(Component& containerComp, int midiout) : Rotors(containerComp),
+    RotarySlowThread(Component& containerComp, int midiout, int slowValue, int fastValue) : Rotors(containerComp),
         Thread("Rotary Upper Slow Thread"),
         startTime(juce::Time::getMillisecondCounterHiRes() * 0.001),
         mididevices(MidiDevices::getInstance()) // Creates the singleton if there isn't already one
     {
         midichannel = midiout;
+        initialiseRotarySteps(slowValue, fastValue);
 
         startThread();
     }
@@ -91,6 +92,35 @@ public:
     }
 
 private:
+    static constexpr int kRampStartIndex = 2;
+    static constexpr int kRampEndIndex = 9;
+
+    void initialiseRotarySteps(int slowValue, int fastValue)
+    {
+        const int clampedSlow = juce::jlimit(0, 127, slowValue);
+        const int clampedFast = juce::jlimit(0, 127, fastValue);
+        const int rampSpan = kRampEndIndex - kRampStartIndex;
+
+        for (int i = 0; i < 10; ++i)
+        {
+            if (i <= kRampStartIndex)
+            {
+                rotarystep[i] = clampedSlow;
+            }
+            else if (i >= kRampEndIndex)
+            {
+                rotarystep[i] = clampedFast;
+            }
+            else
+            {
+                const int segment = i - kRampStartIndex;
+                const int delta = clampedFast - clampedSlow;
+                const int rounded = (delta * segment + (delta >= 0 ? rampSpan / 2 : -(rampSpan / 2))) / rampSpan;
+                rotarystep[i] = juce::jlimit(0, 127, clampedSlow + rounded);
+            }
+        }
+    }
+
     int interval = 200;
     int stepcount = 0;
 
@@ -116,12 +146,13 @@ class RotaryFastThread final : public Rotors,
     public Thread
 {
 public:
-    RotaryFastThread(Component& containerComp, int midiout) : Rotors(containerComp),
+    RotaryFastThread(Component& containerComp, int midiout, int slowValue, int fastValue) : Rotors(containerComp),
         Thread("Rotary Upper Fast Thread"),
         startTime(juce::Time::getMillisecondCounterHiRes() * 0.001),
         mididevices(MidiDevices::getInstance()) // Creates the singleton if there isn't already one
     {
         midichannel = midiout;
+        initialiseRotarySteps(slowValue, fastValue);
 
         startThread();
     }
@@ -157,6 +188,35 @@ public:
     }
 
 private:
+    static constexpr int kRampStartIndex = 2;
+    static constexpr int kRampEndIndex = 9;
+
+    void initialiseRotarySteps(int slowValue, int fastValue)
+    {
+        const int clampedSlow = juce::jlimit(0, 127, slowValue);
+        const int clampedFast = juce::jlimit(0, 127, fastValue);
+        const int rampSpan = kRampEndIndex - kRampStartIndex;
+
+        for (int i = 0; i < 10; ++i)
+        {
+            if (i <= kRampStartIndex)
+            {
+                rotarystep[i] = clampedSlow;
+            }
+            else if (i >= kRampEndIndex)
+            {
+                rotarystep[i] = clampedFast;
+            }
+            else
+            {
+                const int segment = i - kRampStartIndex;
+                const int delta = clampedFast - clampedSlow;
+                const int rounded = (delta * segment + (delta >= 0 ? rampSpan / 2 : -(rampSpan / 2))) / rampSpan;
+                rotarystep[i] = juce::jlimit(0, 127, clampedSlow + rounded);
+            }
+        }
+    }
+
     int interval = 200;
     int stepcount = 0;
 

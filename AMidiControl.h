@@ -37,8 +37,6 @@ enum class Type2RotaryAction
     restoreSlowTarget
 };
 
-inline constexpr int kType2RotorSlowRestoreValue = 10;
-
 inline Type2RotaryAction resolveType2RotaryAction(bool wantFast, bool wantBrake)
 {
     if (wantBrake)
@@ -46,6 +44,16 @@ inline Type2RotaryAction resolveType2RotaryAction(bool wantFast, bool wantBrake)
     if (wantFast)
         return Type2RotaryAction::startFastRamp;
     return Type2RotaryAction::restoreSlowTarget;
+}
+
+inline int getType2RotorSlowTarget(InstrumentModules* modules, int moduleIdx)
+{
+    return juce::jlimit(0, 127, modules->getRotorSlow(moduleIdx));
+}
+
+inline int getType2RotorFastTarget(InstrumentModules* modules, int moduleIdx)
+{
+    return juce::jlimit(0, 127, modules->getRotorFast(moduleIdx));
 }
 
 // Logging to a file
@@ -4577,22 +4585,25 @@ struct KeyboardPanelPage final : public Component,
                     ButtonGroup* ptrbuttongroup = instrumentpanel->getButtonGroup(buttongroupidx);
                     int buttongroupmoduleidx = ptrbuttongroup->moduleidx;
                     int buttongroupmidiout = ptrbuttongroup->midiout;
+                    const int rotorType = instrumentmodules->getRotorType(buttongroupmoduleidx);
 
                     if (!tbrotslow->getToggleState())
                     {
                         // Ignore Fast/Slow command if Rotor brake on
                         if (rotarybrake) return;
 
-                        if (instrumentmodules->getRotorType(buttongroupmoduleidx) == 1) {
+                        if (rotorType == 1) {
                             // Preset Rotor change control value to fast
                             RotaryFastSlow(buttongroupmidiout,
                                 instrumentmodules->getRotorCC(buttongroupmoduleidx),        //74
                                 instrumentmodules->getRotorFast(buttongroupmoduleidx)
                             );
                         }
-                        else if (instrumentmodules->getRotorType(buttongroupmoduleidx) == 2) {
+                        else if (rotorType == 2) {
+                            const int type2SlowTarget = getType2RotorSlowTarget(instrumentmodules, buttongroupmoduleidx);
+                            const int type2FastTarget = getType2RotorFastTarget(instrumentmodules, buttongroupmoduleidx);
                             rotorsarray.clear(true);
-                            rotorsarray.add(new RotaryFastThread(*this, buttongroupmidiout));
+                            rotorsarray.add(new RotaryFastThread(*this, buttongroupmidiout, type2SlowTarget, type2FastTarget));
                         }
 
                         tbrotslow->setButtonText("Fast");
@@ -4602,16 +4613,18 @@ struct KeyboardPanelPage final : public Component,
                     {
                         if (rotarybrake) return;
 
-                        if (instrumentmodules->getRotorType(buttongroupmoduleidx) == 1) {
+                        if (rotorType == 1) {
                             // Preset Rotor change control value to slow
                             RotaryFastSlow(buttongroupmidiout,
                                 instrumentmodules->getRotorCC(buttongroupmoduleidx),        //74
                                 instrumentmodules->getRotorSlow(buttongroupmoduleidx)
                             );
                         }
-                        else if (instrumentmodules->getRotorType(buttongroupmoduleidx) == 2) {
+                        else if (rotorType == 2) {
+                            const int type2SlowTarget = getType2RotorSlowTarget(instrumentmodules, buttongroupmoduleidx);
+                            const int type2FastTarget = getType2RotorFastTarget(instrumentmodules, buttongroupmoduleidx);
                             rotorsarray.clear(true);
-                            rotorsarray.add(new RotarySlowThread(*this, buttongroupmidiout));
+                            rotorsarray.add(new RotarySlowThread(*this, buttongroupmidiout, type2SlowTarget, type2FastTarget));
                         }
 
                         tbrotslow->setButtonText("Slow");
@@ -4660,10 +4673,10 @@ struct KeyboardPanelPage final : public Component,
                     ButtonGroup* ptrbuttongroup = instrumentpanel->getButtonGroup(buttongroupidx);
                     int buttongroupmoduleidx = ptrbuttongroup->moduleidx;
                     int buttongroupmidiout = ptrbuttongroup->midiout;
+                    const int rotorType = instrumentmodules->getRotorType(buttongroupmoduleidx);
 
                     if (tbrotbrake->getToggleState())
                     {
-                        const int rotorType = instrumentmodules->getRotorType(buttongroupmoduleidx);
                         if (rotorType == 2)
                             rotorsarray.clear(true);
                         // Set Rotor Brake on
@@ -4685,18 +4698,19 @@ struct KeyboardPanelPage final : public Component,
                     }
                     else
                     {
-                        const int rotorType = instrumentmodules->getRotorType(buttongroupmoduleidx);
                         // Set Rotor Brake off and restart Rotor at previous Fast or Slow
                         if (rotorType == 2) {
+                            const int type2SlowTarget = getType2RotorSlowTarget(instrumentmodules, buttongroupmoduleidx);
+                            const int type2FastTarget = getType2RotorFastTarget(instrumentmodules, buttongroupmoduleidx);
                             rotorsarray.clear(true);
                             switch (resolveType2RotaryAction(isFastUpper, false))
                             {
                                 case Type2RotaryAction::startFastRamp:
-                                    rotorsarray.add(new RotaryFastThread(*this, buttongroupmidiout));
+                                    rotorsarray.add(new RotaryFastThread(*this, buttongroupmidiout, type2SlowTarget, type2FastTarget));
                                     break;
                                 case Type2RotaryAction::restoreSlowTarget:
                                     // For type-2 slow restore after Brake On, avoid a transient jump to 63.
-                                    RotaryFastSlow(buttongroupmidiout, CCBri, kType2RotorSlowRestoreValue);
+                                    RotaryFastSlow(buttongroupmidiout, CCBri, type2SlowTarget);
                                     break;
                                 case Type2RotaryAction::hardStop:
                                     RotaryFastSlow(buttongroupmidiout, CCBri, 0);
@@ -5543,15 +5557,17 @@ private:
                         );
                     }
                     else if (rotorType == 2) {
+                        const int type2SlowTarget = getType2RotorSlowTarget(instrumentmodules, buttongroupmoduleidx);
+                        const int type2FastTarget = getType2RotorFastTarget(instrumentmodules, buttongroupmoduleidx);
                         switch (resolveType2RotaryAction(true, false))
                         {
                             case Type2RotaryAction::startFastRamp:
                                 rotorsarray.clear(true);
-                                rotorsarray.add(new RotaryFastThread(*this, buttongroupmidiout));
+                                rotorsarray.add(new RotaryFastThread(*this, buttongroupmidiout, type2SlowTarget, type2FastTarget));
                                 break;
                             case Type2RotaryAction::restoreSlowTarget:
                                 rotorsarray.clear(true);
-                                RotaryFastSlow(buttongroupmidiout, CCBri, kType2RotorSlowRestoreValue);
+                                RotaryFastSlow(buttongroupmidiout, CCBri, type2SlowTarget);
                                 break;
                             case Type2RotaryAction::hardStop:
                                 rotorsarray.clear(true);
@@ -5575,15 +5591,17 @@ private:
                         );
                     }
                     else if (rotorType == 2) {
+                        const int type2SlowTarget = getType2RotorSlowTarget(instrumentmodules, buttongroupmoduleidx);
+                        const int type2FastTarget = getType2RotorFastTarget(instrumentmodules, buttongroupmoduleidx);
                         switch (resolveType2RotaryAction(false, false))
                         {
                             case Type2RotaryAction::restoreSlowTarget:
                                 rotorsarray.clear(true);
-                                RotaryFastSlow(buttongroupmidiout, CCBri, kType2RotorSlowRestoreValue);
+                                RotaryFastSlow(buttongroupmidiout, CCBri, type2SlowTarget);
                                 break;
                             case Type2RotaryAction::startFastRamp:
                                 rotorsarray.clear(true);
-                                rotorsarray.add(new RotaryFastThread(*this, buttongroupmidiout));
+                                rotorsarray.add(new RotaryFastThread(*this, buttongroupmidiout, type2SlowTarget, type2FastTarget));
                                 break;
                             case Type2RotaryAction::hardStop:
                                 rotorsarray.clear(true);
