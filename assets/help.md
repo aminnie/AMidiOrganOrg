@@ -31,7 +31,7 @@ Contact the developer for additional module support.
 1. Open the `Start` tab.
 2. Select MIDI input and output devices (selections are restored automatically on the next launch when the same ports are available).
 3. Select the active sound module using `To Modules`.
-4. Load a panel (`.pnl`) and config (`.cfg`) if needed.
+4. Load a panel (`.pnl`) and config (`.cfg`) if needed, or create a fresh panel with `New Panel`.
 5. Confirm the panel and config labels match what you expect.
 6. Move to `Upper`, `Lower`, or `Bass&Drums` and start playing.
 
@@ -42,6 +42,8 @@ Contact the developer for additional module support.
 - Lists MIDI input and output devices and updates as devices connect or disconnect.
 - Lets you choose the active sound module.
 - Loads panel and config files.
+- `New Panel` creates a new `.pnl` from the currently selected module using that module's first voice for all panel voice buttons.
+- The create flow prompts for a file name, blocks duplicates, then saves and auto-loads the new panel.
 - Checks config/panel pairing when loading and can warn if the selected files do not belong together.
 
 ### Upper / Lower / Bass&Drums

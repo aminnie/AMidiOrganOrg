@@ -29,9 +29,11 @@ Optional:
 3. Confirm app opens to tabbed UI.
 4. Confirm `Start` tab can select MIDI In/Out devices.
 5. Load one config (`.cfg`) and one panel (`.pnl`).
-6. Open `Upper` and confirm voice selection + playback.
-7. Open `Monitor`, enable capture, and verify outgoing MIDI lines appear.
-8. Confirm `USER_MANUAL.md` opens from package folder.
+6. Use `New Panel` on `Start`, enter a new `.pnl` name, and confirm it saves + auto-loads.
+7. Retry with the same name and confirm duplicate warning/no overwrite.
+8. Open `Upper` and confirm voice selection + playback.
+9. Open `Monitor`, enable capture, and verify outgoing MIDI lines appear.
+10. Confirm `USER_MANUAL.md` opens from package folder.
 
 ## 3) Runtime Checks (macOS)
 
@@ -40,9 +42,11 @@ Optional:
 3. Confirm app opens to tabbed UI.
 4. Confirm `Start` tab can select MIDI In/Out devices.
 5. Load one config (`.cfg`) and one panel (`.pnl`).
-6. Open `Upper` and confirm voice selection + playback.
-7. Open `Monitor`, enable capture, and verify outgoing MIDI lines appear.
-8. Confirm `USER_MANUAL.md` opens from package folder.
+6. Use `New Panel` on `Start`, enter a new `.pnl` name, and confirm it saves + auto-loads.
+7. Retry with the same name and confirm duplicate warning/no overwrite.
+8. Open `Upper` and confirm voice selection + playback.
+9. Open `Monitor`, enable capture, and verify outgoing MIDI lines appear.
+10. Confirm `USER_MANUAL.md` opens from package folder.
 
 ## 4) Behavior Verification
 

@@ -6010,6 +6010,19 @@ public:
                     });
             };
 
+        addAndMakeVisible(newPanelButton);
+        newPanelButton.setButtonText("New Panel");
+        newPanelButton.setColour(TextButton::textColourOffId, Colours::white);
+        newPanelButton.setColour(TextButton::textColourOnId, Colours::white);
+        newPanelButton.setColour(TextButton::buttonColourId, Colours::black);
+        newPanelButton.setColour(TextButton::buttonOnColourId, Colours::black);
+        newPanelButton.setToggleState(true, dontSendNotification);
+        newPanelButton.setTooltip("Create a new panel prefilled from the current module's first voice.");
+        newPanelButton.onClick = [this]()
+            {
+                launchNewPanelCreationFlow();
+            };
+
         addAndMakeVisible(exitButton);
         exitButton.setButtonText("Exit");
         exitButton.setColour(TextButton::textColourOffId, Colours::white);
@@ -6273,6 +6286,7 @@ public:
 
         // Keep Load Panel aligned with Instruments/Config actions.
         loadPanelButton.setBounds(280, margin + 205, 90, 50);
+        newPanelButton.setBounds(380, margin + 205, 90, 50);
         toConfig.setBounds(820, margin + 200, 90, 50);
 
         // Place Exit in the top-right header area for faster access.
@@ -6396,6 +6410,152 @@ private:
                 break;
             }
         }
+    }
+
+    juce::String normalizePanelFileName(juce::String proposedName) const
+    {
+        proposedName = proposedName.trim();
+        if (proposedName.isEmpty())
+            return {};
+
+        if (!proposedName.endsWithIgnoreCase(".pnl"))
+            proposedName += ".pnl";
+
+        return proposedName;
+    }
+
+    bool seedCurrentPanelFromModuleFirstVoice(juce::String& errorText)
+    {
+        if (instrumentpanel == nullptr || midiInstruments == nullptr)
+        {
+            errorText = "Panel or instrument services are unavailable.";
+            return false;
+        }
+
+        if (!midiInstruments->loadMidiInstruments(appState.instrumentfname))
+        {
+            errorText = "Could not load the current module instrument list.";
+            return false;
+        }
+
+        if (midiInstruments->getCategoryCount() <= 0 || midiInstruments->getCategoryVoiceCount(0) <= 0)
+        {
+            errorText = "The selected module has no instrument voices to initialize a panel.";
+            return false;
+        }
+
+        const juce::String firstCategory = midiInstruments->getCategory(0);
+        const juce::String firstVoice = midiInstruments->getVoice(0, 1).trim();
+        if (firstVoice.isEmpty() || firstVoice == "No Voice")
+        {
+            errorText = "The selected module did not return a valid first voice.";
+            return false;
+        }
+
+        const int firstMSB = midiInstruments->getMSB(0, 1);
+        const int firstLSB = midiInstruments->getLSB(0, 1);
+        const int firstFont = midiInstruments->getFont(0, 1);
+
+        for (int i = 0; i < numbervoicebuttons; ++i)
+        {
+            auto* voiceButton = instrumentpanel->getVoiceButton(i);
+            if (voiceButton == nullptr)
+                continue;
+
+            int panelButtonIdx = voiceButton->getPanelButtonIdx();
+            if (panelButtonIdx < 0 || panelButtonIdx >= numbervoicebuttons)
+                panelButtonIdx = i;
+
+            const int buttonGroupIdx = lookupPanelGroup(panelButtonIdx);
+            auto* buttonGroup = instrumentpanel->getButtonGroup(buttonGroupIdx);
+            const int midiOutChannel = (buttonGroup != nullptr) ? buttonGroup->midiout : 1;
+
+            Instrument instrument;
+            instrument.setCategory(firstCategory);
+            instrument.setVoice(firstVoice);
+            instrument.setMSB(firstMSB);
+            instrument.setLSB(firstLSB);
+            instrument.setFont(firstFont);
+            instrument.setVol(appState.defaultEffectsVol);
+            instrument.setBri(appState.defaultEffectsBri);
+            instrument.setExp(appState.defaultEffectsExp);
+            instrument.setRev(appState.defaultEffectsRev);
+            instrument.setCho(appState.defaultEffectsCho);
+            instrument.setMod(appState.defaultEffectsMod);
+            instrument.setTim(appState.defaultEffectsTim);
+            instrument.setAtk(appState.defaultEffectsAtk);
+            instrument.setRel(appState.defaultEffectsRel);
+            instrument.setPan(appState.defaultEffectsPan);
+            instrument.setChannel(midiOutChannel);
+            instrument.setButtonIdx(panelButtonIdx);
+
+            voiceButton->setInstrument(instrument);
+            voiceButton->setButtonText(instrument.getVoice());
+        }
+
+        return true;
+    }
+
+    void launchNewPanelCreationFlow()
+    {
+        juce::String prepError;
+        if (!seedCurrentPanelFromModuleFirstVoice(prepError))
+        {
+            juce::AlertWindow::showMessageBoxAsync(
+                juce::AlertWindow::WarningIcon,
+                "Cannot create panel",
+                prepError.isNotEmpty() ? prepError : "Unable to initialize panel defaults from module.");
+            return;
+        }
+
+        const juce::File proposed = getDefaultPanelsDirectory().getChildFile("newpanel.pnl");
+        const bool useNativeVersion = false;
+        filechooser.reset(new FileChooser(
+            "Create New Panel: Enter new *.pnl file name",
+            proposed,
+            "*.pnl",
+            useNativeVersion));
+
+        filechooser->launchAsync(
+            FileBrowserComponent::saveMode
+            | FileBrowserComponent::canSelectFiles
+            | FileBrowserComponent::warnAboutOverwriting,
+            [this](const FileChooser& chooser)
+            {
+                juce::String selectedFileName;
+                auto results = chooser.getURLResults();
+                for (auto result : results)
+                    selectedFileName << (result.isLocalFile() ? result.getLocalFile().getFileName()
+                        : result.toString(false));
+
+                if (selectedFileName.isEmpty())
+                    return;
+
+                const juce::String normalizedFileName = normalizePanelFileName(selectedFileName);
+                if (normalizedFileName.isEmpty())
+                    return;
+
+                const juce::File target = getDefaultPanelsDirectory().getChildFile(normalizedFileName);
+                if (target.existsAsFile())
+                {
+                    juce::AlertWindow::showMessageBoxAsync(
+                        juce::AlertWindow::WarningIcon,
+                        "Panel already exists",
+                        "A panel file named \"" + normalizedFileName
+                        + "\" already exists. Choose a different file name.");
+                    return;
+                }
+
+                const bool saved = instrumentpanel->saveInstrumentPanel(target.getFullPathName(), true);
+                if (!saved)
+                {
+                    if (TextButton* focused = &newPanelButton)
+                        BubbleMessage(*focused, "Create panel failed: " + normalizedFileName, this->bubbleMessage);
+                    return;
+                }
+
+                proceedWithPickedPanelFile(target);
+            });
     }
 
     void proceedWithPickedPanelFile(const juce::File& pnlFile)
@@ -6918,6 +7078,7 @@ private:
     TextButton exitButton{ "Exit" };
     TextButton loadConfigButton{ "Load Config" };
     TextButton loadPanelButton{ "Load Panel" };
+    TextButton newPanelButton{ "New Panel" };
 
     TextButton toModule{ "To Modules" };
     TextButton toHelp{ "To Help" };

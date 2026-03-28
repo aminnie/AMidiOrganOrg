@@ -71,7 +71,7 @@ Supported MIDI hardware and software sound modules:
 1. Open the `Start` tab.
 2. Select MIDI input and output devices.
 3. Select the active sound module using `To Modules`.
-4. Load a panel (`.pnl`) and config (`.cfg`) if needed.
+4. Load a panel (`.pnl`) and config (`.cfg`) if needed, or create a fresh panel from the current module using `New Panel`.
 5. Confirm the panel and config labels match what you expect.
 6. Move to `Upper`, `Lower`, or `Bass&Drums` and begin playing.
 
@@ -85,6 +85,11 @@ On startup, the app also attempts to auto-restore the last used panel and config
 - Your selected MIDI In and Out ports are remembered across launches (`Documents/AMidiOrgan/configs/midi_sticky_devices.json`, by JUCE device identifier).
 - Lets you choose the active sound module.
 - Loads panel and config files.
+- `New Panel` creates a new `.pnl` from the currently selected module:
+  - all voice buttons are initialized to the first voice in that module list
+  - you are prompted for a new file name in a save-style dialog
+  - duplicate file names are blocked with a warning (no overwrite)
+  - on successful save, the new panel is loaded immediately (same flow as `Load Panel`)
 - On launch, restores last used panel/config when available (`Documents/AMidiOrgan/configs/last_session.json`).
 - Checks config and panel pairing when loading, and can warn if the selected files do not belong together.
 
@@ -363,6 +368,8 @@ After a successful build, run this quick checklist (5-10 minutes):
 2. On `Start`:
   - Load a config file.
   - Load a panel file.
+  - Create a new panel via `New Panel`, verify it auto-loads.
+  - Try creating the same panel name again and verify duplicate warning/no overwrite.
   - Confirm panel/config labels update and mismatch coloring behaves as expected.
 3. On `Upper`, `Lower`, and `Bass&Drums`:
   - Click several voice buttons and confirm active-state behavior.

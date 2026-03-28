@@ -100,7 +100,7 @@ Notes:
 ## 5) Quick Start (First Sound in 5 Minutes)
 
 1. On `Start`, select MIDI In and MIDI Out devices.
-2. Load a config (`.cfg`) and panel (`.pnl`) if your setup uses prepared files.
+2. Load a config (`.cfg`) and panel (`.pnl`) if your setup uses prepared files, or use `New Panel` to generate a fresh panel from the selected module.
 3. Open `Upper`.
 4. Click a voice button in Group 1.
 5. Play your keyboard and verify sound output.
@@ -133,6 +133,7 @@ You can:
 
 - Select MIDI input and output devices
 - Load panel (`.pnl`) and config (`.cfg`) files
+- Create a new panel (`New Panel`) from the currently selected module defaults
 - Select active sound module
 - Verify panel/config status labels
 
@@ -140,6 +141,7 @@ Behavior:
 
 - Last used panel/config can auto-restore at startup when files still exist.
 - Start tab remembers selected MIDI ports via sticky device storage.
+- `New Panel` opens a save-style prompt; duplicate panel names are blocked, and successful saves auto-load the new panel.
 
 Best practice:
 
