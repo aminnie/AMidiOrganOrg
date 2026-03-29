@@ -6141,7 +6141,7 @@ public:
         newConfigButton.setColour(TextButton::buttonColourId, juce::Colour(0xff8aa3b6));
         newConfigButton.setColour(TextButton::buttonOnColourId, juce::Colour(0xff8aa3b6).interpolatedWith(juce::Colours::black, 0.10f));
         newConfigButton.setToggleState(true, dontSendNotification);
-        newConfigButton.setTooltip("Create a new config from midigm.cfg using the current Start-tab module.");
+        newConfigButton.setTooltip("Create a new config using the current Start-tab module and default routing values.");
         newConfigButton.onClick = [this]()
             {
                 launchNewConfigCreationFlow();
@@ -6636,14 +6636,38 @@ private:
         return proposedName;
     }
 
-    bool buildNewConfigValueTreeFromMidigm(juce::ValueTree& outTree, juce::String& errorText)
+    bool buildNewConfigValueTreeFromSelectedModule(juce::ValueTree& outTree, juce::String& errorText)
     {
+        static const juce::Identifier configsType("configs");
+        static const juce::Identifier buttongroupType("group");
+        static const juce::Identifier defaultEffectsVolType("defaultEffectsVol");
+        static const juce::Identifier defaultEffectsBriType("defaultEffectsBri");
+        static const juce::Identifier defaultEffectsExpType("defaultEffectsExp");
+        static const juce::Identifier defaultEffectsRevType("defaultEffectsRev");
+        static const juce::Identifier defaultEffectsChoType("defaultEffectsCho");
+        static const juce::Identifier defaultEffectsModType("defaultEffectsMod");
+        static const juce::Identifier defaultEffectsTimType("defaultEffectsTim");
+        static const juce::Identifier defaultEffectsAtkType("defaultEffectsAtk");
+        static const juce::Identifier defaultEffectsRelType("defaultEffectsRel");
+        static const juce::Identifier defaultEffectsPanType("defaultEffectsPan");
+        static const juce::Identifier startupMonitorEnabledType("startupMonitorEnabled");
+        static const juce::Identifier indexType("index");
+        static const juce::Identifier midikeyboardType("keyboard");
+        static const juce::Identifier buttongroupnameType("groupname");
+        static const juce::Identifier buttongroupcountType("groupcount");
+        static const juce::Identifier midiinType("midiin");
+        static const juce::Identifier midioutType("midiout");
+        static const juce::Identifier octxposeType("octxpose");
+        static const juce::Identifier splitoutType("splitout");
+        static const juce::Identifier splitoutnameType("splitoutname");
+        static const juce::Identifier isvelocityType("isvelocity");
+        static const juce::Identifier ispassthroughType("ispassthrough");
         static const juce::Identifier moduleidxType("moduleidx");
         static const juce::Identifier modulealiasType("modulealias");
 
-        if (instrumentmodules == nullptr)
+        if (instrumentmodules == nullptr || instrumentpanel == nullptr)
         {
-            errorText = "Module service is unavailable.";
+            errorText = "Config generation services are unavailable.";
             return false;
         }
 
@@ -6654,36 +6678,49 @@ private:
             return false;
         }
 
-        const juce::File sourceFile = getConfigsDirectory().getChildFile("midigm.cfg");
-        if (!sourceFile.existsAsFile())
-        {
-            errorText = "Template config midigm.cfg was not found.";
-            return false;
-        }
+        juce::ValueTree tempConfig(configsType);
+        tempConfig.setProperty(defaultEffectsVolType, appState.defaultEffectsVol, nullptr);
+        tempConfig.setProperty(defaultEffectsBriType, appState.defaultEffectsBri, nullptr);
+        tempConfig.setProperty(defaultEffectsExpType, appState.defaultEffectsExp, nullptr);
+        tempConfig.setProperty(defaultEffectsRevType, appState.defaultEffectsRev, nullptr);
+        tempConfig.setProperty(defaultEffectsChoType, appState.defaultEffectsCho, nullptr);
+        tempConfig.setProperty(defaultEffectsModType, appState.defaultEffectsMod, nullptr);
+        tempConfig.setProperty(defaultEffectsTimType, appState.defaultEffectsTim, nullptr);
+        tempConfig.setProperty(defaultEffectsAtkType, appState.defaultEffectsAtk, nullptr);
+        tempConfig.setProperty(defaultEffectsRelType, appState.defaultEffectsRel, nullptr);
+        tempConfig.setProperty(defaultEffectsPanType, appState.defaultEffectsPan, nullptr);
+        tempConfig.setProperty(startupMonitorEnabledType, appState.startupMonitorEnabled, nullptr);
 
-        juce::FileInputStream input(sourceFile);
-        if (!input.openedOk())
+        for (int i = 0; i < numberbuttongroups; ++i)
         {
-            errorText = "Template config midigm.cfg could not be opened.";
-            return false;
-        }
+            ButtonGroup* const group = instrumentpanel->getButtonGroup(i);
+            if (group == nullptr)
+            {
+                errorText = "A button group is unavailable while generating the new config.";
+                return false;
+            }
 
-        juce::ValueTree tempConfig;
-        tempConfig = tempConfig.readFromStream(input);
-        if (!(tempConfig.isValid() && tempConfig.getNumChildren() > 0))
-        {
-            errorText = "Template config midigm.cfg is invalid.";
-            return false;
-        }
-
-        const int childCount = tempConfig.getNumChildren();
-        for (int i = 0; i < childCount; ++i)
-        {
-            auto child = tempConfig.getChild(i);
-            if (!child.isValid())
-                continue;
+            juce::ValueTree child(buttongroupType);
+            child.setProperty(indexType, i, nullptr);
+            child.setProperty(midikeyboardType, group->midikeyboard, nullptr);
+            child.setProperty(buttongroupnameType, group->groupname, nullptr);
+            child.setProperty(buttongroupcountType, group->buttoncount, nullptr);
+            child.setProperty(midiinType, group->midiin, nullptr);
+            child.setProperty(midioutType, group->midiout, nullptr);
+            child.setProperty(octxposeType, group->octxpose, nullptr);
+            child.setProperty(splitoutType, group->splitout, nullptr);
+            child.setProperty(splitoutnameType, group->splitoutname, nullptr);
+            child.setProperty(isvelocityType, group->velocity, nullptr);
+            child.setProperty(ispassthroughType, false, nullptr);
             child.setProperty(moduleidxType, appState.moduleidx, nullptr);
             child.setProperty(modulealiasType, "", nullptr);
+            tempConfig.appendChild(child, nullptr);
+        }
+
+        if (!(tempConfig.isValid() && tempConfig.getNumChildren() == numberbuttongroups))
+        {
+            errorText = "Generated config data is incomplete.";
+            return false;
         }
 
         outTree = tempConfig.createCopy();
@@ -6770,12 +6807,12 @@ private:
 
                 juce::ValueTree seededConfig;
                 juce::String errorText;
-                if (!buildNewConfigValueTreeFromMidigm(seededConfig, errorText))
+                if (!buildNewConfigValueTreeFromSelectedModule(seededConfig, errorText))
                 {
                     juce::AlertWindow::showMessageBoxAsync(
                         juce::AlertWindow::WarningIcon,
                         "Cannot create config",
-                        errorText.isNotEmpty() ? errorText : "Could not create config from template.");
+                        errorText.isNotEmpty() ? errorText : "Could not generate a new config for the selected module.");
                     return;
                 }
 
