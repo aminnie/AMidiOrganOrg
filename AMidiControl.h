@@ -6014,19 +6014,20 @@ public:
         addLabelAndSetStyle(midiOutputLabel);
         addLabelAndSetStyle(incomingMidiLabel);
 
-        if (!BluetoothMidiDevicePairingDialogue::isAvailable())
-            pairButton.setEnabled(false);
-
-        addAndMakeVisible(pairButton);
-        pairButton.onClick = []
-            {
-                RuntimePermissions::request(RuntimePermissions::bluetoothMidi,
-                    [](bool wasGranted)
-                    {
-                        if (wasGranted)
-                            BluetoothMidiDevicePairingDialogue::open();
-                    });
-            };
+        addAndMakeVisible(virtualOrganBannerGroup);
+        virtualOrganBannerGroup.setColour(juce::GroupComponent::outlineColourId, juce::Colours::grey.darker());
+        virtualOrganBannerGroup.setText("");
+        addAndMakeVisible(virtualOrganBannerLabel);
+        virtualOrganBannerLabel.setText("AMidi Virtual Organ and Sound Module Controller", juce::dontSendNotification);
+        virtualOrganBannerLabel.setJustificationType(juce::Justification::centred);
+        // Same fill as a selected row in MidiDeviceListBox::paintListBoxItem (ListBox text/background blend).
+        {
+            const auto rowSelected = findColour(juce::ListBox::textColourId)
+                .interpolatedWith(findColour(juce::ListBox::backgroundColourId), 0.5f);
+            virtualOrganBannerLabel.setColour(juce::Label::backgroundColourId, rowSelected);
+        }
+        virtualOrganBannerLabel.setColour(juce::Label::textColourId, juce::Colours::black);
+        virtualOrganBannerLabel.setOpaque(true);
         keyboardState.addListener(this);
 
         addAndMakeVisible(midiInputSelector.get());
@@ -6403,8 +6404,9 @@ public:
         midiOutputSelector->setBounds((getWidth() / 2) + margin, 2 * margin + 20,
             (getWidth() / 2) - (2 * margin), 100);
 
-        pairButton.setBounds(margin, 2 * margin + 140,
-            getWidth() - (2 * margin), 36);
+        virtualOrganBannerGroup.setBounds(margin, 2 * margin + 130,
+            getWidth() - (2 * margin), 45);
+        virtualOrganBannerLabel.setBounds(virtualOrganBannerGroup.getBounds());
 
         loadConfigButton.setBounds(180, margin + 205, 90, 50);
 
@@ -7490,7 +7492,8 @@ private:
     MidiKeyboardState keyboardState;
     MidiKeyboardComponent midiKeyboard;
 
-    TextButton pairButton{ "MIDI Bluetooth Devices" };
+    juce::GroupComponent virtualOrganBannerGroup{ "virtualOrganBannerGroup", "" };
+    juce::Label virtualOrganBannerLabel{ "virtualOrganBannerLabel", "AMidi Virtual Organ and Sound Module Controller" };
 
     TextButton exitButton{ "Exit" };
     TextButton loadConfigButton{ "Load Config" };
