@@ -6036,8 +6036,8 @@ public:
         loadConfigButton.setButtonText("Load Config");
         loadConfigButton.setColour(TextButton::textColourOffId, Colours::black);
         loadConfigButton.setColour(TextButton::textColourOnId, Colours::black);
-        loadConfigButton.setColour(TextButton::buttonColourId, juce::Colour(0xffa3b68a));
-        loadConfigButton.setColour(TextButton::buttonOnColourId, juce::Colour(0xffa3b68a).interpolatedWith(juce::Colours::black, 0.10f));
+        loadConfigButton.setColour(TextButton::buttonColourId, juce::Colours::lightgrey);
+        loadConfigButton.setColour(TextButton::buttonOnColourId, juce::Colours::lightgrey);
         loadConfigButton.setToggleState(true, dontSendNotification);
         loadConfigButton.onClick = [this]()
             {
@@ -6079,8 +6079,8 @@ public:
         loadPanelButton.setButtonText("Load Panel");
         loadPanelButton.setColour(TextButton::textColourOffId, Colours::black);
         loadPanelButton.setColour(TextButton::textColourOnId, Colours::black);
-        loadPanelButton.setColour(TextButton::buttonColourId, juce::Colour(0xffa3b68a));
-        loadPanelButton.setColour(TextButton::buttonOnColourId, juce::Colour(0xffa3b68a).interpolatedWith(juce::Colours::black, 0.10f));
+        loadPanelButton.setColour(TextButton::buttonColourId, juce::Colours::lightgrey);
+        loadPanelButton.setColour(TextButton::buttonOnColourId, juce::Colours::lightgrey);
         loadPanelButton.setToggleState(true, dontSendNotification);
         loadPanelButton.onClick = [this]()
             {
