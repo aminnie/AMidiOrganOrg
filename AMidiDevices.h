@@ -971,6 +971,11 @@ private:
         createInstrumentModule(4, "CustomGM", "Custom", "custom.json", "MIDI",
             "Grand Piano", 0, 0, 1, true, 
             false, 0, 0, 0, 0, 0);
+
+        instrumentmodules.add(new InstrumentModule());
+        createInstrumentModule(5, "Ketron EVM", "KetronEVM", "ketronevm.json", "EVM",
+            "Piano", 0, 0, 0, true,
+            true, 1, 0x1E, 0, 0x40, 0X7F);
     };
 
     OwnedArray<InstrumentModule> instrumentmodules;
