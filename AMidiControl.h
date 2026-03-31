@@ -7118,8 +7118,18 @@ private:
                 if (startPage == nullptr)
                     return false;
 
-                if (embeddedCfg.isEmpty() || embeddedCfg == startPage->appState.configfname)
-                    return true;
+                if (embeddedCfg.isEmpty())
+                {
+                    const juce::String msg = juce::String("Panel \"") + startPage->appState.panelfname
+                        + "\" does not contain an embedded config name.\n\nPanel load aborted.";
+                    juce::AlertWindow::showMessageBoxAsync(
+                        juce::AlertWindow::WarningIcon,
+                        "Embedded config missing",
+                        msg,
+                        "OK",
+                        startPage);
+                    return false;
+                }
 
                 const juce::File embeddedCfgFile = startPage->getConfigsDirectory().getChildFile(embeddedCfg);
                 if (!embeddedCfgFile.existsAsFile())
@@ -7136,6 +7146,9 @@ private:
                         startPage);
                     return false;
                 }
+
+                if (embeddedCfg == startPage->appState.configfname)
+                    return true;
 
                 if (!startPage->loadConfigFromBasename)
                 {
@@ -7170,43 +7183,11 @@ private:
                 return true;
             };
 
-        if (embeddedCfg.isEmpty() || embeddedCfg == appState.configfname)
-        {
-            if (embeddedCfg == appState.configfname)
-                appState.configPanelPairingMismatchAcknowledged = false;
-            runPanelLoad(this);
+        if (!ensureEmbeddedConfigLoaded(this))
             return;
-        }
 
-        const juce::String msg = juce::String("This panel file was saved with config \"") + embeddedCfg
-            + "\".\nThe active config is \"" + appState.configfname + "\".\n\n"
-            "Routing may not match this song/style until configs align.\n\n"
-            "Load anyway?";
-
-        auto safeStart = juce::Component::SafePointer<MidiStartPage>(this);
-        juce::AlertWindow::showOkCancelBox(
-            juce::AlertWindow::WarningIcon,
-            "Config / panel mismatch",
-            msg,
-            "Load anyway",
-            "Abort",
-            this,
-            juce::ModalCallbackFunction::create([safeStart, ensureEmbeddedConfigLoaded, runPanelLoad](int result)
-                {
-                    if (safeStart == nullptr || result != 1)
-                        return;
-
-                    MidiStartPage* startPage = safeStart;
-                    if (startPage == nullptr)
-                        return;
-
-                    startPage->appState.configPanelPairingMismatchAcknowledged = true;
-
-                    if (!ensureEmbeddedConfigLoaded(startPage))
-                        return;
-
-                    runPanelLoad(startPage);
-                }));
+        appState.configPanelPairingMismatchAcknowledged = false;
+        runPanelLoad(this);
     }
 
     //-----------------------------------------------------------------------------
@@ -9203,30 +9184,51 @@ private:
         return lines;
     }
 
+    void commitConfigSaveWithFeedback(TextButton& bubbleButton, int scannedPanels, bool savedWithImpactWarning)
+    {
+        const bool bsaved = saveConfigs(appState.configfname);
+
+        appState.configchanged = true;
+
+        String msgloaded;
+        if (!bsaved) {
+            msgloaded = "Config save failed!";
+            juce::Logger::writeToLog("*** ConfigPage(): Config save failed! ");
+        }
+        else {
+            if (savedWithImpactWarning)
+            {
+                msgloaded = String::formatted(
+                    "Config saved with warning: %d panel files reference this config. "
+                    "Review affected panels for module/routing changes.",
+                    scannedPanels);
+            }
+            else if (scannedPanels > 0)
+            {
+                msgloaded = String::formatted(
+                    "Config saved. Checked %d panel files; none reference this config.",
+                    scannedPanels);
+            }
+            else
+            {
+                msgloaded = "Config saved";
+            }
+
+            juce::Logger::writeToLog("*** ConfigPage(): Config saved!");
+            captureModuleIdxBaselineFromPanel();
+        }
+
+        BubbleMessage(bubbleButton, msgloaded, this->bubbleMessage);
+
+        if (bsaved)
+            setConfigSaveButtonEnabled(false);
+    }
+
     void handleConfigSaveRequest(TextButton& bubbleButton)
     {
         if (!hasHardModuleChangeVersusBaseline())
         {
-            const bool bsaved = saveConfigs(appState.configfname);
-
-            appState.configchanged = true;
-
-            String msgloaded;
-            if (!bsaved) {
-                msgloaded = "Config save failed!";
-                juce::Logger::writeToLog("*** ConfigPage(): Config save failed! ");
-            }
-            else {
-                msgloaded = "Config saved";
-                juce::Logger::writeToLog("*** ConfigPage(): Config saved!");
-                captureModuleIdxBaselineFromPanel();
-            }
-
-            BubbleMessage(bubbleButton, msgloaded, this->bubbleMessage);
-
-            if (bsaved)
-                setConfigSaveButtonEnabled(false);
-
+            commitConfigSaveWithFeedback(bubbleButton, 0, false);
             return;
         }
 
@@ -9238,42 +9240,33 @@ private:
         {
             const String msg = String::formatted(
                 "This configuration file is referenced by %d instrument panel(s) (scanned %d .pnl files under panels/, instruments/, or legacy paths). "
-                "Saving would change the MIDI sound module assignment for one or more button groups. "
-                "To keep existing song/style panels valid, use Save As and choose a new file name.",
+                "Saving will change the MIDI sound module assignment for one or more button groups in those panels.\n\n"
+                "Do you want to continue saving this config anyway?",
                 scan.referencingCount,
                 scan.panelsScanned);
 
-            // JUCE AlertWindow (not NativeMessageBox) so styling matches app LookAndFeel.
-            juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
-                "Cannot save configuration",
+            auto safeThis = juce::Component::SafePointer<ConfigPage>(this);
+            auto* bubbleTarget = &bubbleButton;
+            const int scannedPanels = scan.panelsScanned;
+
+            juce::AlertWindow::showOkCancelBox(
+                juce::AlertWindow::WarningIcon,
+                "Save configuration with impact warning",
                 msg,
-                {},
+                "Continue Save",
+                "Cancel",
                 this,
-                nullptr);
+                juce::ModalCallbackFunction::create([safeThis, bubbleTarget, scannedPanels](int result)
+                    {
+                        if (safeThis == nullptr || result != 1)
+                            return;
+
+                        safeThis->commitConfigSaveWithFeedback(*bubbleTarget, scannedPanels, true);
+                    }));
             return;
         }
 
-        const bool bsaved = saveConfigs(appState.configfname);
-
-        appState.configchanged = true;
-
-        String msgloaded;
-        if (!bsaved) {
-            msgloaded = "Config save failed!";
-            juce::Logger::writeToLog("*** ConfigPage(): Config save failed! ");
-        }
-        else {
-            msgloaded = String::formatted(
-                "Config saved. Checked %d panel files; none reference this config.",
-                scan.panelsScanned);
-            juce::Logger::writeToLog("*** ConfigPage(): Config saved!");
-            captureModuleIdxBaselineFromPanel();
-        }
-
-        BubbleMessage(bubbleButton, msgloaded, this->bubbleMessage);
-
-        if (bsaved)
-            setConfigSaveButtonEnabled(false);
+        commitConfigSaveWithFeedback(bubbleButton, scan.panelsScanned, false);
     }
 
     //-------------------------------------------------------------------------
