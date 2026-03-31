@@ -7901,6 +7901,15 @@ public:
                 monitorTextArea.clear();
             };
 
+        addAndMakeVisible(filterMidiClockToggle);
+        filterMidiClockToggle.setToggleState(true, juce::dontSendNotification);
+        filterMidiClockToggle.setTooltip("Hide MIDI Clock (F8) rows in the monitor display.");
+        filterMidiClockToggle.onClick = [this]()
+            {
+                setFilterMidiClockEnabled(filterMidiClockToggle.getToggleState());
+            };
+        setFilterMidiClockEnabled(true);
+
         addAndMakeVisible(monitorTextArea);
         monitorTextArea.setMultiLine(true, true);
         monitorTextArea.setReadOnly(true);
@@ -7974,6 +7983,8 @@ public:
         enableButton.setBounds(leftButtons.removeFromLeft(100));
         leftButtons.removeFromLeft(8);
         clearButton.setBounds(leftButtons.removeFromLeft(90));
+        leftButtons.removeFromLeft(8);
+        filterMidiClockToggle.setBounds(leftButtons.removeFromLeft(170));
         leftInner.removeFromTop(8);
         monitorTextArea.setBounds(leftInner);
 
@@ -8065,6 +8076,24 @@ private:
         enableButton.setButtonText(enabled ? "Enabled" : "Disabled");
     }
 
+    void setFilterMidiClockEnabled(bool enabled)
+    {
+        filterMidiClockToggle.setToggleState(enabled, juce::dontSendNotification);
+        filterMidiClockEnabled.store(enabled, std::memory_order_relaxed);
+    }
+
+    bool shouldFilterOutMessage(const juce::MidiMessage& message) const
+    {
+        if (!filterMidiClockEnabled.load(std::memory_order_relaxed))
+            return false;
+
+        if (message.isMidiClock())
+            return true;
+
+        const auto* data = message.getRawData();
+        return data != nullptr && ((unsigned char) data[0] == (unsigned char) 0xF8);
+    }
+
     void ensureMonitorHookRegistered()
     {
         if (monitorHookInstalled)
@@ -8081,6 +8110,8 @@ private:
                     if (safeThis == nullptr)
                         return;
                     if (!safeThis->monitorEnabled.load(std::memory_order_relaxed))
+                        return;
+                    if (safeThis->shouldFilterOutMessage(message))
                         return;
                     safeThis->enqueueMessage(message, routedModuleName);
                 });
@@ -8149,6 +8180,7 @@ private:
     juce::GroupComponent keyboardGroup{ "keyboardGroup", "Virtual Keyboard" };
     juce::TextButton enableButton{ "Enable" };
     juce::TextButton clearButton{ "Clear" };
+    juce::ToggleButton filterMidiClockToggle{ "Filter MIDI Clock" };
     juce::TextEditor monitorTextArea;
     juce::Label startOctaveLabel{ "startOctaveLabel", "Octave" };
     juce::ComboBox startOctaveCombo;
@@ -8165,6 +8197,7 @@ private:
     int currentVolumeByChannel[17] { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 };
 
     std::atomic<bool> monitorEnabled { false };
+    std::atomic<bool> filterMidiClockEnabled { true };
     bool isTabActive = false;
     bool monitorHookInstalled = false;
 };
