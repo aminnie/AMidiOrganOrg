@@ -4837,7 +4837,7 @@ struct KeyboardPanelPage final : public Component,
                         tbrotbrake->setButtonText("Brake Off");
                         rotarybrake = false;
 
-                        tbrotslow->setEnabled(isrotary);     // Enable rotor fast/slow changes when module supports it
+                        tbrotslow->setEnabled(isRotarySupportedForCurrentTargetGroup());     // Enable rotor fast/slow changes when module supports it
                     }
 
                     commitManualRotaryToAppState();
@@ -5272,7 +5272,7 @@ struct KeyboardPanelPage final : public Component,
 
         // If Rotary not available for the current Instrument Module, disable buttons
         if ((currenttabidx == PTUpper) || (currenttabidx == PTLower)) {
-            if (isrotary == true) {
+            if (isRotarySupportedForCurrentTargetGroup()) {
                 tbrotslow->setEnabled(true);
                 tbrotbrake->setEnabled(true);
             }
@@ -5483,7 +5483,7 @@ struct KeyboardPanelPage final : public Component,
     void triggerRotaryFastSlowHotkey()
     {
         if (currenttabidx == PTBass || tbrotslow == nullptr) return;
-        if (!getAppState().isrotary) return;
+        if (!isRotarySupportedForCurrentTargetGroup()) return;
         if (!tbrotslow->isEnabled()) return;
         tbrotslow->triggerClick();
     }
@@ -5491,7 +5491,7 @@ struct KeyboardPanelPage final : public Component,
     void triggerRotaryBrakeHotkey()
     {
         if (currenttabidx == PTBass || tbrotbrake == nullptr) return;
-        if (!getAppState().isrotary) return;
+        if (!isRotarySupportedForCurrentTargetGroup()) return;
         if (!tbrotbrake->isEnabled()) return;
         tbrotbrake->triggerClick();
     }
@@ -5522,6 +5522,21 @@ private:
         if (currenttabidx == PTUpper)
             return getManualRotaryTargetGroupSelection() == 2 ? 1 : 0;
         return 8;
+    }
+
+    bool isRotarySupportedForCurrentTargetGroup() const
+    {
+        if ((currenttabidx != PTUpper && currenttabidx != PTLower)
+            || instrumentpanel == nullptr
+            || instrumentmodules == nullptr)
+            return false;
+
+        const int buttongroupidx = getRotaryTargetButtonGroupIndex();
+        auto* ptrbuttongroup = instrumentpanel->getButtonGroup(buttongroupidx);
+        if (ptrbuttongroup == nullptr)
+            return false;
+
+        return instrumentmodules->isRotary(ptrbuttongroup->moduleidx);
     }
 
     void syncRotaryTargetToggleStates()
@@ -5711,7 +5726,7 @@ private:
             tbrotbrake->setToggleState(false, dontSendNotification);
             tbrotbrake->setButtonText("Brake Off");
             rotarybrake = false;
-            const bool rotaryUiEnabled = (isrotary == true) && ((currenttabidx == PTUpper) || (currenttabidx == PTLower));
+            const bool rotaryUiEnabled = isRotarySupportedForCurrentTargetGroup();
             tbrotslow->setEnabled(rotaryUiEnabled);
 
             if (wantFast)

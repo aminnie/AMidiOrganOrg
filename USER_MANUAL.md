@@ -74,6 +74,13 @@ Key subfolders/files:
 - `panels/` (`.pnl` files)
 - `instruments/` (module definition JSON files)
 
+Startup sync behavior:
+
+- On first run, AMidiOrgan seeds these folders from bundled `docs/`.
+- On later launches, missing files are restored automatically.
+- A managed file set is refreshed each startup to keep shipped module data current (`configs/instrument_modules.json` and core instrument catalogs such as `at900mi.json` and `ketronevm.json`).
+- User custom catalogs (for example `custom.json`) are not overwritten by managed refresh.
+
 ---
 
 ## 4) Hardware and Device Setup
@@ -213,21 +220,26 @@ Reference image:
 Quick read (look here first):
 
 - Focus first on the left-side controls to navigate categories and pages.
+- Use the right-side `Voice Search` box for quick cross-category filtering when needed.
 - Then choose the target voice from the main content area.
 
 How to use:
 
 1. Select target voice button from a performance tab first.
 2. Open `Sounds`.
-3. Use level 1 category buttons.
-4. Select a voice from level 2.
-5. Use `Back`, `Prev`, and `Next` for navigation and pagination.
-6. Return with `To Upper`, `To Lower`, or `To Bass`.
+3. (Optional) Enter text in `Voice Search` to build a dynamic `Search Results` list across all categories.
+4. Use level 1 category buttons (or `Search Results` when searching).
+5. Select a voice from level 2 / results.
+6. Use `Back`, `Prev`, and `Next` for navigation and pagination.
+7. Return with `To Upper`, `To Lower`, or `To Bass`.
 
 Behavior:
 
 - Selection sends audition Program/Bank data immediately on the group output channel.
 - The border title includes module name when available (for context).
+- Search matching is case-insensitive substring matching (example: `sax`).
+- Search result labels include both voice and category for disambiguation.
+- Clearing search text returns to normal category-first browsing.
 
 Expected result:
 

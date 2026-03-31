@@ -53,6 +53,8 @@ Primary implementation files:
   - Panel save/save-as
 - **Sounds**
   - Two-level button browser (`Category -> Voice`) with pagination
+  - Optional live text search across all categories with dynamic `Search Results`
+  - Search result buttons retain original `(categoryIdx, voiceIdx)` mapping
   - Assign voice/instrument to selected button
   - Immediate audition via MSB/LSB/PC
   - Content border title includes module name when available
@@ -138,7 +140,7 @@ Decision points:
 ### 4.3 Sounds Assignment
 
 1. User opens Sounds for selected voice context.
-2. Category list and voice list are browsed (paginated).
+2. Category list and voice list are browsed (paginated), or search text is entered for cross-category filtering.
 3. Selected voice updates voice-button instrument model.
 4. App sends audition Program/Bank messages on mapped group channel.
 
@@ -196,12 +198,15 @@ User data root: `Documents/AMidiOrgan`
 - `configs/hotkeys.json`: Shortcut mappings
 - `configs/midi_sticky_devices.json`: Last MIDI in/out selections
 - `configs/last_session.json`: Last loaded panel/config
+- `configs/instrument_modules.json`: Managed module catalog (module index and metadata)
 - `instruments/*.json`: Sound module catalogs
 
 Config persistence notes:
 
 - `Startup Monitor` is stored as a root-level config property, not per button group
 - Missing property in older configs defaults to `false`
+- Startup managed sync overwrites `configs/instrument_modules.json` and selected shipped instrument catalogs (`midigm.json`, `maxplus.json`, `integra7.json`, `at900mi.json`, `ketronevm.json`) each launch to keep runtime catalogs aligned with bundled docs.
+- Non-managed user catalogs (for example `custom.json`) are preserved.
 
 ## 7. Threading and Runtime Considerations
 

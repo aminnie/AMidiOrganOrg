@@ -62,8 +62,9 @@ Supported MIDI hardware and software sound modules:
 
 - Deebach BlackBox
 - Roland Integra7
-- Ketron SD2
-- MIDI GM
+- Roland AT900
+- Ketron EVM
+- MIDI GM / Custom GM
 - Contact developer for additional module support.
 
 ### 1. Startup Flow
@@ -110,6 +111,10 @@ On startup, the app also attempts to auto-restore the last used panel and config
 - Browse in two levels inside the `Voice Button Config` area:
   - Level 1: voice category buttons (for example `A-Piano`, `E-Piano`, `Organ`)
   - Level 2: voice buttons in the selected category
+- Use the `Voice Search` box (right side) to filter voices across all categories.
+- Search is case-insensitive substring matching (for example `sax`).
+- While search text is present, the browser becomes `Search Results` and lists matching voices as `Voice (Category)`.
+- Clearing search text restores normal category browsing.
 - The group title is prefixed with the active sound module name when available.
 - Clicking a voice sends MSB/LSB/PC immediately on the button group's MIDI output channel for audition.
 - `Back` returns from Level 2 to Level 1.
@@ -457,7 +462,9 @@ Recommended upkeep on a Mac mini:
 
 - UI images are packaged from `assets/*.png` via `juce_add_binary_data(...)` in `CMakeLists.txt`.
 - On macOS, `docs/` is copied into `AMidiOrgan.app/Contents/Resources/docs` during build so first-run data seeding works when launching the bundle outside the repo tree.
-- On startup, the app seeds `Documents/AMidiOrgan` from `docs/` on first run, then ensures missing files under `configs/`, `instruments/` (JSON instrument catalogs), and `panels/` (`.pnl` panel files) are restored on subsequent runs (without overwriting existing user-edited files).
+- On startup, the app seeds `Documents/AMidiOrgan` from `docs/` on first run, then ensures missing files under `configs/`, `instruments/` (JSON instrument catalogs), and `panels/` (`.pnl` panel files) are restored on subsequent runs.
+- Managed startup sync also overwrites selected shipped files every launch to keep runtime data current: `configs/instrument_modules.json` and module catalogs `midigm.json`, `maxplus.json`, `integra7.json`, `at900mi.json`, `ketronevm.json`.
+- User-editable catalogs such as `custom.json` are not part of the managed overwrite set.
 - On macOS, the current test executable is compiled but runtime execution is temporarily disabled in CTest due a shutdown-time crash; app build validation remains fully enabled.
 
 ### Asset Naming Contract
