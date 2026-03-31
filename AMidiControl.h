@@ -6983,50 +6983,114 @@ private:
         const String selectedfullpathfname = pnlFile.getFullPathName();
         const juce::String embeddedCfg = readEmbeddedConfigFilenameFromPanelFile(pnlFile);
 
-        auto finishPanelLoadUi = [this, selectedfname, selectedfullpathfname](bool bloaded)
+        auto finishPanelLoadUi = [selectedfname, selectedfullpathfname](MidiStartPage* startPage, bool bloaded)
             {
-                appState.panelfname = selectedfname;
-                appState.panelfullpathname = selectedfullpathfname;
+                if (startPage == nullptr)
+                    return;
+
+                startPage->appState.panelfname = selectedfname;
+                startPage->appState.panelfullpathname = selectedfullpathfname;
 
                 juce::String msgloaded;
                 if (bloaded == true)
-                    msgloaded = "Loaded panel:\n " + appState.panelfname;
+                    msgloaded = "Loaded panel:\n " + startPage->appState.panelfname;
                 else
-                    msgloaded = "Panel load failed: " + appState.panelfname;
+                    msgloaded = "Panel load failed: " + startPage->appState.panelfname;
 
                 if (bloaded)
-                    saveLastSessionStateToFile(appState);
+                    saveLastSessionStateToFile(startPage->appState);
 
-                if (TextButton* focused = &loadPanelButton)
-                    BubbleMessage(*focused, msgloaded, this->bubbleMessage);
+                if (TextButton* focused = &startPage->loadPanelButton)
+                    BubbleMessage(*focused, msgloaded, startPage->bubbleMessage);
 
-                panelfileLabel.setText(appState.panelfname, {});
+                startPage->panelfileLabel.setText(startPage->appState.panelfname, {});
 
-                clearConfigPanelPairingMismatchIfAligned(appState);
+                clearConfigPanelPairingMismatchIfAligned(startPage->appState);
 
-                appState.configreload = (appState.configfname.compare(appState.pnlconfigfname) != 0);
+                startPage->appState.configreload = (startPage->appState.configfname.compare(startPage->appState.pnlconfigfname) != 0);
 
-                if (appState.configreload == true)
-                    configfileLabel.setColour(juce::Label::textColourId, juce::Colours::red.darker());
+                if (startPage->appState.configreload == true)
+                    startPage->configfileLabel.setColour(juce::Label::textColourId, juce::Colours::red.darker());
                 else
-                    configfileLabel.setColour(juce::Label::textColourId, juce::Colours::grey);
+                    startPage->configfileLabel.setColour(juce::Label::textColourId, juce::Colours::grey);
 
-                if (refreshKeyboardPanelSaveAvailability)
-                    refreshKeyboardPanelSaveAvailability();
+                if (startPage->refreshKeyboardPanelSaveAvailability)
+                    startPage->refreshKeyboardPanelSaveAvailability();
             };
 
-        auto runPanelLoad = [this, selectedfname, selectedfullpathfname, finishPanelLoadUi]()
+        auto runPanelLoad = [selectedfname, selectedfullpathfname, finishPanelLoadUi](MidiStartPage* startPage)
             {
+                if (startPage == nullptr)
+                    return;
+
                 juce::Logger::writeToLog("*** MidiStartPage(): Loading Instrument Panel: " + selectedfname);
-                const bool bloaded = instrumentpanel->loadInstrumentPanel(appState.instrumentdname, selectedfullpathfname, true);
-                finishPanelLoadUi(bloaded);
+                const bool bloaded = startPage->instrumentpanel->loadInstrumentPanel(
+                    startPage->appState.instrumentdname, selectedfullpathfname, true);
+                finishPanelLoadUi(startPage, bloaded);
+            };
+
+        auto ensureEmbeddedConfigLoaded = [embeddedCfg](MidiStartPage* startPage) -> bool
+            {
+                if (startPage == nullptr)
+                    return false;
+
+                if (embeddedCfg.isEmpty() || embeddedCfg == startPage->appState.configfname)
+                    return true;
+
+                const juce::File embeddedCfgFile = startPage->getConfigsDirectory().getChildFile(embeddedCfg);
+                if (!embeddedCfgFile.existsAsFile())
+                {
+                    const juce::String msg = juce::String("This panel references config \"") + embeddedCfg
+                        + "\".\nThe file was not found in:\n"
+                        + embeddedCfgFile.getParentDirectory().getFullPathName()
+                        + "\n\nPanel load aborted.";
+                    juce::AlertWindow::showMessageBoxAsync(
+                        juce::AlertWindow::WarningIcon,
+                        "Embedded config not found",
+                        msg,
+                        "OK",
+                        startPage);
+                    return false;
+                }
+
+                if (!startPage->loadConfigFromBasename)
+                {
+                    juce::Logger::writeToLog("*** MidiStartPage(): Load Panel: config loader not available for " + embeddedCfg);
+                    juce::AlertWindow::showMessageBoxAsync(
+                        juce::AlertWindow::WarningIcon,
+                        "Cannot load embedded config",
+                        "Config loader is unavailable. Panel load aborted.",
+                        "OK",
+                        startPage);
+                    return false;
+                }
+
+                const bool cfgLoaded = startPage->loadConfigFromBasename(embeddedCfg);
+                if (!cfgLoaded)
+                {
+                    const juce::String msg = juce::String("Failed to load embedded config \"") + embeddedCfg
+                        + "\".\nPanel load aborted.";
+                    juce::AlertWindow::showMessageBoxAsync(
+                        juce::AlertWindow::WarningIcon,
+                        "Embedded config load failed",
+                        msg,
+                        "OK",
+                        startPage);
+                    return false;
+                }
+
+                saveLastSessionStateToFile(startPage->appState);
+                startPage->refreshConfigFileLabel();
+                if (startPage->refreshKeyboardPanelSaveAvailability)
+                    startPage->refreshKeyboardPanelSaveAvailability();
+                return true;
             };
 
         if (embeddedCfg.isEmpty() || embeddedCfg == appState.configfname)
         {
             if (embeddedCfg == appState.configfname)
                 appState.configPanelPairingMismatchAcknowledged = false;
-            runPanelLoad();
+            runPanelLoad(this);
             return;
         }
 
@@ -7043,34 +7107,21 @@ private:
             "Load anyway",
             "Abort",
             this,
-            juce::ModalCallbackFunction::create([safeStart, selectedfname, selectedfullpathfname](int result)
+            juce::ModalCallbackFunction::create([safeStart, ensureEmbeddedConfigLoaded, runPanelLoad](int result)
                 {
                     if (safeStart == nullptr || result != 1)
                         return;
-                    safeStart->appState.configPanelPairingMismatchAcknowledged = true;
-                    juce::Logger::writeToLog("*** MidiStartPage(): Loading Instrument Panel: " + selectedfname);
-                    const bool bloaded = safeStart->instrumentpanel->loadInstrumentPanel(
-                        safeStart->appState.instrumentdname, selectedfullpathfname, true);
-                    safeStart->appState.panelfname = selectedfname;
-                    safeStart->appState.panelfullpathname = selectedfullpathfname;
-                    juce::String msgloaded;
-                    if (bloaded == true)
-                        msgloaded = "Loaded panel:\n " + safeStart->appState.panelfname;
-                    else
-                        msgloaded = "Panel load failed: " + safeStart->appState.panelfname;
-                    if (bloaded)
-                        saveLastSessionStateToFile(safeStart->appState);
-                    if (juce::TextButton* focused = &safeStart->loadPanelButton)
-                        BubbleMessage(*focused, msgloaded, safeStart->bubbleMessage);
-                    safeStart->panelfileLabel.setText(safeStart->appState.panelfname, {});
-                    clearConfigPanelPairingMismatchIfAligned(safeStart->appState);
-                    safeStart->appState.configreload = (safeStart->appState.configfname.compare(safeStart->appState.pnlconfigfname) != 0);
-                    if (safeStart->appState.configreload == true)
-                        safeStart->configfileLabel.setColour(juce::Label::textColourId, juce::Colours::red.darker());
-                    else
-                        safeStart->configfileLabel.setColour(juce::Label::textColourId, juce::Colours::grey);
-                    if (safeStart->refreshKeyboardPanelSaveAvailability)
-                        safeStart->refreshKeyboardPanelSaveAvailability();
+
+                    MidiStartPage* startPage = safeStart;
+                    if (startPage == nullptr)
+                        return;
+
+                    startPage->appState.configPanelPairingMismatchAcknowledged = true;
+
+                    if (!ensureEmbeddedConfigLoaded(startPage))
+                        return;
+
+                    runPanelLoad(startPage);
                 }));
     }
 
@@ -10399,7 +10450,15 @@ void BubbleMessage(Component& targetComponent, const String& textToShow,
 
     AttributedString text(textToShow);
     text.setJustification(Justification::centred);
-    text.setColour(targetComponent.findColour(TextButton::textColourOffId));
+
+    juce::Colour bubbleTextColour = targetComponent.findColour(TextButton::textColourOffId);
+    if (const auto* anchorButton = dynamic_cast<const juce::TextButton*>(&targetComponent))
+    {
+        const juce::String buttonText = anchorButton->getButtonText();
+        if (buttonText == "Load Config" || buttonText == "Load Panel")
+            bubbleTextColour = juce::Colours::white;
+    }
+    text.setColour(bubbleTextColour);
 
     bmc->showAt(&targetComponent, text, 4000, true, false);
 }
