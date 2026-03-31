@@ -518,6 +518,26 @@ public:
         DBG("=S= InstrumentModules(): Destructor " + std::to_string(--zinstcntInstrumentModules));
     };
 
+    struct ModuleDefinition
+    {
+        int moduleIndex = -1;
+        String displayName;
+        String subDirectory;
+        String moduleFileName;
+        String moduleIdString;
+        String defaultVoiceName;
+        int defaultMSB = 0;
+        int defaultLSB = 0;
+        int defaultFont = 0;
+        bool isZeroBased = true;
+        bool isRotary = false;
+        int rotorType = 0;
+        int rotorCC = 0;
+        int rotorOff = 0;
+        int rotorSlow = 0;
+        int rotorFast = 0;
+    };
+
     bool createInstrumentModule(int moduleIndex, String displayname,
         String subdirectory, String modulename, String moduleidstring,
         String voicename, int MSB, int LSB, int font, bool isZeroBased,
@@ -549,6 +569,8 @@ public:
     };
 
     bool setInstrumentModule(int mmoduleidx) {
+        if ((mmoduleidx < 0) || (mmoduleidx >= instrumentmodules.size()))
+            return false;
 
         appState.moduleidx = mmoduleidx;
 
@@ -728,7 +750,10 @@ public:
         // For testing
         //String vtxml = vtmodules.toXmlString();
 
-        appState.moduleidx = (int) vtmodules.getProperty(defaultmoduleType);
+        const int loadedModuleIdx = (int) vtmodules.getProperty(defaultmoduleType);
+        appState.moduleidx = instrumentmodules.size() > 0
+            ? juce::jlimit(0, instrumentmodules.size() - 1, loadedModuleIdx)
+            : 0;
 
         return true;
     }
@@ -792,6 +817,115 @@ public:
     juce_DeclareSingleton(InstrumentModules, true)
 
 private:
+    static constexpr const char* moduleCatalogFileName = "instrument_modules.json";
+
+    static juce::Array<ModuleDefinition> getBuiltInModuleDefinitions()
+    {
+        return {
+            ModuleDefinition{ 0, "MidiGM", "MidiGM", "midigm.json", "MIDI", "Grand Piano", 0, 0, 1, true, false, 0, 0, 0, 0, 0 },
+            ModuleDefinition{ 1, "Deebach BlackBox", "BlackBox", "maxplus.json", "Blackbox", "Deebach Grand 1", 121, 8, 0, true, true, 2, 0x74, 0, 20, 63 },
+            ModuleDefinition{ 2, "Roland Integra7", "Integra7", "integra7.json", "INTEGRA", "Piano", 87, 64, 1, false, true, 1, 0x01, 0, 0x10, 0x60 },
+            ModuleDefinition{ 3, "Ketron SD2", "KetronSD2", "ketronsd2.json", "SD2", "Grand Piano", 0, 2, 0, true, true, 1, 0x1E, 0, 0x40, 0x7F },
+            ModuleDefinition{ 4, "CustomGM", "Custom", "custom.json", "MIDI", "Grand Piano", 0, 0, 1, true, false, 0, 0, 0, 0, 0 },
+            ModuleDefinition{ 5, "Ketron EVM", "KetronEVM", "ketronevm.json", "EVM", "Piano", 0, 0, 0, true, true, 1, 0x1E, 0, 0x40, 0x7F }
+        };
+    }
+
+    static bool loadModuleDefinitionsFromJson(const juce::File& catalogFile, juce::Array<ModuleDefinition>& outDefs)
+    {
+        outDefs.clear();
+
+        if (!catalogFile.existsAsFile())
+            return false;
+
+        const auto parsed = juce::JSON::parse(catalogFile.loadFileAsString());
+        if (parsed.isVoid())
+            return false;
+
+        const auto* root = parsed.getDynamicObject();
+        if (root == nullptr)
+            return false;
+
+        const auto modulesVar = root->getProperty("modules");
+        if (!modulesVar.isArray())
+            return false;
+
+        for (const auto& moduleVar : *modulesVar.getArray())
+        {
+            const auto* obj = moduleVar.getDynamicObject();
+            if (obj == nullptr)
+                continue;
+
+            ModuleDefinition def;
+            def.moduleIndex = obj->hasProperty("moduleIndex") ? (int) obj->getProperty("moduleIndex") : -1;
+            def.displayName = obj->getProperty("displayName").toString();
+            def.subDirectory = obj->getProperty("subDirectory").toString();
+            def.moduleFileName = obj->getProperty("moduleFileName").toString();
+            def.moduleIdString = obj->getProperty("moduleIdString").toString();
+            def.defaultVoiceName = obj->getProperty("defaultVoiceName").toString();
+            def.defaultMSB = (int) obj->getProperty("defaultMSB");
+            def.defaultLSB = (int) obj->getProperty("defaultLSB");
+            def.defaultFont = (int) obj->getProperty("defaultFont");
+            def.isZeroBased = (bool) obj->getProperty("isZeroBased");
+            def.isRotary = (bool) obj->getProperty("isRotary");
+            def.rotorType = (int) obj->getProperty("rotorType");
+            def.rotorCC = (int) obj->getProperty("rotorCC");
+            def.rotorOff = (int) obj->getProperty("rotorOff");
+            def.rotorSlow = (int) obj->getProperty("rotorSlow");
+            def.rotorFast = (int) obj->getProperty("rotorFast");
+
+            if (def.displayName.isNotEmpty() && def.moduleFileName.isNotEmpty())
+                outDefs.add(def);
+        }
+
+        struct ModuleDefSorter
+        {
+            int compareElements(const ModuleDefinition& a, const ModuleDefinition& b) const
+            {
+                const bool aIndexed = a.moduleIndex >= 0;
+                const bool bIndexed = b.moduleIndex >= 0;
+
+                if (aIndexed && bIndexed)
+                {
+                    if (a.moduleIndex < b.moduleIndex) return -1;
+                    if (a.moduleIndex > b.moduleIndex) return 1;
+                    return 0;
+                }
+
+                if (aIndexed && !bIndexed) return -1;
+                if (!aIndexed && bIndexed) return 1;
+                return 0;
+            }
+        };
+
+        ModuleDefSorter sorter;
+        outDefs.sort(sorter, true);
+
+        return outDefs.size() > 0;
+    }
+
+    void addInstrumentModule(const ModuleDefinition& def)
+    {
+        instrumentmodules.add(new InstrumentModule());
+        const int idx = instrumentmodules.size() - 1;
+        createInstrumentModule(idx,
+            def.displayName,
+            def.subDirectory,
+            def.moduleFileName,
+            def.moduleIdString,
+            def.defaultVoiceName,
+            def.defaultMSB,
+            def.defaultLSB,
+            def.defaultFont,
+            def.isZeroBased,
+            def.isRotary,
+            def.rotorType,
+            def.rotorCC,
+            def.rotorOff,
+            def.rotorSlow,
+            def.rotorFast);
+    }
+
 
     // Private Instrument Module Class
     class InstrumentModule final {
@@ -945,37 +1079,20 @@ private:
     // Singleton Constructor
     InstrumentModules() : appState(getAppState()) {
         juce::Logger::writeToLog("=S= InstrumentModules(): Constructor " + std::to_string(zinstcntInstrumentModules++));
+        const auto catalogFile = File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
+            .getChildFile(organdir)
+            .getChildFile(appState.configdir)
+            .getChildFile(moduleCatalogFileName);
 
-        // Create and default Instruments. To be loaded from file in future
-        instrumentmodules.add(new InstrumentModule());
-        createInstrumentModule(0, "MidiGM", "MidiGM", "midigm.json", "MIDI",
-            "Grand Piano", 0, 0, 1, true, 
-            false, 0, 0, 0, 0, 0);
+        juce::Array<ModuleDefinition> definitions;
+        if (!loadModuleDefinitionsFromJson(catalogFile, definitions))
+        {
+            juce::Logger::writeToLog("*** InstrumentModules(): Failed to load module catalog JSON. Falling back to built-in defaults.");
+            definitions = getBuiltInModuleDefinitions();
+        }
 
-        instrumentmodules.add(new InstrumentModule());
-        createInstrumentModule(1, "Deebach BlackBox", "BlackBox", "maxplus.json", "Blackbox",
-            "Deebach Grand 1", 121, 8, 0, true, 
-            true, 2, 0x74, 0, 20, 63);
-
-        instrumentmodules.add(new InstrumentModule());
-        createInstrumentModule(2, "Roland Integra7", "Integra7", "integra7.json", "INTEGRA",
-            "Piano", 87, 64, 1, false, 
-            true, 1, 0x01, 0, 0x10, 0x60);
-
-        instrumentmodules.add(new InstrumentModule());
-        createInstrumentModule(3, "Ketron SD2", "KetronSD2", "ketronsd2.json", "SD2",
-            "Grand Piano", 0, 2, 0, true, 
-            true, 1, 0x1E, 0, 0x40, 0X7F);
-
-        instrumentmodules.add(new InstrumentModule());
-        createInstrumentModule(4, "CustomGM", "Custom", "custom.json", "MIDI",
-            "Grand Piano", 0, 0, 1, true, 
-            false, 0, 0, 0, 0, 0);
-
-        instrumentmodules.add(new InstrumentModule());
-        createInstrumentModule(5, "Ketron EVM", "KetronEVM", "ketronevm.json", "EVM",
-            "Piano", 0, 0, 0, true,
-            true, 1, 0x1E, 0, 0x40, 0X7F);
+        for (const auto& def : definitions)
+            addInstrumentModule(def);
     };
 
     OwnedArray<InstrumentModule> instrumentmodules;
