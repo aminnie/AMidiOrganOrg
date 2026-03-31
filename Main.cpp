@@ -92,6 +92,48 @@ private:
         }
     }
 
+    static void syncManagedInstrumentJsonFiles(const juce::File& sourceInstrumentDir, const juce::File& targetInstrumentDir)
+    {
+        if (!sourceInstrumentDir.exists() || !sourceInstrumentDir.isDirectory())
+            return;
+
+        if (!targetInstrumentDir.exists() && !targetInstrumentDir.createDirectory())
+        {
+            juce::Logger::writeToLog("*** Startup seed: Failed to create instrument directory " + targetInstrumentDir.getFullPathName());
+            return;
+        }
+
+        const juce::StringArray managedInstrumentFiles{
+            "midigm.json",
+            "maxplus.json",
+            "integra7.json",
+            "ketronsd2.json",
+            "ketronevm.json"
+        };
+
+        for (const auto& fileName : managedInstrumentFiles)
+        {
+            const auto sourceFile = sourceInstrumentDir.getChildFile(fileName);
+            const auto targetFile = targetInstrumentDir.getChildFile(fileName);
+
+            if (!sourceFile.existsAsFile())
+            {
+                juce::Logger::writeToLog("*** Startup seed: Managed instrument source missing " + sourceFile.getFullPathName());
+                continue;
+            }
+
+            // Replace with current shipped catalog on each startup for managed files.
+            if (targetFile.existsAsFile() && !targetFile.deleteFile())
+            {
+                juce::Logger::writeToLog("*** Startup seed: Failed to replace managed instrument file " + targetFile.getFullPathName());
+                continue;
+            }
+
+            if (!sourceFile.copyFileTo(targetFile))
+                juce::Logger::writeToLog("*** Startup seed: Failed to sync managed instrument file " + sourceFile.getFullPathName());
+        }
+    }
+
     static juce::File findDocsSeedDirectory()
     {
         auto docsIn = [](const juce::File& base)
@@ -187,6 +229,7 @@ private:
         const auto sourceInstrumentDir = docsSeed.getChildFile(instrumentdir);
         const auto targetInstrumentDir = userDataDir.getChildFile(instrumentdir);
         copyMissingDirectoryContents(sourceInstrumentDir, targetInstrumentDir);
+        syncManagedInstrumentJsonFiles(sourceInstrumentDir, targetInstrumentDir);
 
         // Every startup: ensure panels folder (.pnl) exists in the user workspace.
         const auto sourcePanelDir = docsSeed.getChildFile(paneldir);
