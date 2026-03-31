@@ -471,6 +471,9 @@ inline std::function<void()> gNotifyPresetRotarySyncFromButtonGroups;
 /** Optional: refresh Sounds/Effects tab enabled state when voice-edit gating changes. */
 inline std::function<void()> gNotifyVoiceEditTabAccessChanged;
 
+/** Optional: refresh Start/Keyboard/Config panel+config status labels after filename/state changes. */
+inline std::function<void()> gNotifyStatusLinesChanged;
+
 /** Preset rotary encoding in .pnl per ButtonGroup: 0=slow, 1=fast, 2=brake (see tests). */
 inline int encodePresetRotaryFromManual(bool isFast, bool brake) noexcept
 {

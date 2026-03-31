@@ -821,6 +821,8 @@ public:
 
         if (gNotifyPanelSaveAvailabilityChanged)
             gNotifyPanelSaveAvailabilityChanged();
+        if (gNotifyStatusLinesChanged)
+            gNotifyStatusLinesChanged();
 
         return true;
     }
@@ -884,6 +886,8 @@ public:
 
         if (gNotifyPanelSaveAvailabilityChanged)
             gNotifyPanelSaveAvailabilityChanged();
+        if (gNotifyStatusLinesChanged)
+            gNotifyStatusLinesChanged();
 
         return true;
     }
@@ -5021,6 +5025,8 @@ struct KeyboardPanelPage final : public Component,
                                             juce::Logger::writeToLog("*** KeyboardManualPage(): Saved as " + selectedfname
                                                 + " (embedded config: " + appState.configfname + ")");
                                             updatePanelFileStatusLabel();
+                                            if (gNotifyStatusLinesChanged)
+                                                gNotifyStatusLinesChanged();
                                         }
 
                                         if (TextButton* focused = tbSaveAs)
@@ -5428,6 +5434,11 @@ struct KeyboardPanelPage final : public Component,
         }
 
         updatePanelSaveButtonsPendingStyle();
+    }
+
+    void refreshStatusLinesFromAppState()
+    {
+        updatePanelFileStatusLabel();
     }
 
     /** After preset recall: update this tab's rotary controls from the currently selected rotary target group. */
@@ -6519,13 +6530,17 @@ public:
 
         DBG("*** MiDiStartPage(): Brought To Front Tab " + std::to_string(0));
 
-        // Dsplay current Panel File and Config Files in use. 
-        // Flag mismatch between panel file and incorrect config file in red
+        refreshStatusLinesFromAppState();
+    }
+
+    void refreshStatusLinesFromAppState()
+    {
+        // Display current Panel and Config files in use.
+        // Flag mismatch between panel file and incorrect config file in red.
         configfileLabel.setText(appState.configfname, {});
         panelfileLabel.setText(appState.panelfname, {});
 
         appState.configreload = (appState.configfname.compare(appState.pnlconfigfname) != 0);
-
         if (appState.configreload == true)
             configfileLabel.setColour(juce::Label::textColourId, juce::Colours::red.darker());
         else
@@ -6662,6 +6677,8 @@ private:
                 if (bloaded)
                     saveLastSessionStateToFile(appState);
                 refreshConfigFileLabel();
+                if (gNotifyStatusLinesChanged)
+                    gNotifyStatusLinesChanged();
                 const String msgloaded = bloaded ? ("Loaded: " + appState.configfname)
                     : ("Load failed: " + selectedfname);
                 if (bubbleButton != nullptr)
@@ -6701,6 +6718,8 @@ private:
                     if (bloaded)
                         saveLastSessionStateToFile(safeStart->appState);
                     safeStart->refreshConfigFileLabel();
+                    if (gNotifyStatusLinesChanged)
+                        gNotifyStatusLinesChanged();
                     const juce::String msgloaded = bloaded ? ("Loaded: " + safeStart->appState.configfname)
                         : ("Load failed: " + selectedfname);
                     if (bubbleButton != nullptr)
@@ -7100,6 +7119,8 @@ private:
 
                 if (startPage->refreshKeyboardPanelSaveAvailability)
                     startPage->refreshKeyboardPanelSaveAvailability();
+                if (gNotifyStatusLinesChanged)
+                    gNotifyStatusLinesChanged();
             };
 
         auto runPanelLoad = [selectedfname, selectedfullpathfname, finishPanelLoadUi](MidiStartPage* startPage)
@@ -7178,6 +7199,8 @@ private:
 
                 saveLastSessionStateToFile(startPage->appState);
                 startPage->refreshConfigFileLabel();
+                if (gNotifyStatusLinesChanged)
+                    gNotifyStatusLinesChanged();
                 if (startPage->refreshKeyboardPanelSaveAvailability)
                     startPage->refreshKeyboardPanelSaveAvailability();
                 return true;
@@ -8893,6 +8916,8 @@ public:
                         {
                             handleConfigSaveRequest(saveAsButton);
                             updateConfigFileStatusLabel();
+                            if (gNotifyStatusLinesChanged)
+                                gNotifyStatusLinesChanged();
                             return;
                         }
 
@@ -8921,6 +8946,8 @@ public:
                     }
 
                     updateConfigFileStatusLabel();
+                    if (gNotifyStatusLinesChanged)
+                        gNotifyStatusLinesChanged();
                 });
         };
     }
@@ -8951,7 +8978,14 @@ public:
         comboConfig.setSelectedId(1);
         captureModuleIdxBaselineFromPanel();
         clearConfigPanelPairingMismatchIfAligned(appState);
+        if (gNotifyStatusLinesChanged)
+            gNotifyStatusLinesChanged();
         return true;
+    }
+
+    void refreshStatusLinesFromAppState()
+    {
+        updateConfigFileStatusLabel();
     }
 
     ~ConfigPage() override {
@@ -10024,7 +10058,21 @@ public:
             {
                 updateVoiceEditTabAccessUi();
             };
+        gNotifyStatusLinesChanged = [this]()
+            {
+                for (int i = 0; i < getNumTabs(); ++i)
+                {
+                    if (auto* start = dynamic_cast<MidiStartPage*>(getTabContentComponent(i)))
+                        start->refreshStatusLinesFromAppState();
+                    else if (auto* k = dynamic_cast<KeyboardPanelPage*>(getTabContentComponent(i)))
+                        k->refreshStatusLinesFromAppState();
+                    else if (auto* cfg = dynamic_cast<ConfigPage*>(getTabContentComponent(i)))
+                        cfg->refreshStatusLinesFromAppState();
+                }
+            };
         updateVoiceEditTabAccessUi();
+        if (gNotifyStatusLinesChanged)
+            gNotifyStatusLinesChanged();
 
         //this->grabKeyboardFocus();
     }
@@ -10035,6 +10083,7 @@ public:
         gNotifyManualRotarySyncFromAppState = {};
         gNotifyPresetRotarySyncFromButtonGroups = {};
         gNotifyVoiceEditTabAccessChanged = {};
+        gNotifyStatusLinesChanged = {};
     }
 
     /** Phase 1 hotkeys: recall preset on all keyboard pages (single loadPreset + radio sync). */
