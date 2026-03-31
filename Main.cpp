@@ -107,7 +107,7 @@ private:
             "midigm.json",
             "maxplus.json",
             "integra7.json",
-            "ketronsd2.json",
+            "at900mi.json",
             "ketronevm.json"
         };
 
@@ -131,6 +131,44 @@ private:
 
             if (!sourceFile.copyFileTo(targetFile))
                 juce::Logger::writeToLog("*** Startup seed: Failed to sync managed instrument file " + sourceFile.getFullPathName());
+        }
+    }
+
+    static void syncManagedConfigFiles(const juce::File& sourceConfigDir, const juce::File& targetConfigDir)
+    {
+        if (!sourceConfigDir.exists() || !sourceConfigDir.isDirectory())
+            return;
+
+        if (!targetConfigDir.exists() && !targetConfigDir.createDirectory())
+        {
+            juce::Logger::writeToLog("*** Startup seed: Failed to create config directory " + targetConfigDir.getFullPathName());
+            return;
+        }
+
+        const juce::StringArray managedConfigFiles{
+            "instrument_modules.json"
+        };
+
+        for (const auto& fileName : managedConfigFiles)
+        {
+            const auto sourceFile = sourceConfigDir.getChildFile(fileName);
+            const auto targetFile = targetConfigDir.getChildFile(fileName);
+
+            if (!sourceFile.existsAsFile())
+            {
+                juce::Logger::writeToLog("*** Startup seed: Managed config source missing " + sourceFile.getFullPathName());
+                continue;
+            }
+
+            // Replace with current shipped config on each startup for managed files.
+            if (targetFile.existsAsFile() && !targetFile.deleteFile())
+            {
+                juce::Logger::writeToLog("*** Startup seed: Failed to replace managed config file " + targetFile.getFullPathName());
+                continue;
+            }
+
+            if (!sourceFile.copyFileTo(targetFile))
+                juce::Logger::writeToLog("*** Startup seed: Failed to sync managed config file " + sourceFile.getFullPathName());
         }
     }
 
@@ -224,6 +262,7 @@ private:
         const auto sourceConfigDir = docsSeed.getChildFile(configdir);
         const auto targetConfigDir = userDataDir.getChildFile(configdir);
         copyMissingDirectoryContents(sourceConfigDir, targetConfigDir);
+        syncManagedConfigFiles(sourceConfigDir, targetConfigDir);
 
         // Every startup: ensure instruments folder/files exist in the user workspace (JSON catalogs).
         const auto sourceInstrumentDir = docsSeed.getChildFile(instrumentdir);

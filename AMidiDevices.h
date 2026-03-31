@@ -825,7 +825,7 @@ private:
             ModuleDefinition{ 0, "MidiGM", "MidiGM", "midigm.json", "MIDI", "Grand Piano", 0, 0, 1, true, false, 0, 0, 0, 0, 0 },
             ModuleDefinition{ 1, "Deebach BlackBox", "BlackBox", "maxplus.json", "Blackbox", "Deebach Grand 1", 121, 8, 0, true, true, 2, 0x74, 0, 20, 63 },
             ModuleDefinition{ 2, "Roland Integra7", "Integra7", "integra7.json", "INTEGRA", "Piano", 87, 64, 1, false, true, 1, 0x01, 0, 0x10, 0x60 },
-            ModuleDefinition{ 3, "Ketron SD2", "KetronSD2", "ketronsd2.json", "SD2", "Grand Piano", 0, 2, 0, true, true, 1, 0x1E, 0, 0x40, 0x7F },
+            ModuleDefinition{ 3, "Roland AT900", "AT900MI", "at900mi.json", "AT900MI", "Grand Piano1", 121, 0, 0, true, false, 0, 0, 0, 0, 0 },
             ModuleDefinition{ 4, "CustomGM", "Custom", "custom.json", "MIDI", "Grand Piano", 0, 0, 1, true, false, 0, 0, 0, 0, 0 },
             ModuleDefinition{ 5, "Ketron EVM", "KetronEVM", "ketronevm.json", "EVM", "Piano", 0, 0, 0, true, true, 1, 0x1E, 0, 0x40, 0x7F }
         };
