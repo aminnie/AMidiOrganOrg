@@ -1469,6 +1469,23 @@ public:
         voiceBrowserGroup.setColour(GroupComponent::outlineColourId, Colours::grey.darker());
         voiceBrowserGroup.setBounds(margin + 220, 35, 920, 185);
 
+        addAndMakeVisible(voiceSearchGroup);
+        voiceSearchGroup.setText("Voice Search");
+        voiceSearchGroup.setColour(GroupComponent::outlineColourId, Colours::grey.darker());
+        voiceSearchGroup.setBounds(xgroup + gwidth + 10, ygroup, 200, 110);
+
+        addAndMakeVisible(voiceSearchEditor);
+        voiceSearchEditor.setBounds(xgroup + gwidth + 20, ygroup + 35, 180, 24);
+        voiceSearchEditor.setTextToShowWhenEmpty("Search voices", Colours::grey);
+        voiceSearchEditor.setColour(juce::TextEditor::textColourId, juce::Colours::white);
+        voiceSearchEditor.setColour(juce::TextEditor::backgroundColourId, juce::Colours::black.withAlpha(0.35f));
+        voiceSearchEditor.setColour(juce::TextEditor::outlineColourId, juce::Colours::darkgrey);
+        voiceSearchEditor.setColour(juce::TextEditor::focusedOutlineColourId, juce::Colours::antiquewhite);
+        voiceSearchEditor.onTextChange = [this]()
+        {
+            refreshVoiceSearchResults(true);
+        };
+
         addAndMakeVisible(browserBackButton);
         browserBackButton.setButtonText("Back");
         browserBackButton.setColour(TextButton::textColourOffId, Colours::black);
@@ -1574,6 +1591,8 @@ public:
             : "Voice Button Config");
 
         setVoiceBrowserInteractive(true);
+        voiceSearchEditor.setText("", dontSendNotification);
+        refreshVoiceSearchResults(true);
         browserLevel = BrowserLevel::categories;
         selectedCategoryIdx = -1;
         browserPage = 0;
@@ -1730,11 +1749,14 @@ private:
     juce::Label lblsvoice{ "Button Voice" };
     juce::Label lblsvoicetxt{ "No Voice" };
     juce::GroupComponent voiceBrowserGroup{ "voiceBrowser", "Voice Categories" };
+    juce::GroupComponent voiceSearchGroup{ "voiceSearch", "Voice Search" };
+    juce::TextEditor voiceSearchEditor;
     juce::TextButton browserBackButton{ "Back" };
     juce::TextButton browserPrevButton{ "Prev" };
     juce::TextButton browserNextButton{ "Next" };
     juce::Label browserPageLabel{ "browserPageLabel", "" };
     juce::OwnedArray<juce::TextButton> browserButtons;
+    juce::Array<MidiInstruments::VoiceMatch> voiceSearchMatches;
 
     enum class BrowserLevel
     {
@@ -1745,6 +1767,23 @@ private:
     int selectedCategoryIdx = -1;
     int browserPage = 0;
     bool browserInteractive = false;
+
+    bool isVoiceSearchActive() const
+    {
+        return voiceSearchEditor.getText().trim().isNotEmpty();
+    }
+
+    void refreshVoiceSearchResults(bool resetPage)
+    {
+        if (resetPage)
+            browserPage = 0;
+
+        voiceSearchMatches.clear();
+        if (midiInstruments != nullptr && isVoiceSearchActive())
+            voiceSearchMatches = midiInstruments->findVoicesContaining(voiceSearchEditor.getText());
+
+        renderVoiceBrowser();
+    }
 
     void resized() override
     {
@@ -1758,6 +1797,8 @@ private:
         browserBackButton.setEnabled(enabled);
         browserPrevButton.setEnabled(enabled);
         browserNextButton.setEnabled(enabled);
+        voiceSearchGroup.setEnabled(enabled);
+        voiceSearchEditor.setEnabled(enabled);
         if (!enabled)
             browserPageLabel.setText("", dontSendNotification);
 
@@ -1768,6 +1809,9 @@ private:
     {
         if (midiInstruments == nullptr)
             return 0;
+
+        if (isVoiceSearchActive())
+            return voiceSearchMatches.size();
 
         if (browserLevel == BrowserLevel::categories)
             return midiInstruments->getCategoryCount();
@@ -1870,7 +1914,29 @@ private:
             b->setColour(TextButton::buttonOnColourId, Colours::antiquewhite);
             b->setBounds(inner.getX() + col * (btnW + gapX), inner.getY() + row * (btnH + gapY), btnW, btnH);
 
-            if (browserLevel == BrowserLevel::categories)
+            if (isVoiceSearchActive())
+            {
+                const auto match = voiceSearchMatches[item];
+                const int categoryIdx = match.categoryIdx;
+                const int voiceIdx = match.voiceIdx;
+                const auto voiceName = midiInstruments->getVoice(categoryIdx, voiceIdx);
+                const auto categoryName = midiInstruments->getCategory(categoryIdx);
+                b->setButtonText(voiceName + " (" + categoryName + ")");
+                b->setTooltip("Category: " + categoryName);
+                b->onClick = [this, categoryIdx, voiceIdx]()
+                {
+                    selvoicebank = categoryIdx;
+                    selvoice = voiceIdx;
+
+                    lblsvoicetxt.setText(midiInstruments->getVoice(selvoicebank, selvoice), {});
+                    sendPreviewMidiForSelection(selvoicebank, selvoice);
+
+                    if ((currenttabidx == PTUpper) || (currenttabidx == PTLower) || (currenttabidx == PTBass))
+                        tbroute->setEnabled(true);
+                    updateVoicesRouteButtonDirtyStyle();
+                };
+            }
+            else if (browserLevel == BrowserLevel::categories)
             {
                 const int categoryIdx = item;
                 b->setButtonText(midiInstruments->getCategory(categoryIdx));
@@ -1901,8 +1967,11 @@ private:
             }
         }
 
-        browserBackButton.setVisible(browserLevel == BrowserLevel::voices);
-        if (browserLevel == BrowserLevel::voices && selectedCategoryIdx >= 0)
+        const bool searchActive = isVoiceSearchActive();
+        browserBackButton.setVisible(!searchActive && browserLevel == BrowserLevel::voices);
+        if (searchActive)
+            voiceBrowserGroup.setText("Search Results");
+        else if (browserLevel == BrowserLevel::voices && selectedCategoryIdx >= 0)
             voiceBrowserGroup.setText("Category Voices: " + midiInstruments->getCategory(selectedCategoryIdx));
         else
             voiceBrowserGroup.setText("Voice Categories");

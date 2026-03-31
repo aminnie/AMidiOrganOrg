@@ -350,6 +350,35 @@ public:
         return voiceCount > 0 ? voiceCount : 0;
     }
 
+    struct VoiceMatch
+    {
+        int categoryIdx = -1;
+        int voiceIdx = -1; // 1-based voice entry index within category
+    };
+
+    juce::Array<VoiceMatch> findVoicesContaining(const juce::String& searchTerm)
+    {
+        juce::Array<VoiceMatch> matches;
+
+        const juce::String needle = searchTerm.trim().toLowerCase();
+        if (needle.isEmpty())
+            return matches;
+
+        const int categoryCount = getCategoryCount();
+        for (int categoryIdx = 0; categoryIdx < categoryCount; ++categoryIdx)
+        {
+            const int voiceCount = getCategoryVoiceCount(categoryIdx);
+            for (int voiceIdx = 1; voiceIdx <= voiceCount; ++voiceIdx)
+            {
+                const auto voiceName = getVoice(categoryIdx, voiceIdx);
+                if (voiceName.toLowerCase().contains(needle))
+                    matches.add({ categoryIdx, voiceIdx });
+            }
+        }
+
+        return matches;
+    }
+
     ~MidiInstruments() {
         DBG("=S= MidiInstruments(): Destructor " + std::to_string(--zinstcntmidiinstruments));
     };
