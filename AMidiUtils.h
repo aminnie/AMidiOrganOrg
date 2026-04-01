@@ -29,7 +29,8 @@ static FileLogger* flogger;
 // Fixed number of Buttons, Button Groups and Presets
 static const int numbervoicebuttons = 96;
 static const int numberbuttongroups = 12;
-static const int numberpresets = 7;
+static const int numberpresets = 13;       // Manual (0) + Preset 1..12
+static const int numberdisplaypresets = 6; // UI shows six numbered presets per bank
 
 static const int defvelocityout = 64;
 
@@ -852,7 +853,7 @@ public:
                 addShortcutInfo("Preset 6", "Recall Preset 6");
                 break;
             case KeyPressCommandIDs::btnPresetNext:
-                addShortcutInfo("Next preset", "Advance to the next preset");
+                addShortcutInfo("Next preset", "Advance to next preset (cycles 1 to 12)");
                 break;
             case KeyPressCommandIDs::btnUpperRotaryFastSlow:
                 addShortcutInfo("Upper rotary Fast/Slow", "Upper manual rotary Fast/Slow");

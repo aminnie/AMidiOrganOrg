@@ -228,15 +228,21 @@ On startup, the app also attempts to auto-restore the last used panel and config
 - Panel save (`.pnl`) stores:
   - all voice button values
   - button group details
-  - 7 preset configurations
+  - 13 preset configurations (`Manual` + `Preset 1..12`)
 - Button groups are color-coded by keyboard panel.
 
 ### 6. Presets
 
-- There are 7 presets in total:
+- There are 13 presets in total:
   - `Manual`
-  - Presets `1` to `6`
+  - Presets `1` to `12` (displayed in two banks of six)
 - `Manual` is the default preset on startup.
+- The UI keeps six numbered preset buttons visible at a time:
+  - Default bank: `Preset 1` to `Preset 6`
+  - Alternate bank: `Preset 7` to `Preset 12`
+- `Next` cycles numbered presets as `1 -> ... -> 6 -> 7 -> ... -> 12 -> 1`.
+- If `Manual` is active, `Next` recalls the first preset in the currently displayed bank (`1` or `7`).
+- Panel load remains backward compatible with older files that contain only `Manual + Preset 1..6`; missing `Preset 7..12` entries are initialized to defaults.
 - Each preset stores the active voice button in each button group across all three keyboard tabs.
 - Each preset also stores per-button-group rotary snapshot values used during preset recall.
 - Preset programming flow:
@@ -291,6 +297,7 @@ When the main window has focus:
 |--------|-----|
 | Preset 1–6 | `1`–`6` |
 | Manual preset | `0` |
+| Next preset | `7` |
 | Upper / Lower / Bass tab | A / S / D |
 | Sounds tab | Z |
 | Effects tab | X |
@@ -305,6 +312,8 @@ Upper and Lower rotary keys always target their respective manuals, even when an
 ### Editing Shortcuts
 
 Use the `Hotkeys` tab (between `Config` and `Monitor`) to assign each command to a key from `A-Z` or `0-9`, or `(None)` for no mapping. `Save` writes `Documents/AMidiOrgan/configs/hotkeys.json` and applies the mapping; the app also loads that file on startup. If two or more commands share the same non-empty key, `Save` is blocked and a warning is shown. `Cancel` discards unsaved edits in the tab and restores the last applied bindings.
+
+Current preset hotkeys cover `Manual`, `Preset 1..6`, and `Next preset`. Dedicated hotkeys for `Preset 7..12` are not defined.
 
 While a `TextEditor` or `ComboBox` has keyboard focus, including inside modal dialogs, global shortcuts are deferred so normal typing and selection still work.
 

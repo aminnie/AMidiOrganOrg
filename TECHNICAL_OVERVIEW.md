@@ -49,6 +49,9 @@ Primary implementation files:
   - Main performance tabs with voice button groups
   - Per-group volume and mute controls
   - Preset recall/write flows
+  - Preset model: `Manual` plus numbered presets `1..12`
+  - Banked preset display: six numbered preset buttons shown at a time (`1..6` or `7..12`)
+  - `Next` cycle: `1 -> ... -> 6 -> 7 -> ... -> 12 -> 1`; from `Manual`, `Next` selects first preset in current bank
   - Rotary controls on Upper/Lower with per-manual target selection between group 1 and group 2
   - Panel save/save-as
 - **Sounds**
@@ -73,6 +76,7 @@ Primary implementation files:
   - User-editable key mapping persisted to `hotkeys.json`
   - Duplicate key conflict prevention
   - Includes Monitor tab hotkey command
+  - Preset hotkeys currently cover `Manual`, `Preset 1..6`, and `Next` (no dedicated `Preset 7..12` hotkeys yet)
 - **Monitor**
   - Outgoing MIDI monitor with enable/disable capture
   - Optional startup auto-enable without tab navigation
@@ -188,6 +192,7 @@ flowchart TD
 - MIDI channels treated as `1..16`
 - `(module, channel)` is the uniqueness key in config validation
 - Same channel may be reused across different modules; duplicate module+channel is blocked
+- Preset storage indices are `0..12` where `0=Manual`, `1..12=Preset 1..12`
 
 ## 6. Persistence and File Layout
 
@@ -207,6 +212,9 @@ Config persistence notes:
 - Missing property in older configs defaults to `false`
 - Startup managed sync overwrites `configs/instrument_modules.json` and selected shipped instrument catalogs (`midigm.json`, `maxplus.json`, `integra7.json`, `at900mi.json`, `ketronevm.json`) each launch to keep runtime catalogs aligned with bundled docs.
 - Non-managed user catalogs (for example `custom.json`) are preserved.
+- Panel preset payload compatibility:
+  - New saves include `Manual + Preset 1..12`.
+  - Loading remains backward compatible with legacy panel files containing only `Manual + Preset 1..6`; missing `Preset 7..12` nodes are default-initialized.
 
 ## 7. Threading and Runtime Considerations
 

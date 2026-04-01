@@ -923,7 +923,7 @@ namespace
         const String testDir = "AMidiOrganTestData";
         const String testInstrumentFile = "integration_test_instruments.json";
         const String panelFile = "integration_presets.pnl";
-        const int presetIdx = 3;
+        const int presetIdx = 10;
 
         if (!prepareTestInstrumentJson(testDir, testInstrumentFile, details))
             return false;
@@ -990,6 +990,149 @@ namespace
             !expectEqual(presets->getRotaryStatus(presetIdx, 0), 2, "preset rotary group 0", details) ||
             !expectEqual(presets->getRotaryStatus(presetIdx, 5), 1, "preset rotary group 5", details) ||
             !expectEqual(presets->getRotaryStatus(presetIdx, 11), 0, "preset rotary group 11", details))
+        {
+            restoreAppState(snapshot);
+            return false;
+        }
+
+        restoreAppState(snapshot);
+        return true;
+    }
+
+    bool runPresetNextCycleBoundaries(std::string& details)
+    {
+        auto nextPresetIdx = [](int activePresetIdx, int displayBank)
+        {
+            if (activePresetIdx == 0)
+                return displayBank == 1 ? 7 : 1;
+            return activePresetIdx >= (numberpresets - 1) ? 1 : (activePresetIdx + 1);
+        };
+
+        if (!expectEqual(nextPresetIdx(6, 0), 7, "next from preset 6 enters preset 7 bank", details))
+            return false;
+        if (!expectEqual(nextPresetIdx(12, 1), 1, "next from preset 12 wraps to preset 1", details))
+            return false;
+        if (!expectEqual(nextPresetIdx(0, 0), 1, "manual next in bank 1 goes to preset 1", details))
+            return false;
+
+        return expectEqual(nextPresetIdx(0, 1), 7, "manual next in bank 2 goes to preset 7", details);
+    }
+
+    bool runLegacyPresetLoadCompatibility(std::string& details)
+    {
+        auto* midiInstruments = MidiInstruments::getInstance();
+        auto* instrumentPanel = InstrumentPanel::getInstance();
+        auto* presets = PanelPresets::getInstance();
+        if (midiInstruments == nullptr || instrumentPanel == nullptr || presets == nullptr)
+        {
+            details = "Required singleton unavailable";
+            return false;
+        }
+
+        const auto snapshot = takeAppStateSnapshot();
+        auto& state = getAppState();
+        const String testDir = "AMidiOrganTestData";
+        const String testInstrumentFile = "integration_test_instruments.json";
+        const String fullPanelFile = "integration_presets_full.pnl";
+        const String legacyPanelFile = "integration_presets_legacy.pnl";
+
+        if (!prepareTestInstrumentJson(testDir, testInstrumentFile, details))
+            return false;
+
+        if (!midiInstruments->loadMidiInstruments(state.instrumentfname))
+        {
+            details = "Failed to load test instrument JSON";
+            restoreAppState(snapshot);
+            return false;
+        }
+
+        state.panelfname = fullPanelFile;
+        state.configfname = "legacy_preset_test.cfg";
+
+        if (!instrumentPanel->initInstrumentPanel(testDir, fullPanelFile, false))
+        {
+            details = "initInstrumentPanel for legacy preset test failed";
+            restoreAppState(snapshot);
+            return false;
+        }
+
+        // Seed one low preset and one high preset to validate legacy truncation behavior.
+        presets->setPanelButtonIdx(3, 0, 40);
+        presets->setMuteStatus(3, 0, true);
+        presets->setRotaryStatus(3, 0, 2);
+        presets->setPanelButtonIdx(10, 0, 84);
+        presets->setMuteStatus(10, 0, true);
+        presets->setRotaryStatus(10, 0, 1);
+
+        if (!instrumentPanel->saveInstrumentPanel(testDir, fullPanelFile))
+        {
+            details = "saveInstrumentPanel for full preset payload failed";
+            restoreAppState(snapshot);
+            return false;
+        }
+
+        const File baseDir = File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
+            .getChildFile(organdir)
+            .getChildFile(state.paneldir);
+        const File fullPanelPath = baseDir.getChildFile(fullPanelFile);
+        const File legacyPanelPath = baseDir.getChildFile(legacyPanelFile);
+
+        FileInputStream in(fullPanelPath);
+        if (!in.openedOk())
+        {
+            details = "Failed to open full panel file for legacy conversion";
+            restoreAppState(snapshot);
+            return false;
+        }
+
+        ValueTree tree = ValueTree::readFromStream(in);
+        if (!tree.isValid())
+        {
+            details = "Failed to parse full panel file ValueTree";
+            restoreAppState(snapshot);
+            return false;
+        }
+
+        ValueTree presetsNode = tree.getChild(numbervoicebuttons);
+        if (!presetsNode.isValid())
+        {
+            details = "ValueTree missing Presets child";
+            restoreAppState(snapshot);
+            return false;
+        }
+
+        while (presetsNode.getNumChildren() > 7)
+            presetsNode.removeChild(presetsNode.getNumChildren() - 1, nullptr);
+
+        {
+            FileOutputStream out(legacyPanelPath);
+            if (!out.openedOk())
+            {
+                details = "Failed to create legacy panel file";
+                restoreAppState(snapshot);
+                return false;
+            }
+            tree.writeToStream(out);
+        }
+
+        // Poison preset 10 in-memory; legacy load should reset missing high presets to defaults.
+        presets->setPanelButtonIdx(10, 0, 90);
+        presets->setMuteStatus(10, 0, false);
+        presets->setRotaryStatus(10, 0, 2);
+
+        if (!instrumentPanel->loadInstrumentPanel(testDir, legacyPanelFile, false))
+        {
+            details = "loadInstrumentPanel failed for legacy preset payload";
+            restoreAppState(snapshot);
+            return false;
+        }
+
+        if (!expectEqual(presets->getPanelButtonIdx(3, 0), 40, "legacy load keeps preset 3 payload", details) ||
+            !expectEqual(presets->getMuteStatus(3, 0) ? 1 : 0, 1, "legacy load keeps preset 3 mute", details) ||
+            !expectEqual(presets->getRotaryStatus(3, 0), 2, "legacy load keeps preset 3 rotary", details) ||
+            !expectEqual(presets->getPanelButtonIdx(10, 0), 0, "legacy load resets missing preset 10 button", details) ||
+            !expectEqual(presets->getMuteStatus(10, 0) ? 1 : 0, 0, "legacy load resets missing preset 10 mute", details) ||
+            !expectEqual(presets->getRotaryStatus(10, 0), 0, "legacy load resets missing preset 10 rotary", details))
         {
             restoreAppState(snapshot);
             return false;
@@ -1749,6 +1892,16 @@ int main()
     {
         std::string details;
         results.push_back({ "Preset recall persists across groups/buttons", runPresetRecallPersistenceAcrossGroups(details), details });
+    }
+
+    {
+        std::string details;
+        results.push_back({ "Preset Next boundaries include bank transitions", runPresetNextCycleBoundaries(details), details });
+    }
+
+    {
+        std::string details;
+        results.push_back({ "Panel load supports legacy 7-preset payload", runLegacyPresetLoadCompatibility(details), details });
     }
 
     {

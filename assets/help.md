@@ -135,10 +135,15 @@ Contact the developer for additional module support.
 
 ### Presets
 
-- There are 7 presets in total:
+- There are 13 presets in total:
   - `Manual`
-  - Presets `1` to `6`
+  - Presets `1` to `12`
 - `Manual` is the default preset on startup.
+- The preset row shows six numbered presets at a time:
+  - Default bank: `Preset 1` to `Preset 6`
+  - Alternate bank: `Preset 7` to `Preset 12`
+- `Next` cycles numbered presets as `1 -> ... -> 6 -> 7 -> ... -> 12 -> 1`.
+- If `Manual` is active, `Next` recalls the first preset in the currently displayed bank (`1` or `7`).
 - Each preset stores the active voice button in each button group across all three keyboard tabs.
 - Each preset also stores per-button-group rotary snapshot values used during preset recall.
 - Preset programming flow:
@@ -174,6 +179,7 @@ When the main window has focus, the default shortcuts are:
 | Preset 4 | `4` |
 | Preset 5 | `5` |
 | Preset 6 | `6` |
+| Next preset | `7` |
 | Upper rotary Fast/Slow | `F` |
 | Upper rotary Brake | `B` |
 | Lower rotary Fast/Slow | `G` |
@@ -185,6 +191,7 @@ Shortcut notes:
 - Sounds and Effects shortcuts are intended for use after a target voice button has been selected on a keyboard tab.
 - While a `TextEditor`, `ComboBox`, or modal dialog has keyboard focus, global shortcuts are deferred so normal typing continues to work.
 - Some plain controls may still allow letter shortcuts when they have focus.
+- Preset recall hotkeys are currently defined for `Manual` and `Preset 1..6`; dedicated hotkeys for `Preset 7..12` are not defined.
 
 ### Customizing Shortcuts
 
@@ -216,8 +223,9 @@ Important subfolders:
 - `.pnl`
   - voice button assignments
   - button group details
-  - presets
+  - presets (`Manual` + `Preset 1..12`)
   - panel-level saved state such as manual rotary values
+- Panel load remains backward compatible with older `.pnl` files that contain only `Manual + Preset 1..6`; missing `Preset 7..12` values are initialized to defaults.
 - `hotkeys.json`
   - customized keyboard shortcuts
 

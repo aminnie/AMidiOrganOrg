@@ -344,8 +344,9 @@ Rules:
 
 - Duplicate non-empty key assignments are not allowed.
 - Saved hotkeys persist to `Documents/AMidiOrgan/configs/hotkeys.json`.
+- Preset hotkeys currently cover `Manual`, `Preset 1..6`, and `Next`; dedicated keys for `Preset 7..12` are not defined.
 
-Default includes `Monitor` tab hotkey (`M`).
+Default includes `Monitor` tab hotkey (`M`) and `Next preset` (`7`).
 
 Expected result:
 
@@ -413,8 +414,13 @@ Quick read (look here first):
 
 Preset basics:
 
-- `Manual` plus presets `1` to `6`
+- `Manual` plus presets `1` to `12`
 - Shared across `Upper`, `Lower`, `Bass&Drums`
+- The UI shows six numbered preset buttons at a time:
+  - Bank A: `Preset 1..6` (default)
+  - Bank B: `Preset 7..12` (shown after boundary Next)
+- `Next` sequence is `1 -> ... -> 6 -> 7 -> ... -> 12 -> 1`.
+- If `Manual` is active, `Next` recalls the first preset in the currently displayed bank (`1` or `7`).
 
 Typical preset programming:
 
@@ -455,6 +461,7 @@ Stores routing/global behavior.
 ### Panel (`.pnl`)
 
 Stores voice assignments, group state, and preset data.
+Backward-compatible load supports both legacy panels (`Manual + Preset 1..6`) and current panels (`Manual + Preset 1..12`).
 
 ### Recommended Save Discipline
 

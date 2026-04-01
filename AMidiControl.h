@@ -118,7 +118,7 @@ private:
 
 
 //==============================================================================
-// Class: Singleton PanelPresets - 7 x Panel Presets for Upper, Lower and Bass Keyboards
+// Class: Singleton PanelPresets - Manual + Preset 1..12 for all keyboards
 //==============================================================================
 static int zinstcntPanelPresets = 0;
 class PanelPresets final : Component
@@ -185,6 +185,14 @@ public:
         activepresetidx = pstidx;
     }
 
+    void resetPresetsToDefaults()
+    {
+        for (int i = 0; i < numberpresets; ++i)
+            initialisePresetDefaults(i);
+
+        activepresetidx = 0;
+    }
+
     juce_DeclareSingleton(PanelPresets, true)
 
 private:
@@ -192,26 +200,30 @@ private:
     PanelPresets() {
         juce::Logger::writeToLog("=S= PanelPresets(): Constructor " + std::to_string(zinstcntPanelPresets++));
 
-        // Create and default 7 presets: 1 x Manual + 6 x Custom Presets
+        // Create and default all presets: 1 x Manual + Preset 1..12
         for (int i = 0; i < numberpresets; i++) {
             presets.add(new Preset());
-
-            createPreset(i, 0, 0, false, 0);
-            createPreset(i, 1, 12, true, 0);
-            createPreset(i, 2, 20, true, 0);
-            createPreset(i, 3, 26, true, 0);
-
-            createPreset(i, 4, 32, false, 0);
-            createPreset(i, 5, 44, true, 0);
-            createPreset(i, 6, 52, true, 0);
-            createPreset(i, 7, 58, true, 0);
-
-            createPreset(i, 8, 64, false, 0);
-            createPreset(i, 9, 76, true, 0);
-            createPreset(i, 10, 84, true, 0);
-            createPreset(i, 11, 90, true, 0);
+            initialisePresetDefaults(i);
         }
     };
+
+    void initialisePresetDefaults(int presetid)
+    {
+        createPreset(presetid, 0, 0, false, 0);
+        createPreset(presetid, 1, 12, true, 0);
+        createPreset(presetid, 2, 20, true, 0);
+        createPreset(presetid, 3, 26, true, 0);
+
+        createPreset(presetid, 4, 32, false, 0);
+        createPreset(presetid, 5, 44, true, 0);
+        createPreset(presetid, 6, 52, true, 0);
+        createPreset(presetid, 7, 58, true, 0);
+
+        createPreset(presetid, 8, 64, false, 0);
+        createPreset(presetid, 9, 76, true, 0);
+        createPreset(presetid, 10, 84, true, 0);
+        createPreset(presetid, 11, 90, true, 0);
+    }
 
     // Each Preset captures all the clicked/acthive VoiceButtons, Mute and Rotary States in each of the 12 Button Groups
     class Preset final {
@@ -1244,9 +1256,12 @@ private:
         static Identifier presetsType("Presets");
         ValueTree vtpresets = vtinstrumentpanel.getChild(i);
 
+        panelpresets->resetPresetsToDefaults();
+
         if ((vtpresets.isValid()) && (vtpresets.getType() == presetsType)) {
 
-            for (int presetIdx = 0; presetIdx < numberpresets; presetIdx++) {
+            const int presetLoadCount = juce::jmin(numberpresets, vtpresets.getNumChildren());
+            for (int presetIdx = 0; presetIdx < presetLoadCount; presetIdx++) {
 
                 static Identifier presetType("Preset");
                 ValueTree vtpreset = vtpresets.getChild(presetIdx);
@@ -1255,9 +1270,7 @@ private:
                     continue;
                 }
 
-                String presetno = "preset" + std::to_string(presetIdx);
-                String preset = vtpreset.getProperty(presetno);
-                //DBG("loadVTInstrumentPanel(): Preset " + std::to_string(presetIdx));
+                // Legacy/new compatibility: the property name can differ, child index is authoritative.
 
                 for (int j = 0; j < numberbuttongroups; j++) {
 
@@ -1285,10 +1298,14 @@ private:
                 }
             }
 
+            if (presetLoadCount < numberpresets) {
+                DBG("loadVTInstrumentPanel(): Loaded " + std::to_string(presetLoadCount)
+                    + " preset nodes; remaining presets keep defaults.");
+            }
         }
         else {
             DBG("loadVTInstrumentPanel(): An error occurred while loading Instrument Panel ValueTree item: No Presets");
-            // To do: Add more error handling
+            DBG("loadVTInstrumentPanel(): Keeping default preset values.");
         }
 
         DBG("*** loadVTInstrumentPanel(): Instrument Panel ValueTree created!");
@@ -4527,7 +4544,7 @@ struct KeyboardPanelPage final : public Component,
             int g10xoffset = 370; //xgroup;
             ygroup = 190;
 
-            const int cbuttons = numberpresets + 2; // Set + Preset(0..6) + Next Preset
+            const int cbuttons = numberdisplaypresets + 3; // Set + Manual + six numbered presets + Next
             int rbuttons = 1;
             int bgroupid = 110;
 
@@ -4568,78 +4585,92 @@ struct KeyboardPanelPage final : public Component,
                     }
                 };
 
-            // Create the Panel Buttons for Group 1
+            // Manual button (index 0 in presetbuttons)
             col = 1;
-            for (int i = 0; i < numberpresets; ++i)
+            auto* manualPresetButton = addToList(new PresetButton());
+            presetbuttons.add(manualPresetButton);
+            manualPresetButton->setPresetButtonPtr(manualPresetButton);
+            manualPresetButton->setButtonId(0);
+            manualPresetButton->setRadioGroupId(bgroupid);
+            manualPresetButton->setClickingTogglesState(true);
+            manualPresetButton->setButtonText("Manual");
+            manualPresetButton->setColour(TextButton::textColourOffId, Colours::white);
+            manualPresetButton->setColour(TextButton::textColourOnId, Colours::white);
+            manualPresetButton->setColour(TextButton::buttonColourId, Colours::darkred.brighter());
+            manualPresetButton->setColour(TextButton::buttonOnColourId, Colours::darkred);
+            manualPresetButton->setBounds(g10xoffset + mgroup + col * bwidth, ygroup + mgroup * 2, bwidth, bheight);
+            manualPresetButton->setConnectedEdges(Button::ConnectedOnLeft | Button::ConnectedOnRight);
+            manualPresetButton->onClick = [=]()
+                {
+                    if (manualPresetButton->getToggleState())
+                    {
+                        if (tabchanged == true) {
+                            DBG("PresetButton.onClick(): Soft exit Preset 0");
+                            tabchanged = false;
+                            return;
+                        }
+
+                        instrumentpanel->panelpresets->setActivePresetIdx(0);
+                        if (bsetpreset == true) {
+                            savePreset(0);
+                            tbsetpreset->triggerClick();
+                            bsetpreset = false;
+                            DBG("PresetButton.onClick(): Saved 0");
+                        }
+                        else {
+                            loadPreset(0);
+                            DBG("PresetButton.onClick(): Recall 0");
+                        }
+                    }
+                };
+            manualPresetButton->triggerClick();
+            col++;
+
+            // Six display slots for numbered presets; each slot maps to bank 1..6 or 7..12.
+            for (int slot = 0; slot < numberdisplaypresets; ++slot)
             {
                 auto* pstb = addToList(new PresetButton());
-
                 presetbuttons.add(pstb);
-                presetbuttons[i]->setPresetButtonPtr(pstb);
-
-                pstb->setButtonId(i);
+                pstb->setPresetButtonPtr(pstb);
+                pstb->setButtonId(slot + 1);
                 pstb->setRadioGroupId(bgroupid);
                 pstb->setClickingTogglesState(true);
-
-                if (i == 0) {
-                    pstb->setButtonText("Manual");
-                    pstb->setColour(TextButton::textColourOffId, Colours::white);
-                    pstb->setColour(TextButton::textColourOnId, Colours::white);
-                    pstb->setColour(TextButton::buttonColourId, Colours::darkred.brighter());
-                    pstb->setColour(TextButton::buttonOnColourId, Colours::darkred);
-                }
-                else {
-                    pstb->setButtonText("Preset " + std::to_string(i));
-                    pstb->setColour(TextButton::textColourOffId, Colours::black);
-                    pstb->setColour(TextButton::textColourOnId, Colours::black);
-                    pstb->setColour(TextButton::buttonColourId, Colours::lightgrey);
-                    pstb->setColour(TextButton::buttonOnColourId, Colours::antiquewhite);
-                }
+                pstb->setButtonText("Preset " + std::to_string(slot + 1));
+                pstb->setColour(TextButton::textColourOffId, Colours::black);
+                pstb->setColour(TextButton::textColourOnId, Colours::black);
+                pstb->setColour(TextButton::buttonColourId, Colours::lightgrey);
+                pstb->setColour(TextButton::buttonOnColourId, Colours::antiquewhite);
                 pstb->setBounds(g10xoffset + mgroup + col * bwidth, ygroup + mgroup * 2, bwidth, bheight);
-                pstb->setConnectedEdges(((col != 0) ? Button::ConnectedOnLeft : 0)
-                    | ((col != (cbuttons / rbuttons - 1)) ? Button::ConnectedOnRight : 0));
+                pstb->setConnectedEdges(Button::ConnectedOnLeft | Button::ConnectedOnRight);
                 pstb->onClick = [=]()
                     {
-                        // If the button is already on, do not send another change in addition to original down
-                        if (pstb->getToggleState()) 
+                        if (pstb->getToggleState())
                         {
-                            // Soft Trigger after we changed tabs and decided up show (only!!!)
-                            // last Preset button pressed
+                            const int presetIdx = pstb->getButtonId();
                             if (tabchanged == true) {
-                                DBG("PresetButton.onClick(): Soft exit Preset " + std::to_string(i));
-
+                                DBG("PresetButton.onClick(): Soft exit Preset " + std::to_string(presetIdx));
                                 tabchanged = false;
                                 return;
                             }
 
-                            // Remember last preset so we can duplicate and show it 
-                            // as pressed in Upper, Lower, and Bass&Drums keyboards.
-                            instrumentpanel->panelpresets->setActivePresetIdx(pstb->getButtonId());
+                            instrumentpanel->panelpresets->setActivePresetIdx(presetIdx);
 
-                            // Update the selected Preset if Set Button is true
                             if (bsetpreset == true) {
-                                savePreset(pstb->getButtonId());
-
+                                savePreset(presetIdx);
                                 tbsetpreset->triggerClick();
                                 bsetpreset = false;
-
-                                DBG("PresetButton.onClick(): Saved " + std::to_string(i));
+                                DBG("PresetButton.onClick(): Saved " + std::to_string(presetIdx));
                             }
-                            // Recall an existig Preset setting and update the Panel
                             else {
-                                loadPreset(pstb->getButtonId());
-
-                                DBG("PresetButton.onClick(): Recall " + std::to_string(i));
+                                loadPreset(presetIdx);
+                                DBG("PresetButton.onClick(): Recall " + std::to_string(presetIdx));
                             }
                         }
                     };
-
-                // Default first Preset Button (Manual)
-                if (i == 0)
-                  pstb->triggerClick();
-
                 col++;
             }
+
+            updatePresetBankDisplayButtons();
 
             auto* tbnextpreset = addToList(new PresetButton("Next"));
             tbnextpreset->setClickingTogglesState(false);
@@ -4647,7 +4678,7 @@ struct KeyboardPanelPage final : public Component,
             tbnextpreset->setColour(TextButton::textColourOnId, Colours::white);
             tbnextpreset->setColour(TextButton::buttonColourId, Colours::black.darker());
             tbnextpreset->setColour(TextButton::buttonOnColourId, Colours::antiquewhite);
-            tbnextpreset->setTooltip("Advance to the next preset (Manual and Preset 6 both go to Preset 1).");
+            tbnextpreset->setTooltip("Advance to next preset (1..12 with banked display; Manual follows current bank).");
             tbnextpreset->setBounds(g10xoffset + mgroup + col * bwidth, ygroup + mgroup * 2, presetControlButtonWidth, bheight);
             tbnextpreset->setConnectedEdges(Button::ConnectedOnLeft);
             tbnextpreset->onClick = [=]()
@@ -5337,12 +5368,8 @@ struct KeyboardPanelPage final : public Component,
         // Note: Need to review if we should avoid a complete retrigger of Preset
         else if (currenttabidx != lasttabidx) {
 
-            tabchanged = true;
-
-            // Ensure right/active button is displayed, but do not trigger MIDI outputs
             int pstidx = instrumentpanel->panelpresets->getActivePresetIdx();
-            PresetButton* presetbuttonptr = presetbuttons[pstidx]->getPresetButtonPtr();
-            presetbuttonptr->triggerClick();
+            setPresetRadioSelection(pstidx);
 
             lasttabidx = currenttabidx;
         }
@@ -5480,8 +5507,20 @@ struct KeyboardPanelPage final : public Component,
     /** Phase 1 hotkeys: sync preset radio UI only (no MIDI). */
     void setPresetRadioSelection(int pstidx)
     {
-        if (pstidx < 0 || pstidx >= presetbuttons.size()) return;
-        if (auto* p = presetbuttons[pstidx])
+        if (pstidx < 0 || pstidx >= numberpresets)
+            return;
+
+        if (pstidx == 0)
+        {
+            if (auto* p = getManualPresetButton())
+                p->setToggleState(true, dontSendNotification);
+            return;
+        }
+
+        if (!ensurePresetBankForRealPreset(pstidx))
+            return;
+
+        if (auto* p = getDisplayPresetButtonForRealPreset(pstidx))
             p->setToggleState(true, dontSendNotification);
     }
 
@@ -5613,18 +5652,92 @@ private:
     void triggerNextPresetFromCurrentSelection()
     {
         const int activePresetIdx = juce::jlimit(0, numberpresets - 1, instrumentpanel->panelpresets->getActivePresetIdx());
-        int nextPresetIdx = activePresetIdx + 1;
+        int nextPresetIdx = 1;
 
-        // Manual (0) jumps to Preset 1. Preset 6 wraps to Preset 1.
-        if (nextPresetIdx >= numberpresets || activePresetIdx == 0)
-            nextPresetIdx = 1;
+        if (activePresetIdx == 0)
+            nextPresetIdx = (presetDisplayBank == 1 ? 7 : 1);
+        else
+            nextPresetIdx = (activePresetIdx >= (numberpresets - 1)) ? 1 : (activePresetIdx + 1);
 
-        if (nextPresetIdx < 0 || nextPresetIdx >= presetbuttons.size())
+        if (!ensurePresetBankForRealPreset(nextPresetIdx))
             return;
 
-        auto* nextPresetButton = presetbuttons[nextPresetIdx]->getPresetButtonPtr();
+        auto* nextPresetButton = getDisplayPresetButtonForRealPreset(nextPresetIdx);
         if (nextPresetButton != nullptr)
             nextPresetButton->triggerClick();
+    }
+
+    bool isBankTwoPreset(int presetIdx) const
+    {
+        return presetIdx >= 7;
+    }
+
+    int getPresetDisplayBankForRealPreset(int presetIdx) const
+    {
+        return isBankTwoPreset(presetIdx) ? 1 : 0;
+    }
+
+    int getBankStartPresetIdx(int bank) const
+    {
+        return bank == 1 ? 7 : 1;
+    }
+
+    bool ensurePresetBankForRealPreset(int presetIdx)
+    {
+        if (presetIdx <= 0 || presetIdx >= numberpresets)
+            return false;
+
+        const int targetBank = getPresetDisplayBankForRealPreset(presetIdx);
+        if (presetDisplayBank != targetBank)
+        {
+            presetDisplayBank = targetBank;
+            updatePresetBankDisplayButtons();
+        }
+
+        return true;
+    }
+
+    int getDisplaySlotForRealPreset(int presetIdx) const
+    {
+        if (presetIdx <= 0 || presetIdx >= numberpresets)
+            return -1;
+        return (presetIdx - getBankStartPresetIdx(presetDisplayBank));
+    }
+
+    PresetButton* getManualPresetButton() const
+    {
+        return presetbuttons.size() > 0 ? presetbuttons[0] : nullptr;
+    }
+
+    PresetButton* getDisplayPresetButtonForRealPreset(int presetIdx) const
+    {
+        const int slot = getDisplaySlotForRealPreset(presetIdx);
+        if (slot < 0 || slot >= numberdisplaypresets)
+            return nullptr;
+
+        const int buttonIndex = 1 + slot;
+        if (buttonIndex < 0 || buttonIndex >= presetbuttons.size())
+            return nullptr;
+
+        return presetbuttons[buttonIndex];
+    }
+
+    void updatePresetBankDisplayButtons()
+    {
+        const int bankStart = getBankStartPresetIdx(presetDisplayBank);
+        for (int slot = 0; slot < numberdisplaypresets; ++slot)
+        {
+            const int buttonIndex = 1 + slot;
+            if (buttonIndex < 0 || buttonIndex >= presetbuttons.size())
+                break;
+
+            const int realPresetIdx = bankStart + slot;
+            if (auto* b = presetbuttons[buttonIndex])
+            {
+                b->setButtonId(realPresetIdx);
+                b->setButtonText("Preset " + std::to_string(realPresetIdx));
+            }
+        }
     }
 
     /** Called from VoiceButton::mouseUp only for explicit user clicks on a voice button. */
@@ -5852,6 +5965,7 @@ private:
     bool g4uppermute = false;
 
     Array<PresetButton*> presetbuttons;
+    int presetDisplayBank = 0; // 0 => Preset 1..6, 1 => Preset 7..12
     bool bsetpreset = false;
 
     bool isPanelSavePending() const
