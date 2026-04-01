@@ -365,6 +365,7 @@ FodyWeavers.xsd
 # AMidiOrgan local macOS build/dependency folders
 .deps/
 build-mac/
+build-release-local/
 
 # Windows (and generic) CMake out-of-tree build — regenerate with: cmake -B build ...
 build/
