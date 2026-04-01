@@ -61,6 +61,8 @@ namespace
         int defaultEffectsAtk = 0;
         int defaultEffectsRel = 0;
         int defaultEffectsPan = 64;
+        int presetMidiPcInputChannel = 16;
+        int presetMidiPcValue = 0;
         bool configreload = false;
         bool configPanelPairingMismatchAcknowledged = false;
         bool upperManualRotaryFast = true;
@@ -91,6 +93,8 @@ namespace
         snapshot.defaultEffectsAtk = state.defaultEffectsAtk;
         snapshot.defaultEffectsRel = state.defaultEffectsRel;
         snapshot.defaultEffectsPan = state.defaultEffectsPan;
+        snapshot.presetMidiPcInputChannel = state.presetMidiPcInputChannel;
+        snapshot.presetMidiPcValue = state.presetMidiPcValue;
         snapshot.configreload = state.configreload;
         snapshot.configPanelPairingMismatchAcknowledged = state.configPanelPairingMismatchAcknowledged;
         snapshot.upperManualRotaryFast = state.upperManualRotaryFast;
@@ -121,6 +125,8 @@ namespace
         state.defaultEffectsAtk = snapshot.defaultEffectsAtk;
         state.defaultEffectsRel = snapshot.defaultEffectsRel;
         state.defaultEffectsPan = snapshot.defaultEffectsPan;
+        state.presetMidiPcInputChannel = snapshot.presetMidiPcInputChannel;
+        state.presetMidiPcValue = snapshot.presetMidiPcValue;
         state.configreload = snapshot.configreload;
         state.configPanelPairingMismatchAcknowledged = snapshot.configPanelPairingMismatchAcknowledged;
         state.upperManualRotaryFast = snapshot.upperManualRotaryFast;
@@ -1593,6 +1599,66 @@ namespace
         return true;
     }
 
+    bool runProgramChangePresetNextTriggerAndConsume(std::string& details)
+    {
+        auto* devices = MidiDevices::getInstance();
+        if (devices == nullptr)
+        {
+            details = "MidiDevices::getInstance() returned nullptr";
+            return false;
+        }
+
+        const auto snapshot = takeAppStateSnapshot();
+        auto& state = getAppState();
+
+        state.presetMidiPcInputChannel = 16;
+        state.presetMidiPcValue = 0;
+
+        devices->clearMidiIOMap();
+        devices->iomap[16][0] = 4;
+        devices->passthroughin[16] = false; // Match check must ignore pass-through gate.
+
+        int triggerHits = 0;
+        std::vector<MidiMessage> sentMessages;
+        devices->setPresetNextProgramChangeTrigger([&triggerHits]() { ++triggerHits; });
+        devices->testSendHook = [&sentMessages](const MidiMessage& message)
+        {
+            sentMessages.push_back(message);
+        };
+
+        const auto matchingPc = MidiMessage::programChange(16, 0);
+        devices->handleIncomingMidiMessage(nullptr, matchingPc);
+
+        if (!expectEqual(triggerHits, 1, "matching Program Change triggers preset next callback", details) ||
+            !expectEqual(static_cast<int>(sentMessages.size()), 0, "matching Program Change is consumed", details))
+        {
+            devices->setPresetNextProgramChangeTrigger({});
+            devices->testSendHook = nullptr;
+            restoreAppState(snapshot);
+            return false;
+        }
+
+        // Non-matching PC should follow normal non-note routing behavior.
+        devices->passthroughin[16] = true;
+        const auto nonMatchingPc = MidiMessage::programChange(16, 1);
+        devices->handleIncomingMidiMessage(nullptr, nonMatchingPc);
+
+        if (!expectEqual(triggerHits, 1, "non-matching Program Change does not trigger preset next", details) ||
+            !expectEqual(static_cast<int>(sentMessages.size()), 1, "non-matching Program Change still routes", details) ||
+            !expectEqual(sentMessages[0].getChannel(), 4, "non-matching Program Change routed output channel", details))
+        {
+            devices->setPresetNextProgramChangeTrigger({});
+            devices->testSendHook = nullptr;
+            restoreAppState(snapshot);
+            return false;
+        }
+
+        devices->setPresetNextProgramChangeTrigger({});
+        devices->testSendHook = nullptr;
+        restoreAppState(snapshot);
+        return true;
+    }
+
     bool runShortcutFocusDeferralGuard(std::string& details)
     {
         TextEditor editor;
@@ -1937,6 +2003,11 @@ int main()
     {
         std::string details;
         results.push_back({ "MIDI non-note routing follows configured channels only", runChannelizedNonNoteStrictRouting(details), details });
+    }
+
+    {
+        std::string details;
+        results.push_back({ "MIDI Program Change can trigger consumed preset next", runProgramChangePresetNextTriggerAndConsume(details), details });
     }
 
     {

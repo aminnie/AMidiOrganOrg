@@ -6869,6 +6869,8 @@ private:
         static const juce::Identifier defaultEffectsAtkType("defaultEffectsAtk");
         static const juce::Identifier defaultEffectsRelType("defaultEffectsRel");
         static const juce::Identifier defaultEffectsPanType("defaultEffectsPan");
+        static const juce::Identifier presetMidiPcInputChannelType("presetMidiPcInputChannel");
+        static const juce::Identifier presetMidiPcValueType("presetMidiPcValue");
         static const juce::Identifier startupMonitorEnabledType("startupMonitorEnabled");
         static const juce::Identifier indexType("index");
         static const juce::Identifier midikeyboardType("keyboard");
@@ -6908,6 +6910,8 @@ private:
         tempConfig.setProperty(defaultEffectsAtkType, appState.defaultEffectsAtk, nullptr);
         tempConfig.setProperty(defaultEffectsRelType, appState.defaultEffectsRel, nullptr);
         tempConfig.setProperty(defaultEffectsPanType, appState.defaultEffectsPan, nullptr);
+        tempConfig.setProperty(presetMidiPcInputChannelType, appState.presetMidiPcInputChannel, nullptr);
+        tempConfig.setProperty(presetMidiPcValueType, appState.presetMidiPcValue, nullptr);
         tempConfig.setProperty(startupMonitorEnabledType, appState.startupMonitorEnabled, nullptr);
 
         for (int i = 0; i < numberbuttongroups; ++i)
@@ -8935,7 +8939,7 @@ public:
 
         addAndMakeVisible(globalConfigsGroup);
         globalConfigsGroup.setColour(GroupComponent::outlineColourId, Colours::grey.darker());
-        globalConfigsGroup.setBounds(1135, 8, 305, 88);
+        globalConfigsGroup.setBounds(1135, 8, 305, 118);
 
         addAndMakeVisible(lblPassthrough);
         lblPassthrough.setBounds(1150, 32, 135, 24);
@@ -8964,6 +8968,24 @@ public:
                 appState.startupMonitorEnabled = toggleStartupMonitor.getToggleState();
                 setConfigSaveButtonEnabled(true);
             };
+
+        addAndMakeVisible(lblPresetMidiPc);
+        lblPresetMidiPc.setBounds(1150, 78, 135, 24);
+        lblPresetMidiPc.setText("Preset MIDI PC", {});
+
+        addAndMakeVisible(txtPresetMidiPcInputChannel);
+        txtPresetMidiPcInputChannel.setBounds(1290, 78, 24, 24);
+        txtPresetMidiPcInputChannel.setText(std::to_string(appState.presetMidiPcInputChannel));
+        wireDefaultEffectsNumberField(txtPresetMidiPcInputChannel, &appState.presetMidiPcInputChannel, 1, 16);
+
+        addAndMakeVisible(lblPresetMidiPcSeparator);
+        lblPresetMidiPcSeparator.setBounds(1318, 78, 10, 24);
+        lblPresetMidiPcSeparator.setText("/", {});
+
+        addAndMakeVisible(txtPresetMidiPcValue);
+        txtPresetMidiPcValue.setBounds(1330, 78, 40, 24);
+        txtPresetMidiPcValue.setText(std::to_string(appState.presetMidiPcValue));
+        wireDefaultEffectsNumberField(txtPresetMidiPcValue, &appState.presetMidiPcValue, 0, 127);
 
         addAndMakeVisible(resetButton);
         resetButton.setButtonText("MIDI Reset");
@@ -9161,8 +9183,9 @@ private:
     juce::TextEditor txtDefaultEffectsVol, txtDefaultEffectsBri, txtDefaultEffectsExp, txtDefaultEffectsRev;
     juce::TextEditor txtDefaultEffectsCho, txtDefaultEffectsMod, txtDefaultEffectsTim, txtDefaultEffectsAtk;
     juce::TextEditor txtDefaultEffectsRel, txtDefaultEffectsPan;
+    juce::TextEditor txtPresetMidiPcInputChannel, txtPresetMidiPcValue;
     juce::Label lblKeyboard, lblGroupName, lblButtonCount, lblMidiIn, lblMidiOut, lblSplit, lblOctave, lblModule, lblModuleAlias;
-    juce::Label lblPassthrough, lblStartupMonitor, lblVelocity;
+    juce::Label lblPassthrough, lblStartupMonitor, lblVelocity, lblPresetMidiPc, lblPresetMidiPcSeparator;
     juce::Label lblDefaultEffectsVol, lblDefaultEffectsBri, lblDefaultEffectsExp, lblDefaultEffectsRev;
     juce::Label lblDefaultEffectsCho, lblDefaultEffectsMod, lblDefaultEffectsTim, lblDefaultEffectsAtk;
     juce::Label lblDefaultEffectsRel, lblDefaultEffectsPan;
@@ -9277,6 +9300,12 @@ private:
         txtDefaultEffectsRel.setText(std::to_string(appState.defaultEffectsRel), false);
         txtDefaultEffectsPan.setText(std::to_string(appState.defaultEffectsPan), false);
         styleDefaultEffectsLikeButtonGroupSection();
+    }
+
+    void refreshPresetMidiPcEditorsFromAppState()
+    {
+        txtPresetMidiPcInputChannel.setText(std::to_string(juce::jlimit(1, 16, appState.presetMidiPcInputChannel)), false);
+        txtPresetMidiPcValue.setText(std::to_string(juce::jlimit(0, 127, appState.presetMidiPcValue)), false);
     }
 
     /** Match the "Button Group Name" row using the same L&F font + colour resolution JUCE uses when painting. */
@@ -9608,6 +9637,8 @@ private:
         static Identifier defaultEffectsAtkType("defaultEffectsAtk");
         static Identifier defaultEffectsRelType("defaultEffectsRel");
         static Identifier defaultEffectsPanType("defaultEffectsPan");
+        static Identifier presetMidiPcInputChannelType("presetMidiPcInputChannel");
+        static Identifier presetMidiPcValueType("presetMidiPcValue");
         static Identifier startupMonitorEnabledType("startupMonitorEnabled");
 
         static Identifier indexType("index");               // Child Properties
@@ -9639,6 +9670,8 @@ private:
         configsTree.setProperty(defaultEffectsAtkType, appState.defaultEffectsAtk, nullptr);
         configsTree.setProperty(defaultEffectsRelType, appState.defaultEffectsRel, nullptr);
         configsTree.setProperty(defaultEffectsPanType, appState.defaultEffectsPan, nullptr);
+        configsTree.setProperty(presetMidiPcInputChannelType, appState.presetMidiPcInputChannel, nullptr);
+        configsTree.setProperty(presetMidiPcValueType, appState.presetMidiPcValue, nullptr);
         configsTree.setProperty(startupMonitorEnabledType, appState.startupMonitorEnabled, nullptr);
 
         for (int i = 0; i < numberbuttongroups; i++) {
@@ -9780,6 +9813,8 @@ private:
         static Identifier defaultEffectsAtkType("defaultEffectsAtk");
         static Identifier defaultEffectsRelType("defaultEffectsRel");
         static Identifier defaultEffectsPanType("defaultEffectsPan");
+        static Identifier presetMidiPcInputChannelType("presetMidiPcInputChannel");
+        static Identifier presetMidiPcValueType("presetMidiPcValue");
         static Identifier startupMonitorEnabledType("startupMonitorEnabled");
 
         static Identifier indexType("index");           // Child Properties
@@ -9858,6 +9893,16 @@ private:
             appState.defaultEffectsPan = juce::jlimit(0, 127, (int)vtconfigs.getProperty(defaultEffectsPanType));
         else
             appState.defaultEffectsPan = 64;
+
+        if (vtconfigs.hasProperty(presetMidiPcInputChannelType))
+            appState.presetMidiPcInputChannel = juce::jlimit(1, 16, (int)vtconfigs.getProperty(presetMidiPcInputChannelType));
+        else
+            appState.presetMidiPcInputChannel = 16;
+
+        if (vtconfigs.hasProperty(presetMidiPcValueType))
+            appState.presetMidiPcValue = juce::jlimit(0, 127, (int)vtconfigs.getProperty(presetMidiPcValueType));
+        else
+            appState.presetMidiPcValue = 0;
 
         appState.startupMonitorEnabled = vtconfigs.hasProperty(startupMonitorEnabledType)
             ? static_cast<bool>(vtconfigs.getProperty(startupMonitorEnabledType))
@@ -9978,6 +10023,7 @@ private:
         toggleStartupMonitor.setToggleState(appState.startupMonitorEnabled, dontSendNotification);
 
         refreshDefaultEffectsEditorsFromAppState();
+        refreshPresetMidiPcEditorsFromAppState();
 
         return true;
     }
@@ -10643,6 +10689,17 @@ public:
         keyTarget.onLowerRotaryFastSlow = [this] { tabs.triggerLowerRotaryFastSlowHotkey(); };
         keyTarget.onLowerRotaryBrake = [this] { tabs.triggerLowerRotaryBrakeHotkey(); };
 
+        if (auto* midiDevices = MidiDevices::getInstance())
+        {
+            juce::Component::SafePointer<AMidiControl> safeThis(this);
+            midiDevices->setPresetNextProgramChangeTrigger([safeThis]()
+                {
+                    if (safeThis == nullptr)
+                        return;
+                    safeThis->tabs.triggerNextPresetHotkey();
+                });
+        }
+
         setOpaque (true);
         setWantsKeyboardFocus (true);
         setMouseClickGrabsKeyboardFocus (true);
@@ -10657,6 +10714,9 @@ public:
     {
         tabs.removeKeyListener (&shortcutKeyListener);
         removeKeyListener (&shortcutKeyListener);
+
+        if (auto* midiDevices = MidiDevices::getInstance())
+            midiDevices->setPresetNextProgramChangeTrigger({});
 
         if (topLevelWithAttachedKeyListener != nullptr)
             topLevelWithAttachedKeyListener->removeKeyListener (&shortcutKeyListener);

@@ -70,6 +70,7 @@ Primary implementation files:
   - Default effects values
   - Module alias fields
   - Global startup-monitor toggle persisted in config
+  - Global `Preset MIDI PC` trigger (`input channel` + `PC value`) persisted in config
   - Solo split note naming uses project convention `C4 = 60`
   - Validation rules for module/channel uniqueness
 - **Hotkeys**
@@ -93,6 +94,8 @@ Primary implementation files:
 - Support for output channel fan-out to multiple modules
 - Defensive module/channel validation during config mapping
 - Channelized non-note messages obey explicit routing decisions
+- Incoming Program Change can trigger preset-next when it matches global config (`Preset MIDI PC`), using message-thread handoff to the hotkey-equivalent preset-next path
+- Matched Program Change trigger events are consumed and not forwarded
 - Output monitoring hook captures final routed messages
 - When startup-monitor config is enabled, the outgoing monitor hook is armed during startup before Start-tab initialization completes
 
@@ -193,6 +196,7 @@ flowchart TD
 - `(module, channel)` is the uniqueness key in config validation
 - Same channel may be reused across different modules; duplicate module+channel is blocked
 - Preset storage indices are `0..12` where `0=Manual`, `1..12=Preset 1..12`
+- Preset-next Program Change trigger match uses `input channel 1..16` and `PC 0..127`
 
 ## 6. Persistence and File Layout
 
@@ -212,6 +216,7 @@ Config persistence notes:
 - Missing property in older configs defaults to `false`
 - Startup managed sync overwrites `configs/instrument_modules.json` and selected shipped instrument catalogs (`midigm.json`, `maxplus.json`, `integra7.json`, `at900mi.json`, `ketronevm.json`) each launch to keep runtime catalogs aligned with bundled docs.
 - Non-managed user catalogs (for example `custom.json`) are preserved.
+- Config root also persists `presetMidiPcInputChannel` and `presetMidiPcValue` for external Program Change preset-next triggering.
 - Panel preset payload compatibility:
   - New saves include `Manual + Preset 1..12`.
   - Loading remains backward compatible with legacy panel files containing only `Manual + Preset 1..6`; missing `Preset 7..12` nodes are default-initialized.

@@ -126,6 +126,10 @@ struct AppState final
     int defaultEffectsAtk = 0;
     int defaultEffectsRel = 0;
     int defaultEffectsPan = 64;
+    /** Config-global MIDI Program Change trigger for Preset Next (input channel 1..16). */
+    int presetMidiPcInputChannel = 16;
+    /** Config-global MIDI Program Change number (0..127) that triggers Preset Next. */
+    int presetMidiPcValue = 0;
     bool startupMonitorEnabled = false;
     bool configchanged = false;
     bool configreload = false;
@@ -186,6 +190,8 @@ inline String& pnlconfigfname = getAppState().pnlconfigfname;
 inline String& configdir = getAppState().configdir;
 inline int& defaultEffectsVol = getAppState().defaultEffectsVol;
 inline int& defaultEffectsBri = getAppState().defaultEffectsBri;
+inline int& presetMidiPcInputChannel = getAppState().presetMidiPcInputChannel;
+inline int& presetMidiPcValue = getAppState().presetMidiPcValue;
 inline bool& startupMonitorEnabled = getAppState().startupMonitorEnabled;
 inline bool& configchanged = getAppState().configchanged;
 inline bool& configreload = getAppState().configreload;

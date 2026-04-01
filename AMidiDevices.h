@@ -203,6 +203,26 @@ public:
             return;
         }
 
+        // Config-global Program Change trigger for "Next preset" (consumed when matched).
+        if (message.isProgramChange()
+            && inchan == juce::jlimit(1, 16, getAppState().presetMidiPcInputChannel)
+            && message.getProgramChangeNumber() == juce::jlimit(0, 127, getAppState().presetMidiPcValue))
+        {
+            auto triggerCopy = presetNextTriggerHook;
+            if (triggerCopy)
+            {
+                auto* messageManager = juce::MessageManager::getInstanceWithoutCreating();
+                if (messageManager == nullptr || juce::MessageManager::existsAndIsCurrentThread())
+                    triggerCopy();
+                else
+                    juce::MessageManager::callAsync([triggerCopy]()
+                        {
+                            triggerCopy();
+                        });
+            }
+            return;
+        }
+
         // Check to see if Midi passthrough is blocked for this channel and igore all messages if true
         if (passthroughin[inchan] == false)
             return;
@@ -376,6 +396,11 @@ public:
         outgoingMonitorHook = std::move(hook);
     }
 
+    void setPresetNextProgramChangeTrigger(std::function<void()> hook)
+    {
+        presetNextTriggerHook = std::move(hook);
+    }
+
     void resetAllControllers()
     {
         // Reset all Controllers - is it implemented by BlackBox?
@@ -458,6 +483,7 @@ public:
 
     // Test hook for observing emitted output messages without hardware.
     std::function<void(const MidiMessage&)> testSendHook;
+    std::function<void()> presetNextTriggerHook;
     juce::SpinLock outgoingMonitorHookLock;
     std::function<void(const MidiMessage&, const juce::String&)> outgoingMonitorHook;
 

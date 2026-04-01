@@ -155,6 +155,11 @@ On startup, the app also attempts to auto-restore the last used panel and config
 - `Startup Monitor` is a global config option saved in the `.cfg` file.
 - When `Startup Monitor` is **ON**, outgoing MIDI monitoring is enabled automatically during startup so initialization traffic can be reviewed later in the `Monitor` tab.
 - Startup auto-enable does **not** switch the visible tab; the app continues normal startup and you open `Monitor` manually when needed.
+- `Preset MIDI PC` is a global config trigger for preset-next automation:
+  - `Input Channel` (`1..16`, default `16`)
+  - `PC Value` (`0..127`, default `0`)
+  - When a matching incoming Program Change is received, it triggers `Next preset` using the same path as the `Next preset` hotkey.
+  - Matching Program Change is consumed (not forwarded to MIDI outputs), and this match check is independent of `MIDI In Passthru`.
 - Solo split note names use the project-wide `C4 = 60` convention.
 - **Default Effects** fields (Vol, Bri, Exp, Rev, Cho, Mod, Tim, Atk, Rel, Pan) set starting MIDI CC values for new voice assignments (Sounds tab route and fresh panel initialization). They are saved in the config file. Defaults match a new `Instrument`: Vol 100, Bri 30, Exp 127, Rev 20, Cho 10, Mod/Tim/Atk/Rel 0, Pan 64. Each field accepts **0–127** only (digits-only entry; invalid or out-of-range values are rejected on focus loss). Volume scaling still treats a default Vol of **0** like **1** when computing effective CC7.
 - Re-using the same **MIDI Out channel** across button groups that target different sound modules is supported: that output channel fans out to each mapped module.

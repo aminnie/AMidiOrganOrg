@@ -315,6 +315,11 @@ Global options note:
 - `Allow all MIDI In` controls global input pass-through filtering.
 - `Startup Monitor` enables outgoing monitor capture automatically during app startup so initialization MIDI can be inspected later.
 - Enabling `Startup Monitor` does **not** open the `Monitor` tab automatically; startup continues normally on the usual tab.
+- `Preset MIDI PC` adds an external Program Change trigger for `Next preset`:
+  - `Input Channel` accepts `1..16` (default `16`)
+  - `PC Value` accepts `0..127` (default `0`)
+  - A matching incoming Program Change triggers `Next preset` exactly like the hotkey flow.
+  - Matching Program Change is consumed (not routed to outputs) and the trigger check ignores pass-through gating.
 - Solo split note names use the project-wide `C4 = 60` convention.
 
 Expected result:

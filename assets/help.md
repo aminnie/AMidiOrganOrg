@@ -95,6 +95,11 @@ Contact the developer for additional module support.
 - When it is **ON**, all incoming MIDI channels are allowed through.
 - When it is **OFF**, only MIDI input channels assigned to button groups are allowed through; other incoming channels are blocked.
 - MIDI channel `16` is still allowed for controller-style traffic even when pass-through is off.
+- `Preset MIDI PC` lets external Program Change trigger `Next preset`:
+  - Input Channel (`1..16`, default `16`)
+  - PC Value (`0..127`, default `0`)
+  - Matching Program Change triggers preset-next using the same behavior as the `Next preset` hotkey.
+  - Matching Program Change is consumed (not forwarded to outputs) and this trigger check ignores pass-through filtering.
 - Config settings are global to the app and are separate from the currently loaded panel.
 
 ### Hotkeys
@@ -219,7 +224,7 @@ Important subfolders:
 ### What Each File Stores
 
 - `.cfg`
-  - MIDI routing, group naming, split points, pass-through behavior, and related configuration
+  - MIDI routing, group naming, split points, pass-through behavior, preset-next Program Change trigger, and related configuration
 - `.pnl`
   - voice button assignments
   - button group details
