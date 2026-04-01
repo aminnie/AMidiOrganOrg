@@ -256,8 +256,21 @@ public:
 
         auto instrumentText = instrumentFile.loadFileAsString();
 
-        // Parse the JSON string into a var object.
-        jsonInstrumentData = juce::JSON::parse(instrumentText);
+        const juce::var parsed = juce::JSON::parse(instrumentText);
+        if (parsed.isVoid() || parsed.isUndefined() || !parsed.isObject())
+        {
+            juce::Logger::writeToLog("*** loadMidiInstruments(): JSON parse failed or root is not an object: " + instrumentFileName);
+            return false;
+        }
+
+        const juce::var instrumentsNode = parsed["Instruments"];
+        if (!instrumentsNode.isArray())
+        {
+            juce::Logger::writeToLog("*** loadMidiInstruments(): Missing or invalid Instruments array: " + instrumentFileName);
+            return false;
+        }
+
+        jsonInstrumentData = parsed;
 
         // Check if newly loaded Midi Instrument file is 0 or 1 based on the PC value
         // For example: Integra7 needs 1 subtracted from PC value before send
@@ -280,49 +293,55 @@ public:
         if (cat < 0)
             return "None";
 
-        return jsonInstrumentData["Instruments"][cat][0];
+        const auto instruments = jsonInstrumentData["Instruments"];
+        if (!instruments.isArray() || cat >= instruments.size())
+            return "None";
+
+        const auto category = instruments[cat];
+        if (!category.isArray() || category.size() < 1)
+            return "None";
+
+        return category[0].toString();
     }
 
     int getCategoryCount() {
+        const auto instruments = jsonInstrumentData["Instruments"];
+        if (!instruments.isArray())
+            return 0;
 
-        int count = jsonInstrumentData["Instruments"].size();
-        return count;
+        return instruments.size();
     }
 
     String getVoice(int cat, int inst) {
-        if ((cat < 0) || (inst < 0))
-            return "None";
+        const auto row = getVoiceRowArray(cat, inst);
+        if (!row.isArray())
+            return "No Voice";
 
-        String svoice;
-        try {
-            svoice = jsonInstrumentData["Instruments"][cat][inst][4];
-        }
-        catch (...) {
-            svoice = "No Voice";
-        }
-
-        return svoice;
+        return row[4].toString();
     }
 
     int getMSB(int cat, int inst) {
-        if ((cat < 0) || (inst < 0))
+        const auto row = getVoiceRowArray(cat, inst);
+        if (!row.isArray())
             return 0;
 
-        return jsonInstrumentData["Instruments"][cat][inst][2];
+        return static_cast<int>(row[2]);
     }
 
     int getLSB(int cat, int inst) {
-        if ((cat < 0) || (inst < 0))
+        const auto row = getVoiceRowArray(cat, inst);
+        if (!row.isArray())
             return 0;
 
-        return jsonInstrumentData["Instruments"][cat][inst][3];
+        return static_cast<int>(row[3]);
     }
 
     int getFont(int cat, int inst) {
-        if ((cat < 0) || (inst < 0))
+        const auto row = getVoiceRowArray(cat, inst);
+        if (!row.isArray())
             return 0;
 
-        int insfont = jsonInstrumentData["Instruments"][cat][inst][1];
+        int insfont = static_cast<int>(row[1]);
 
         if ((!appState.iszerobased) && (inst > 0)) insfont = insfont - 1;
 
@@ -397,6 +416,27 @@ private:
 
     InstrumentModules* instrumentmodules = nullptr;
     AppState& appState;
+
+    /** Category arrays are ["CategoryName", voiceRow1, voiceRow2, ...]; voice rows start at index 1. */
+    juce::var getVoiceRowArray(int cat, int voiceIdx) const
+    {
+        if (cat < 0 || voiceIdx < 1)
+            return {};
+
+        const auto instruments = jsonInstrumentData["Instruments"];
+        if (!instruments.isArray() || cat >= instruments.size())
+            return {};
+
+        const auto category = instruments[cat];
+        if (!category.isArray() || voiceIdx >= category.size())
+            return {};
+
+        const auto row = category[voiceIdx];
+        if (!row.isArray() || row.size() < 5)
+            return {};
+
+        return row;
+    }
 
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MidiInstruments)

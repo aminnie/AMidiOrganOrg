@@ -172,6 +172,102 @@ namespace
         return true;
     }
 
+    /** Valid catalog with one category and one voice (regression: voice index 0 must not crash). */
+    bool prepareTestInstrumentJsonOneVoice(const String& testDirName, const String& fileName, std::string& details)
+    {
+        auto& state = getAppState();
+
+        const File baseDir = File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
+            .getChildFile(organdir)
+            .getChildFile(testDirName);
+
+        if (!baseDir.exists() && !baseDir.createDirectory())
+        {
+            details = "Failed to create test directory: " + baseDir.getFullPathName().toStdString();
+            return false;
+        }
+
+        const File instrumentJson = baseDir.getChildFile(fileName);
+        const String jsonText = R"({
+  "Vendor": "TestVendor",
+  "Instruments": [
+    ["Cat1", [3, 0, 121, 8, "VoiceOne"]]
+  ]
+})";
+
+        if (!instrumentJson.replaceWithText(jsonText))
+        {
+            details = "Failed to write test JSON: " + instrumentJson.getFullPathName().toStdString();
+            return false;
+        }
+
+        state.instrumentdir = testDirName;
+        state.instrumentfname = fileName;
+        return true;
+    }
+
+    bool runMidiInstrumentsVoiceLookupBounds(std::string& details)
+    {
+        auto* midiInstruments = MidiInstruments::getInstance();
+        if (midiInstruments == nullptr)
+        {
+            details = "MidiInstruments::getInstance() returned nullptr";
+            return false;
+        }
+
+        const auto snapshot = takeAppStateSnapshot();
+        auto& state = getAppState();
+
+        const String testDir = "AMidiOrganTestData";
+        const String testFile = "midi_voice_bounds_test.json";
+
+        if (!prepareTestInstrumentJsonOneVoice(testDir, testFile, details))
+        {
+            restoreAppState(snapshot);
+            return false;
+        }
+
+        if (!midiInstruments->loadMidiInstruments(state.instrumentfname))
+        {
+            details = "Failed to load one-voice test instrument JSON";
+            restoreAppState(snapshot);
+            return false;
+        }
+
+        if (!expectEqual(midiInstruments->getCategoryCount(), 1, "getCategoryCount", details) ||
+            !expectEqual(midiInstruments->getCategoryVoiceCount(0), 1, "getCategoryVoiceCount(0)", details))
+        {
+            restoreAppState(snapshot);
+            return false;
+        }
+
+        // Index 0 within a category is the category title, not a voice row — must not crash.
+        if (!expectEqualStr(midiInstruments->getVoice(0, 0), "No Voice",
+                            "getVoice(0,0) category slot", details) ||
+            !expectEqualStr(midiInstruments->getVoice(0, 1), "VoiceOne",
+                            "getVoice(0,1) first voice", details) ||
+            !expectEqualStr(midiInstruments->getVoice(0, 2), "No Voice",
+                            "getVoice(0,2) out of range", details) ||
+            !expectEqualStr(midiInstruments->getVoice(50, 1), "No Voice",
+                            "getVoice bad category", details))
+        {
+            restoreAppState(snapshot);
+            return false;
+        }
+
+        if (!expectEqual(midiInstruments->getMSB(0, 0), 0, "getMSB(0,0)", details) ||
+            !expectEqual(midiInstruments->getMSB(0, 1), 121, "getMSB(0,1)", details) ||
+            !expectEqual(midiInstruments->getLSB(0, 0), 0, "getLSB(0,0)", details) ||
+            !expectEqual(midiInstruments->getLSB(0, 1), 8, "getLSB(0,1)", details))
+        {
+            restoreAppState(snapshot);
+            return false;
+        }
+
+        restoreAppState(snapshot);
+        return true;
+    }
+
     bool runCheck0to127(std::string& details)
     {
         return expectEqual(check0to127(-5), 0, "check0to127(-5)", details)
@@ -1538,6 +1634,11 @@ int main()
     {
         std::string details;
         results.push_back({ "check1to16 clamps values", runCheck1to16(details), details });
+    }
+
+    {
+        std::string details;
+        results.push_back({ "MidiInstruments voice lookup bounds (no crash on category slot index)", runMidiInstrumentsVoiceLookupBounds(details), details });
     }
 
     {
