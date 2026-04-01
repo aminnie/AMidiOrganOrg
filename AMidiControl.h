@@ -4911,7 +4911,7 @@ struct KeyboardPanelPage final : public Component,
                 toUpperKBD->setColour(TextButton::buttonColourId, Colours::white);
                 toUpperKBD->setColour(TextButton::buttonOnColourId, Colours::black.brighter());
                 toUpperKBD->setTooltip("Switch to the Upper tab.");
-                toUpperKBD->setBounds(mgroup + xaccess, ygroup + mgroup * 2, 80, 50);
+                toUpperKBD->setBounds(mgroup + xaccess, ygroup + mgroup * 2 + 5, 80, 50);
                 toUpperKBD->setToggleState(true, dontSendNotification);
                 toUpperKBD->onClick = [=, &tabs]()
                     {
@@ -4929,7 +4929,7 @@ struct KeyboardPanelPage final : public Component,
                 toLowerKBD->setColour(TextButton::buttonColourId, Colours::white);
                 toLowerKBD->setColour(TextButton::buttonOnColourId, Colours::black.brighter());
                 toLowerKBD->setTooltip("Switch to the Lower tab.");
-                toLowerKBD->setBounds(mgroup + xaccess, ygroup + mgroup * 2, 80, 50);
+                toLowerKBD->setBounds(mgroup + xaccess, ygroup + mgroup * 2 + 5, 80, 50);
                 toLowerKBD->setToggleState(true, dontSendNotification);
                 toLowerKBD->onClick = [=, &tabs]()
                     {
@@ -4947,7 +4947,7 @@ struct KeyboardPanelPage final : public Component,
                 toBassKBD->setColour(TextButton::buttonColourId, Colours::white);
                 toBassKBD->setColour(TextButton::buttonOnColourId, Colours::black.brighter());
                 toBassKBD->setTooltip("Switch to the Bass&Drums tab.");
-                toBassKBD->setBounds(mgroup + xaccess, ygroup + mgroup * 2, 80, 50);
+                toBassKBD->setBounds(mgroup + xaccess, ygroup + mgroup * 2 + 5, 80, 50);
                 toBassKBD->setToggleState(true, dontSendNotification);
                 toBassKBD->onClick = [=, &tabs]()
                     {
@@ -6438,7 +6438,7 @@ public:
         toConfig.setColour(TextButton::textColourOnId, Colours::white);
         toConfig.setColour(TextButton::buttonColourId, Colours::white);
         toConfig.setColour(TextButton::buttonOnColourId, Colours::black.brighter());
-        toConfig.setBounds(mgroup + 810, mgroup + 200, 90, 50);
+        toConfig.setBounds(mgroup + 810, mgroup + 210, 90, 50);
         toConfig.setToggleState(true, dontSendNotification);
         toConfig.onClick = [=, &tabs]()
             {
@@ -6474,7 +6474,7 @@ public:
             toUpperKBD.setColour(TextButton::textColourOnId, Colours::white);
             toUpperKBD.setColour(TextButton::buttonColourId, Colours::white);
             toUpperKBD.setColour(TextButton::buttonOnColourId, Colours::black.brighter());
-            toUpperKBD.setBounds(quickAccessMargin + xaccess, quickAccessMargin + 200, 80, 50);
+            toUpperKBD.setBounds(quickAccessMargin + xaccess, quickAccessMargin + 205, 80, 50);
             toUpperKBD.setToggleState(true, dontSendNotification);
             toUpperKBD.onClick = [=, &tabs]()
                 {
@@ -6489,7 +6489,7 @@ public:
             toLowerKBD.setColour(TextButton::textColourOnId, Colours::white);
             toLowerKBD.setColour(TextButton::buttonColourId, Colours::white);
             toLowerKBD.setColour(TextButton::buttonOnColourId, Colours::black.brighter());
-            toLowerKBD.setBounds(quickAccessMargin + xaccess, quickAccessMargin + 200, 80, 50);
+            toLowerKBD.setBounds(quickAccessMargin + xaccess, quickAccessMargin + 205, 80, 50);
             toLowerKBD.setToggleState(true, dontSendNotification);
             toLowerKBD.onClick = [=, &tabs]()
                 {
@@ -6504,7 +6504,7 @@ public:
             toBassKBD.setColour(TextButton::textColourOnId, Colours::white);
             toBassKBD.setColour(TextButton::buttonColourId, Colours::white);
             toBassKBD.setColour(TextButton::buttonOnColourId, Colours::black.brighter());
-            toBassKBD.setBounds(quickAccessMargin + xaccess, quickAccessMargin + 200, 80, 50);
+            toBassKBD.setBounds(quickAccessMargin + xaccess, quickAccessMargin + 205, 80, 50);
             toBassKBD.setToggleState(true, dontSendNotification);
             toBassKBD.onClick = [=, &tabs]()
                 {
@@ -6623,7 +6623,7 @@ public:
         loadPanelButton.setBounds(280, margin + 205, 90, 50);
         newConfigButton.setBounds(380, margin + 205, 90, 50);
         newPanelButton.setBounds(480, margin + 205, 90, 50);
-        toConfig.setBounds(820, margin + 200, 90, 50);
+        toConfig.setBounds(820, margin + 205, 90, 50);
 
         // Place Exit in the top-right header area for faster access.
         exitButton.setBounds(getWidth() - 90, 4, 80, 24);
@@ -8895,7 +8895,7 @@ public:
             toUpperKBD.setColour(TextButton::textColourOnId, Colours::white);
             toUpperKBD.setColour(TextButton::buttonColourId, Colours::white);
             toUpperKBD.setColour(TextButton::buttonOnColourId, Colours::black.brighter());
-            toUpperKBD.setBounds(mgroup + xaccess, ygroup + mgroup * 2, 80, 50);
+            toUpperKBD.setBounds(mgroup + xaccess, ygroup + mgroup * 2 + 5, 80, 50);
             toUpperKBD.setToggleState(true, dontSendNotification);
             toUpperKBD.onClick = [=, &tabs]()
                 {
@@ -8910,7 +8910,7 @@ public:
             toLowerKBD.setColour(TextButton::textColourOnId, Colours::white);
             toLowerKBD.setColour(TextButton::buttonColourId, Colours::white);
             toLowerKBD.setColour(TextButton::buttonOnColourId, Colours::black.brighter());
-            toLowerKBD.setBounds(mgroup + xaccess, ygroup + mgroup * 2, 80, 50);
+            toLowerKBD.setBounds(mgroup + xaccess, ygroup + mgroup * 2 + 5, 80, 50);
             toLowerKBD.setToggleState(true, dontSendNotification);
             toLowerKBD.onClick = [=, &tabs]()
                 {
@@ -8925,7 +8925,7 @@ public:
             toBassKBD.setColour(TextButton::textColourOnId, Colours::white);
             toBassKBD.setColour(TextButton::buttonColourId, Colours::white);
             toBassKBD.setColour(TextButton::buttonOnColourId, Colours::black.brighter());
-            toBassKBD.setBounds(mgroup + xaccess, ygroup + mgroup * 2, 80, 50);
+            toBassKBD.setBounds(mgroup + xaccess, ygroup + mgroup * 2 + 5, 80, 50);
             toBassKBD.setToggleState(true, dontSendNotification);
             toBassKBD.onClick = [=, &tabs]()
                 {
