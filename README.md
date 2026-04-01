@@ -35,6 +35,7 @@ Each panel uses the active configuration and panel data to determine which voice
 ### Sounds Tab
 
 ![Sounds Tab](docs/images/tab-sounds.png)
+![Sounds Tab](docs/images/tab-sounds1.png)
 
 ### Effects Tab
 
