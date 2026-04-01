@@ -8947,7 +8947,7 @@ public:
 
         //https://docs.juce.com/master/tutorial_radio_buttons_checkboxes.html
         addAndMakeVisible(togglePassthrough);
-        togglePassthrough.setBounds(1295, 32, 50, 24);
+        togglePassthrough.setBounds(1290, 32, 50, 24);
         togglePassthrough.onClick = [=]() {
             passthroughstate = togglePassthrough.getToggleState();
 
@@ -8962,7 +8962,7 @@ public:
         lblStartupMonitor.setText("Startup Monitor", {});
 
         addAndMakeVisible(toggleStartupMonitor);
-        toggleStartupMonitor.setBounds(1295, 54, 50, 24);
+        toggleStartupMonitor.setBounds(1290, 54, 50, 24);
         toggleStartupMonitor.onClick = [this]()
             {
                 appState.startupMonitorEnabled = toggleStartupMonitor.getToggleState();
@@ -8971,7 +8971,7 @@ public:
 
         addAndMakeVisible(lblPresetMidiPc);
         lblPresetMidiPc.setBounds(1150, 78, 135, 24);
-        lblPresetMidiPc.setText("Preset MIDI PC", {});
+        lblPresetMidiPc.setText("Preset PC & Val", {});
 
         addAndMakeVisible(txtPresetMidiPcInputChannel);
         txtPresetMidiPcInputChannel.setBounds(1290, 78, 24, 24);
