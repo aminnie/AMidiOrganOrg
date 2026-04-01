@@ -7903,7 +7903,7 @@ public:
 
         addAndMakeVisible(filterMidiClockToggle);
         filterMidiClockToggle.setToggleState(true, juce::dontSendNotification);
-        filterMidiClockToggle.setTooltip("Hide MIDI Clock (F8) rows in the monitor display.");
+        filterMidiClockToggle.setTooltip("Hide MIDI Clock (F8) and Active Sensing (FE) rows in the monitor display.");
         filterMidiClockToggle.onClick = [this]()
             {
                 setFilterMidiClockEnabled(filterMidiClockToggle.getToggleState());
@@ -8091,7 +8091,11 @@ private:
             return true;
 
         const auto* data = message.getRawData();
-        return data != nullptr && ((unsigned char) data[0] == (unsigned char) 0xF8);
+        if (data == nullptr)
+            return false;
+
+        const auto status = (unsigned char) data[0];
+        return status == (unsigned char) 0xF8 || status == (unsigned char) 0xFE;
     }
 
     void ensureMonitorHookRegistered()
@@ -8180,7 +8184,7 @@ private:
     juce::GroupComponent keyboardGroup{ "keyboardGroup", "Virtual Keyboard" };
     juce::TextButton enableButton{ "Enable" };
     juce::TextButton clearButton{ "Clear" };
-    juce::ToggleButton filterMidiClockToggle{ "Filter MIDI Clock" };
+    juce::ToggleButton filterMidiClockToggle{ "Filter Clock & Sensing" };
     juce::TextEditor monitorTextArea;
     juce::Label startOctaveLabel{ "startOctaveLabel", "Octave" };
     juce::ComboBox startOctaveCombo;
