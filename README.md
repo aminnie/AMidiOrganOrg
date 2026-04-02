@@ -94,6 +94,8 @@ On startup, the app also attempts to auto-restore the last used panel and config
   - on successful save, the new panel is loaded immediately (same flow as `Load Panel`)
 - On launch, restores last used panel/config when available (`Documents/AMidiOrgan/configs/last_session.json`).
 - Checks config and panel pairing when loading, and can warn if the selected files do not belong together.
+- Includes a quick `Exit` button in the Start action row (next to keyboard navigation).
+- Start status lines render as `Panel: <file>` and `Config: <file>` with tight one-space formatting.
 
 #### Upper / Lower / Bass&Drums
 
@@ -157,7 +159,7 @@ On startup, the app also attempts to auto-restore the last used panel and config
 - When `Startup Monitor` is **ON**, outgoing MIDI monitoring is enabled automatically during startup so initialization traffic can be reviewed later in the `Monitor` tab.
 - Startup auto-enable does **not** switch the visible tab; the app continues normal startup and you open `Monitor` manually when needed.
 - `UI Profile` selects a fixed-size UI layout profile (currently `1480x320` and `2560x720`).
-- Changing `UI Profile` applies live to Start/Upper/Lower/Bass/Config and also resizes the app window to the selected profile dimensions.
+- Changing `UI Profile` applies live to Start/Upper/Lower/Bass/Config/Sounds/Effects/Hotkeys/Monitor and also resizes the app window to the selected profile dimensions.
 - Profile catalog file is `Documents/AMidiOrgan/configs/ui_profiles.json`.
 - `Export UI Map` writes a ready-to-edit snapshot file:
   - `Documents/AMidiOrgan/configs/ui_profile_overrides_<profileId>.json`
@@ -206,6 +208,7 @@ On startup, the app also attempts to auto-restore the last used panel and config
 
 - Exits the application.
 - If panel-related changes are pending, the app may ask whether you want to save before quitting.
+- Start-tab `Exit` button triggers the same exit flow as the `Exit` tab.
 
 ### 3. Voice Buttons
 

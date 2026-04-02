@@ -45,6 +45,8 @@ Primary implementation files:
   - Load panel (`.pnl`) and config (`.cfg`)
   - Persist sticky MIDI ports
   - Restore last used panel/config on startup (`last_session.json`) when files exist
+  - Quick `Exit` button in the Start action row (routes through the same flow as Exit tab)
+  - Consolidated status lines rendered as `Panel: <file>` and `Config: <file>`
 - **Upper / Lower / Bass&Drums**
   - Main performance tabs with voice button groups
   - Per-group volume and mute controls
@@ -71,7 +73,7 @@ Primary implementation files:
   - Module alias fields
   - Global startup-monitor toggle persisted in config
   - Global UI profile selector persisted in config (`uiProfileId`)
-  - UI profile changes apply live to keyboard-tab layouts and resize the top-level app window
+  - UI profile changes apply live across Start/Upper/Lower/Bass/Config/Sounds/Effects/Hotkeys/Monitor and resize the top-level app window
   - Profile catalog source: `Documents/AMidiOrgan/configs/ui_profiles.json`
   - Utility export action writes current keyboard control bounds to `ui_profile_overrides_<profileId>.json`
   - Global `Preset MIDI PC` trigger (`input channel` + `PC value`) persisted in config

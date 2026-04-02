@@ -3345,7 +3345,8 @@ struct KeyboardPanelPage final : public Component,
         //statusLabel->setColour(juce::Label::backgroundColourId, juce::Colours::black);
         statusLabel->setColour(juce::Label::textColourId, juce::Colours::grey);
         statusLabel->setJustificationType(juce::Justification::left);
-        statusLabel->setBounds(mgroup + 1260, 185, 200, 20);
+        statusLabel->setBounds(mgroup + 1260, 210, 200, 20);
+        statusLabel->setVisible(false);
 
         int g1width, g2width, g3width, g4width;
         int g1widthfull;
@@ -5605,7 +5606,7 @@ struct KeyboardPanelPage final : public Component,
         lblpanelfile = addToList(new Label("Panel File", appState.panelfname));
         lblpanelfile->setComponentID("kbd." + profileTabKey + ".panelFile");
         lblpanelfile->setColour(juce::Label::textColourId, juce::Colours::grey);
-        lblpanelfile->setJustificationType(juce::Justification::left);
+        lblpanelfile->setJustificationType(juce::Justification::topLeft);
         lblpanelfile->setMinimumHorizontalScale(0.8f);
         lblpanelfile->setBounds(mgroup + 1260, 210, 200, 30);
         updatePanelFileStatusLabel();
@@ -6994,12 +6995,10 @@ public:
         exitButton.setColour(TextButton::textColourOnId, Colours::white);
         exitButton.setColour(TextButton::buttonColourId, Colours::black.darker());
         exitButton.setColour(TextButton::buttonOnColourId, Colours::black.brighter());
-        exitButton.onClick = [=]() {
-
-            ApplicationQuit();
+        exitButton.onClick = [=, &tabs]()
+            {
+                tabs.setCurrentTabIndex(PTExit, true);
             };
-        // Header-level Exit button is provided globally in AMidiControl.
-        exitButton.setVisible(false);
 
         int mgroup = 10;
         addAndMakeVisible(toModule);
@@ -7079,6 +7078,7 @@ public:
         addAndMakeVisible(panelPrefixLabel);
         panelPrefixLabel.setColour(juce::Label::textColourId, juce::Colours::grey);
         panelPrefixLabel.setJustificationType(juce::Justification::left);
+        panelPrefixLabel.setVisible(false);
 
         addAndMakeVisible(panelfileLabel);
         panelfileLabel.setColour(juce::Label::textColourId, juce::Colours::grey);
@@ -7087,6 +7087,7 @@ public:
         addAndMakeVisible(configPrefixLabel);
         configPrefixLabel.setColour(juce::Label::textColourId, juce::Colours::grey);
         configPrefixLabel.setJustificationType(juce::Justification::left);
+        configPrefixLabel.setVisible(false);
 
         addAndMakeVisible(configfileLabel);
         configfileLabel.setColour(juce::Label::textColourId, juce::Colours::grey);
@@ -7153,6 +7154,7 @@ public:
         buildInfoLabel.setJustificationType(juce::Justification::right);
         buildInfoLabel.setText("Build " + juce::String(AMIDIORGAN_PROJECT_VERSION)
             + " (" + juce::String(AMIDIORGAN_BUILD_NUMBER) + ")", juce::dontSendNotification);
+        buildInfoLabel.setVisible(false);
 
         // Preset Device Modules includig index so we start with the same one as last saved
         instrumentmodules->loadModules();
@@ -7196,8 +7198,8 @@ public:
 
         // Dsplay current Panel File and Config Files in use. 
         // Flag mismatch between panel file and incorrect config file in red
-        configfileLabel.setText(appState.configfname, {});
-        panelfileLabel.setText(appState.panelfname, {});
+        configfileLabel.setText("Config: " + appState.configfname, {});
+        panelfileLabel.setText("Panel: " + appState.panelfname, {});
 
         appState.configreload = (appState.configfname.compare(appState.pnlconfigfname) != 0);
 
@@ -7219,6 +7221,7 @@ public:
         toUpperKBD.setComponentID("start.nav.upper");
         toLowerKBD.setComponentID("start.nav.lower");
         toBassKBD.setComponentID("start.nav.bass");
+        exitButton.setComponentID("start.exit");
         panelPrefixLabel.setComponentID("start.panel.prefix");
         panelfileLabel.setComponentID("start.panel.value");
         configPrefixLabel.setComponentID("start.config.prefix");
@@ -7238,6 +7241,7 @@ public:
         registerUiProfileComponent(toUpperKBD);
         registerUiProfileComponent(toLowerKBD);
         registerUiProfileComponent(toBassKBD);
+        registerUiProfileComponent(exitButton);
         registerUiProfileComponent(panelPrefixLabel);
         registerUiProfileComponent(panelfileLabel);
         registerUiProfileComponent(configPrefixLabel);
@@ -7305,17 +7309,19 @@ public:
         toLowerKBD.toFront(false);
         toBassKBD.toFront(false);
 
-        // Place Exit in the top-right header area for faster access.
-        exitButton.setBounds(getWidth() - 90, 4, 80, 24);
+        // Start-tab Exit: place immediately to the right of Bass (default profile).
+        exitButton.setBounds(1230, margin + 205, 80, 50);
+        exitButton.setEnabled(true);
+        exitButton.setVisible(true);
+        exitButton.toFront(false);
 
-        panelPrefixLabel.setBounds(580, margin + 210, 55, 20);
-        panelfileLabel.setBounds(635, margin + 210, 290, 20);
+        panelPrefixLabel.setBounds(580, margin + 210, 45, 20);
+        panelfileLabel.setBounds(580, margin + 210, 345, 20);
 
-        configPrefixLabel.setBounds(580, margin + 230, 55, 20);
-        configfileLabel.setBounds(635, margin + 230, 290, 20);
+        configPrefixLabel.setBounds(580, margin + 230, 45, 20);
+        configfileLabel.setBounds(580, margin + 230, 345, 20);
 
         statusLabel.setBounds(1170, margin + 200, 300, 20);
-        buildInfoLabel.setBounds(getWidth() - 290, getHeight() - 24, 280, 20);
 
         updateBannerPlacementFromMidiLists();
 
@@ -7339,8 +7345,8 @@ public:
     {
         // Display current Panel and Config files in use.
         // Flag mismatch between panel file and incorrect config file in red.
-        configfileLabel.setText(appState.configfname, {});
-        panelfileLabel.setText(appState.panelfname, {});
+        configfileLabel.setText("Config: " + appState.configfname, {});
+        panelfileLabel.setText("Panel: " + appState.panelfname, {});
 
         appState.configreload = (appState.configfname.compare(appState.pnlconfigfname) != 0);
         if (appState.configreload == true)
@@ -8576,7 +8582,7 @@ private:
 
     Label panelPrefixLabel{ "Panel Prefix", "Panel:" };
     Label panelfileLabel{ "Panel File" ,  "Panel File" };
-    Label configPrefixLabel{ "Config Prefix", "Config:" };
+    Label configPrefixLabel{ "Config Prefix", "Config" };
     Label configfileLabel { "Config File",  "Config File" };
     Label statusLabel{ "" };
     Label buildInfoLabel{ "BuildInfo", "" };
@@ -9735,15 +9741,16 @@ public:
         addAndMakeVisible(lblconfigfileprefix);
         lblconfigfileprefix.setColour(juce::Label::textColourId, juce::Colours::grey);
         lblconfigfileprefix.setJustificationType(juce::Justification::left);
-        lblconfigfileprefix.setText("Config:", {});
-        lblconfigfileprefix.setBounds(kbPanelMargin + 1260, 205, 60, 30);
+        lblconfigfileprefix.setText("Config", {});
+        lblconfigfileprefix.setBounds(kbPanelMargin + 1260, 210, 50, 30);
+        lblconfigfileprefix.setVisible(false);
 
         addAndMakeVisible(lblconfigfile);
         lblconfigfile.setColour(juce::Label::textColourId, juce::Colours::grey);
         lblconfigfile.setJustificationType(juce::Justification::left);
         lblconfigfile.setMinimumHorizontalScale(0.8f);
         // Align with panel filename label on Upper/Lower/Bass (mgroup + 1240, 205, 200x30).
-        lblconfigfile.setBounds(kbPanelMargin + 1320, 205, 140, 30);
+        lblconfigfile.setBounds(kbPanelMargin + 1260, 205, 200, 30);
         updateConfigFileStatusLabel();
 
         // Quick Access Keyboard Buttons
@@ -9870,16 +9877,16 @@ public:
         lblPresetMidiPc.setText("Preset PC Chan/Val", {});
 
         addAndMakeVisible(txtPresetMidiPcInputChannel);
-        txtPresetMidiPcInputChannel.setBounds(1290, 78, 24, 24);
+        txtPresetMidiPcInputChannel.setBounds(1290, 78, 40, 24);
         txtPresetMidiPcInputChannel.setText(std::to_string(appState.presetMidiPcInputChannel));
         wireDefaultEffectsNumberField(txtPresetMidiPcInputChannel, &appState.presetMidiPcInputChannel, 1, 16);
 
         addAndMakeVisible(lblPresetMidiPcSeparator);
-        lblPresetMidiPcSeparator.setBounds(1318, 78, 10, 24);
+        lblPresetMidiPcSeparator.setBounds(1334, 78, 10, 24);
         lblPresetMidiPcSeparator.setText("/", {});
 
         addAndMakeVisible(txtPresetMidiPcValue);
-        txtPresetMidiPcValue.setBounds(1330, 78, 40, 24);
+        txtPresetMidiPcValue.setBounds(1346, 78, 40, 24);
         txtPresetMidiPcValue.setText(std::to_string(appState.presetMidiPcValue));
         wireDefaultEffectsNumberField(txtPresetMidiPcValue, &appState.presetMidiPcValue, 0, 127);
 
@@ -9902,14 +9909,9 @@ public:
         exitButton.setColour(TextButton::textColourOnId, Colours::white);
         exitButton.setColour(TextButton::buttonColourId, Colours::black.darker());
         exitButton.setColour(TextButton::buttonOnColourId, Colours::black.brighter());
-        // Keep off the Save As slot (Upper tab uses mgroup+1340,235 for Save As); global Exit is used instead.
         exitButton.setBounds(0, 0, 1, 1);
-        // Header-level Exit button is provided globally in AMidiControl.
         exitButton.setVisible(false);
-
-        exitButton.onClick = [=]() {
-            ApplicationQuit();
-            };
+        exitButton.onClick = [=]() { ApplicationQuit(); };
 
         // Config Status Bar
         addAndMakeVisible(statusLabel);
@@ -10019,6 +10021,16 @@ public:
                         gNotifyStatusLinesChanged();
                 });
         };
+
+        juce::TextEditor* const configEditors[] = {
+            &txtModuleAlias, &txtGroupName, &txtMidiIn, &txtMidiOut, &txtOctave, &txtSplit,
+            &txtDefaultEffectsVol, &txtDefaultEffectsBri, &txtDefaultEffectsExp, &txtDefaultEffectsRev, &txtDefaultEffectsCho,
+            &txtDefaultEffectsMod, &txtDefaultEffectsTim, &txtDefaultEffectsAtk, &txtDefaultEffectsRel, &txtDefaultEffectsPan,
+            &txtPresetMidiPcInputChannel, &txtPresetMidiPcValue
+        };
+        for (auto* editor : configEditors)
+            if (editor != nullptr)
+                styleConfigTextEditor(*editor);
 
         // Profile-targeted controls (Config tab).
         lblconfigfileprefix.setComponentID("cfg.file.prefix");
@@ -10297,6 +10309,8 @@ private:
             uiProfileBaseBounds.emplace(comp, comp->getBounds());
             if (auto* l = dynamic_cast<juce::Label*>(comp))
                 uiProfileBaseFonts.emplace(comp, l->getFont());
+            else if (auto* te = dynamic_cast<juce::TextEditor*>(comp))
+                uiProfileBaseFonts.emplace(comp, te->getFont());
         }
         uiProfileBaseCaptured = true;
     }
@@ -10315,6 +10329,8 @@ private:
             scale = profile.comboFontScale;
         else if (dynamic_cast<juce::GroupComponent*>(comp) != nullptr)
             scale = profile.groupTitleFontScale;
+        else if (dynamic_cast<juce::TextEditor*>(comp) != nullptr)
+            scale = profile.labelFontScale;
         else
             return;
 
@@ -10330,8 +10346,27 @@ private:
             return;
         }
 
+        if (auto* te = dynamic_cast<juce::TextEditor*>(comp))
+        {
+            if (fit == uiProfileBaseFonts.end())
+                return;
+            const auto scaled = fit->second.withHeight(fit->second.getHeight() * juce::jlimit(0.5f, 4.0f, scale));
+            te->setFont(scaled);
+            te->applyFontToAllText(scaled);
+            te->setJustification(juce::Justification::centredLeft);
+            return;
+        }
+
         comp->getProperties().set(kUiProfileFontScaleProperty, juce::jlimit(0.5f, 4.0f, scale));
         comp->setLookAndFeel(&uiProfileLookAndFeel);
+    }
+
+    static void styleConfigTextEditor(juce::TextEditor& editor)
+    {
+        editor.setMultiLine(false, false);
+        editor.setReturnKeyStartsNewLine(false);
+        editor.setJustification(juce::Justification::centredLeft);
+        editor.setIndents(6, 0);
     }
 
     void clearProfileLookAndFeelBindings()
@@ -10345,7 +10380,7 @@ private:
 
     void updateConfigFileStatusLabel()
     {
-        lblconfigfile.setText(appState.configfname, juce::dontSendNotification);
+        lblconfigfile.setText("Config: " + appState.configfname, juce::dontSendNotification);
         lblconfigfile.setTooltip(appState.configfname);
     }
 

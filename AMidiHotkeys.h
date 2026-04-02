@@ -490,9 +490,10 @@ public:
         applyScale(mainGroup, currentProfile.groupTitleFontScale);
         applyScale(saveButton, currentProfile.buttonFontScale);
         applyScale(cancelButton, currentProfile.buttonFontScale);
+        const float hotkeyLabelScale = (currentProfile.id == "2560x720") ? 1.12f : currentProfile.labelFontScale;
         for (size_t i = 0; i < labels.size(); ++i)
             if (labels[i] != nullptr)
-                applyScale(*labels[i], currentProfile.labelFontScale);
+                applyScale(*labels[i], hotkeyLabelScale);
         for (size_t i = 0; i < combos.size(); ++i)
             if (combos[i] != nullptr)
                 applyScale(*combos[i], currentProfile.comboFontScale);
