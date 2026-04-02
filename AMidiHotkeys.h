@@ -10,6 +10,85 @@
 
 #include <vector>
 
+inline constexpr const char* kHotkeysUiProfileFontScaleProperty = "uiProfileFontScale";
+
+class HotkeysProfileLookAndFeel final : public juce::LookAndFeel_V4
+{
+public:
+    juce::Font getTextButtonFont(juce::TextButton& button, int buttonHeight) override
+    {
+        auto f = juce::LookAndFeel_V4::getTextButtonFont(button, buttonHeight);
+        return f.withHeight(f.getHeight() * getComponentScale(button));
+    }
+
+    juce::Font getComboBoxFont(juce::ComboBox& box) override
+    {
+        auto f = juce::LookAndFeel_V4::getComboBoxFont(box);
+        return f.withHeight(f.getHeight() * getComponentScale(box));
+    }
+
+    juce::Font getLabelFont(juce::Label& label) override
+    {
+        auto f = juce::LookAndFeel_V4::getLabelFont(label);
+        return f.withHeight(f.getHeight() * getComponentScale(label));
+    }
+
+    void drawGroupComponentOutline(juce::Graphics& g, int width, int height, const juce::String& text,
+                                   const juce::Justification& position, juce::GroupComponent& group) override
+    {
+        const float textH = juce::jlimit(10.0f, 72.0f, 15.0f * getComponentScale(group));
+        const float indent = 3.0f;
+        const float textEdgeGap = 4.0f;
+        auto cs = 5.0f;
+
+        juce::Font f(textH);
+        juce::Path p;
+        auto x = indent;
+        auto y = f.getAscent() - 3.0f;
+        auto w = juce::jmax(0.0f, (float)width - x * 2.0f);
+        auto h = juce::jmax(0.0f, (float)height - y - indent);
+        cs = juce::jmin(cs, w * 0.5f, h * 0.5f);
+        auto cs2 = 2.0f * cs;
+        auto textW = text.isEmpty() ? 0.0f
+                                    : juce::jlimit(0.0f,
+                                                   juce::jmax(0.0f, w - cs2 - textEdgeGap * 2),
+                                                   (float)juce::GlyphArrangement::getStringWidthInt(f, text) + textEdgeGap * 2.0f);
+        auto textX = cs + textEdgeGap;
+        if (position.testFlags(juce::Justification::horizontallyCentred))
+            textX = cs + (w - cs2 - textW) * 0.5f;
+        else if (position.testFlags(juce::Justification::right))
+            textX = w - cs - textW - textEdgeGap;
+
+        p.startNewSubPath(x + textX + textW, y);
+        p.lineTo(x + w - cs, y);
+        p.addArc(x + w - cs2, y, cs2, cs2, 0, juce::MathConstants<float>::halfPi);
+        p.lineTo(x + w, y + h - cs);
+        p.addArc(x + w - cs2, y + h - cs2, cs2, cs2, juce::MathConstants<float>::halfPi, juce::MathConstants<float>::pi);
+        p.lineTo(x + cs, y + h);
+        p.addArc(x, y + h - cs2, cs2, cs2, juce::MathConstants<float>::pi, juce::MathConstants<float>::pi * 1.5f);
+        p.lineTo(x, y + cs);
+        p.addArc(x, y, cs2, cs2, juce::MathConstants<float>::pi * 1.5f, juce::MathConstants<float>::twoPi);
+        p.lineTo(x + textX, y);
+
+        const auto alpha = group.isEnabled() ? 1.0f : 0.5f;
+        g.setColour(group.findColour(juce::GroupComponent::outlineColourId).withMultipliedAlpha(alpha));
+        g.strokePath(p, juce::PathStrokeType(2.0f));
+        g.setColour(group.findColour(juce::GroupComponent::textColourId).withMultipliedAlpha(alpha));
+        g.setFont(f);
+        g.drawText(text, juce::roundToInt(x + textX), 0, juce::roundToInt(textW), juce::roundToInt(textH),
+                   juce::Justification::centred, true);
+    }
+
+private:
+    static float getComponentScale(const juce::Component& c)
+    {
+        const auto v = c.getProperties().getWithDefault(kHotkeysUiProfileFontScaleProperty, 1.0);
+        if (!(v.isInt() || v.isInt64() || v.isDouble()))
+            return 1.0f;
+        return juce::jlimit(0.5f, 4.0f, static_cast<float>((double) v));
+    }
+};
+
 //==============================================================================
 inline juce::File getHotkeysFile()
 {
@@ -285,7 +364,6 @@ namespace hotkeyUiDetail
     inline void styleLabelLikeConfig(juce::Label& lab)
     {
         lab.setColour(juce::Label::textColourId, juce::Colours::white);
-        lab.setFont(juce::Font(juce::FontOptions(15.0f, juce::Font::plain)));
     }
 } // namespace hotkeyUiDetail
 
@@ -306,12 +384,14 @@ public:
         : commandManager(cmIn)
         , keyTarget(ktIn)
     {
+        setLookAndFeel(&uiProfileLookAndFeel);
         working = keyTarget.getHotkeyBindings();
         snapshot = working;
 
         const juce::Colour tabBg = findColour(juce::ResizableWindow::backgroundColourId);
 
         mainGroup.setColour(juce::GroupComponent::outlineColourId, juce::Colours::yellow.darker(0.45f));
+        mainGroup.setComponentID("hk.group");
         addAndMakeVisible(mainGroup);
 
         viewport.setScrollBarsShown(true, false);
@@ -329,6 +409,7 @@ public:
             auto* lab = new juce::Label({}, hotkeyUiDetail::hotkeyRowLabels[i]);
             lab->setJustificationType(juce::Justification::centredLeft);
             hotkeyUiDetail::styleLabelLikeConfig(*lab);
+            lab->setComponentID("hk.label." + juce::String(i));
             lab->setBounds(0, 0, labelW, rowH - 2);
             content.addAndMakeVisible(lab);
             labels.push_back(std::unique_ptr<juce::Label>(lab));
@@ -336,6 +417,7 @@ public:
             auto* cb = new juce::ComboBox();
             hotkeyUiDetail::populateHotkeyComboBox(*cb);
             hotkeyUiDetail::styleComboLikeConfig(*cb, tabBg);
+            cb->setComponentID("hk.combo." + juce::String(i));
             cb->setBounds(0, 0, comboW, rowH - 2);
             cb->onChange = [this] { updateSaveButtonState(); };
             content.addAndMakeVisible(cb);
@@ -348,11 +430,13 @@ public:
 
         addAndMakeVisible(saveButton);
         saveButton.setButtonText("Save");
+        saveButton.setComponentID("hk.save");
         hotkeyUiDetail::styleTextButtonLikeConfig(saveButton);
         saveButton.onClick = [this] { onSaveClicked(); };
 
         addAndMakeVisible(cancelButton);
         cancelButton.setButtonText("Cancel");
+        cancelButton.setComponentID("hk.cancel");
         hotkeyUiDetail::styleTextButtonLikeConfig(cancelButton);
         cancelButton.onClick = [this] { onCancelClicked(); };
 
@@ -361,6 +445,12 @@ public:
 
         // Match tab pages that use `findColour(ResizableWindow::backgroundColourId)` (see MenuTabs::addTab).
         setOpaque(true);
+        applyCurrentUiProfile();
+    }
+
+    ~HotkeysPage() override
+    {
+        setLookAndFeel(nullptr);
     }
 
     void paint(juce::Graphics& g) override
@@ -370,22 +460,22 @@ public:
 
     void resized() override
     {
-        auto r = getLocalBounds().reduced(8);
-        const int buttonH = 30;
-        const int buttonW = 80;
-        const int gapAboveButtons = 12;   // space between group bottom outline and Save/Cancel row
-        const int paddingBelowButtons = 8; // margin under the button row within the tab
+        auto r = getLocalBounds().reduced(scaleX(8));
+        const int buttonH = scaleY(30);
+        const int buttonW = scaleX(80);
+        const int gapAboveButtons = scaleY(12);   // space between group bottom outline and Save/Cancel row
+        const int paddingBelowButtons = scaleY(8); // margin under the button row within the tab
 
         auto bottom = r.removeFromBottom(buttonH + paddingBelowButtons);
         r.removeFromBottom(gapAboveButtons);
         cancelButton.setBounds(bottom.removeFromRight(buttonW).withHeight(buttonH));
-        bottom.removeFromRight(8);
+        bottom.removeFromRight(scaleX(8));
         saveButton.setBounds(bottom.removeFromRight(buttonW).withHeight(buttonH));
 
         mainGroup.setBounds(r);
 
-        const int titleInset = 28;
-        const int sidePad = 10;
+        const int titleInset = scaleY(28);
+        const int sidePad = scaleX(10);
         viewport.setBounds(sidePad,
                            titleInset,
                            juce::jmax(0, mainGroup.getWidth() - 2 * sidePad),
@@ -394,10 +484,26 @@ public:
         layoutHotkeyGrid();
     }
 
+    void applyCurrentUiProfile()
+    {
+        currentProfile = resolveUiProfile(getAppState().uiProfileId);
+        applyScale(mainGroup, currentProfile.groupTitleFontScale);
+        applyScale(saveButton, currentProfile.buttonFontScale);
+        applyScale(cancelButton, currentProfile.buttonFontScale);
+        for (size_t i = 0; i < labels.size(); ++i)
+            if (labels[i] != nullptr)
+                applyScale(*labels[i], currentProfile.labelFontScale);
+        for (size_t i = 0; i < combos.size(); ++i)
+            if (combos[i] != nullptr)
+                applyScale(*combos[i], currentProfile.comboFontScale);
+        resized();
+    }
+
     void visibilityChanged() override
     {
         if (isShowing())
         {
+            applyCurrentUiProfile();
             working = keyTarget.getHotkeyBindings();
             snapshot = working;
             syncCombosFromWorking();
@@ -422,6 +528,26 @@ private:
 
     HotkeyBindings working;
     HotkeyBindings snapshot;
+    UiProfileDefinition currentProfile = resolveUiProfile(getAppState().uiProfileId);
+    HotkeysProfileLookAndFeel uiProfileLookAndFeel;
+
+    int scaleX(int v) const
+    {
+        return juce::jmax(1, juce::roundToInt(v * juce::jlimit(0.5f, 4.0f, currentProfile.xScale)));
+    }
+
+    int scaleY(int v) const
+    {
+        return juce::jmax(1, juce::roundToInt(v * juce::jlimit(0.5f, 4.0f, currentProfile.yScale)));
+    }
+
+    void applyScale(juce::Component& c, float fallbackScale)
+    {
+        float scale = fallbackScale;
+        if (const auto specific = getUiFontScaleOverride(currentProfile, c.getComponentID()))
+            scale = *specific;
+        c.getProperties().set(kHotkeysUiProfileFontScaleProperty, juce::jlimit(0.5f, 4.0f, scale));
+    }
 
     /** True when combo selections match `snapshot` (ConfigPage-style: Save enabled only when dirty). */
     bool currentCombosMatchSnapshot() const
@@ -461,14 +587,14 @@ private:
     /** Column-major grid: fill top-to-bottom, then next column. Chooses the widest column count that still fits the viewport to reduce scrolling. */
     void layoutHotkeyGrid()
     {
-        const int titleInset = 28;
-        const int sidePad = 10;
-        const int rowH = 28;
-        const int labelW = hotkeyUiDetail::kHotkeyLabelWidth;
-        const int comboW = 100;
-        const int pad = 8;
-        const int colGap = 36; // horizontal gap between columns (combo of col N → label of col N+1)
-        const int labelToComboGap = 4; // tighter than outer pad — keeps label + dropdown visually paired
+        const int titleInset = scaleY(28);
+        const int sidePad = scaleX(10);
+        const int rowH = scaleY(28);
+        const int labelW = scaleX(hotkeyUiDetail::kHotkeyLabelWidth);
+        const int comboW = scaleX(100);
+        const int pad = scaleX(8);
+        const int colGap = scaleX(36); // horizontal gap between columns (combo of col N → label of col N+1)
+        const int labelToComboGap = scaleX(4); // tighter than outer pad — keeps label + dropdown visually paired
         const int minColW = pad + labelW + labelToComboGap + comboW + pad;
 
         const int vpW = juce::jmax(0, mainGroup.getWidth() - 2 * sidePad);

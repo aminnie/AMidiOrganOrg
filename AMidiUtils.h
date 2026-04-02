@@ -331,6 +331,12 @@ struct UiProfileDefinition final
     float groupTitleFontScale = 1.0f;
     /** Optional absolute rect overrides for keyboard tab controls (keyed by component id). */
     std::map<juce::String, juce::Rectangle<int>> keyboardRectOverrides;
+    /** Optional absolute rect overrides for Start tab controls (keyed by component id). */
+    std::map<juce::String, juce::Rectangle<int>> startRectOverrides;
+    /** Optional absolute rect overrides for Config tab controls (keyed by component id). */
+    std::map<juce::String, juce::Rectangle<int>> configRectOverrides;
+    /** Optional per-control font scale overrides (keyed by component id). */
+    std::map<juce::String, float> fontScaleOverrides;
 };
 
 inline juce::String getDefaultUiProfileId()
@@ -364,7 +370,10 @@ inline juce::String buildDefaultUiProfilesCatalogJson()
       "toggleFontScale": 1.0,
       "comboFontScale": 1.0,
       "groupTitleFontScale": 1.0,
-      "keyboardRectOverrides": {}
+      "keyboardRectOverrides": {},
+      "startRectOverrides": {},
+      "configRectOverrides": {},
+      "fontScaleOverrides": {}
     },
     {
       "id": "2560x720",
@@ -405,7 +414,10 @@ inline juce::String buildDefaultUiProfilesCatalogJson()
         "kbd.upper.saveAs": { "x": 2348, "y": 518, "w": 138, "h": 68 },
         "kbd.lower.saveAs": { "x": 2348, "y": 518, "w": 138, "h": 68 },
         "kbd.bass.saveAs": { "x": 2348, "y": 518, "w": 138, "h": 68 }
-      }
+      },
+      "startRectOverrides": {},
+      "configRectOverrides": {},
+      "fontScaleOverrides": {}
     }
   ]
 }
@@ -515,6 +527,34 @@ inline juce::Array<UiProfileDefinition> loadUiProfilesCatalog()
             outRect = { x, y, w, h };
             return true;
         };
+    auto readRectMap = [&readRect](const juce::var& v, std::map<juce::String, juce::Rectangle<int>>& out)
+        {
+            auto* obj = v.getDynamicObject();
+            if (obj == nullptr)
+                return;
+            const auto& props = obj->getProperties();
+            for (int i = 0; i < props.size(); ++i)
+            {
+                const juce::Identifier keyId = props.getName(i);
+                juce::Rectangle<int> r;
+                if (readRect(obj->getProperty(keyId), r))
+                    out[keyId.toString()] = r;
+            }
+        };
+    auto readFloatMap = [](const juce::var& v, std::map<juce::String, float>& out)
+        {
+            auto* obj = v.getDynamicObject();
+            if (obj == nullptr)
+                return;
+            const auto& props = obj->getProperties();
+            for (int i = 0; i < props.size(); ++i)
+            {
+                const juce::Identifier keyId = props.getName(i);
+                const auto vv = obj->getProperty(keyId);
+                if (vv.isInt() || vv.isInt64() || vv.isDouble())
+                    out[keyId.toString()] = juce::jlimit(0.5f, 4.0f, static_cast<float>((double) vv));
+            }
+        };
 
     for (const auto& item : *profiles)
     {
@@ -535,19 +575,10 @@ inline juce::Array<UiProfileDefinition> loadUiProfilesCatalog()
         p.comboFontScale = juce::jlimit(0.50f, 4.0f, readFloat(obj, "comboFontScale", 1.0f));
         p.groupTitleFontScale = juce::jlimit(0.50f, 4.0f, readFloat(obj, "groupTitleFontScale", 1.0f));
 
-        const juce::var overridesVar = obj->getProperty("keyboardRectOverrides");
-        if (auto* overridesObj = overridesVar.getDynamicObject())
-        {
-            const auto& props = overridesObj->getProperties();
-            for (int i = 0; i < props.size(); ++i)
-            {
-                const juce::Identifier keyId = props.getName(i);
-                const juce::String key = keyId.toString();
-                juce::Rectangle<int> r;
-                if (readRect(overridesObj->getProperty(keyId), r))
-                    p.keyboardRectOverrides[key] = r;
-            }
-        }
+        readRectMap(obj->getProperty("keyboardRectOverrides"), p.keyboardRectOverrides);
+        readRectMap(obj->getProperty("startRectOverrides"), p.startRectOverrides);
+        readRectMap(obj->getProperty("configRectOverrides"), p.configRectOverrides);
+        readFloatMap(obj->getProperty("fontScaleOverrides"), p.fontScaleOverrides);
         if (p.id == "2560x720" && p.keyboardRectOverrides.empty())
             p.keyboardRectOverrides = getBuiltIn2560KeyboardRectOverrides();
         result.add(std::move(p));
@@ -587,6 +618,30 @@ inline std::optional<juce::Rectangle<int>> getKeyboardRectOverride(const UiProfi
 {
     const auto it = profile.keyboardRectOverrides.find(componentId);
     if (it == profile.keyboardRectOverrides.end())
+        return std::nullopt;
+    return it->second;
+}
+
+inline std::optional<juce::Rectangle<int>> getStartRectOverride(const UiProfileDefinition& profile, const juce::String& componentId)
+{
+    const auto it = profile.startRectOverrides.find(componentId);
+    if (it == profile.startRectOverrides.end())
+        return std::nullopt;
+    return it->second;
+}
+
+inline std::optional<juce::Rectangle<int>> getConfigRectOverride(const UiProfileDefinition& profile, const juce::String& componentId)
+{
+    const auto it = profile.configRectOverrides.find(componentId);
+    if (it == profile.configRectOverrides.end())
+        return std::nullopt;
+    return it->second;
+}
+
+inline std::optional<float> getUiFontScaleOverride(const UiProfileDefinition& profile, const juce::String& componentId)
+{
+    const auto it = profile.fontScaleOverrides.find(componentId);
+    if (it == profile.fontScaleOverrides.end())
         return std::nullopt;
     return it->second;
 }
