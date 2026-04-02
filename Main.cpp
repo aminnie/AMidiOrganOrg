@@ -295,9 +295,11 @@ private:
            #if JUCE_ANDROID || JUCE_IOS
             setFullScreen (true);
            #else
+            const auto profile = resolveUiProfile(getAppState().uiProfileId);
             setResizable (false, false);
-            setResizeLimits (1000, 300, 1480, 320);
-            centreWithSize (getWidth(), getHeight());
+            setResizeLimits (1000, 300, profile.baseWidth, profile.baseHeight);
+            setSize(profile.baseWidth, profile.baseHeight);
+            centreWithSize (profile.baseWidth, profile.baseHeight);
             setDraggable(true);
            #endif
 

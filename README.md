@@ -156,6 +156,13 @@ On startup, the app also attempts to auto-restore the last used panel and config
 - `Startup Monitor` is a global config option saved in the `.cfg` file.
 - When `Startup Monitor` is **ON**, outgoing MIDI monitoring is enabled automatically during startup so initialization traffic can be reviewed later in the `Monitor` tab.
 - Startup auto-enable does **not** switch the visible tab; the app continues normal startup and you open `Monitor` manually when needed.
+- `UI Profile` selects a fixed-size UI layout profile (currently `1480x320` and `2560x720`).
+- Changing `UI Profile` applies live to Upper/Lower/Bass and also resizes the app window to the selected profile dimensions.
+- Profile catalog file is `Documents/AMidiOrgan/configs/ui_profiles.json`.
+- `Export UI Map` writes a ready-to-edit snapshot file:
+  - `Documents/AMidiOrgan/configs/ui_profile_overrides_<profileId>.json`
+  - includes `keyboardRectOverrides` entries with control ids (for example `kbd.upper.*`) and current bounds.
+- Override precedence: explicit `keyboardRectOverrides` in your `ui_profiles.json` win over built-in defaults shipped by the app.
 - `Preset MIDI PC` is a global config trigger for preset-next automation:
   - `Input Channel` (`1..16`, default `16`)
   - `PC Value` (`0..127`, default `0`)
@@ -509,8 +516,10 @@ The following asset filenames are referenced by code through `BinaryData` symbol
   - Uses custom JSON sound-module device files.
   - Supports hardware/software modules that present as MIDI devices after module file is added.
 - Displays:
-  - Optimized for Waveshare 11.9" capacitive touch screen (1480x320):
+  - Baseline profile optimized for Waveshare 11.9" capacitive touch screen (1480x320):
     - [Waveshare 11.9" HDMI LCD](https://www.waveshare.com/11.9inch-hdmi-lcd.htm)
+  - Additional fixed-size profile available: `2560x720`.
+  - App window size follows the selected UI profile.
   - Application auto-centers on typical HD 15.6" displays.
   - Contact the developer for additional display requests.
 

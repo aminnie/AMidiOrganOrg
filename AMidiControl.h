@@ -18,6 +18,7 @@
 #include <atomic>
 #include <map>
 #include <memory>
+#include <unordered_map>
 #include <vector>
 #include<iostream>
 #include<fstream>
@@ -1681,7 +1682,6 @@ private:
     };
 
     OwnedArray<Component> components;
-
     double startTime;
 
     MidiDevices* mididevices = nullptr;
@@ -2854,9 +2854,11 @@ struct KeyboardPanelPage final : public Component,
 
         // Remember current Tab Index so we can redirect Voice and Effects pages back to it
         currenttabidx = tabidx;
+        const juce::String profileTabKey = getUiProfileTabKey();
 
         // Keyboard Manual Status Bar
         auto* statusLabel = addToList(new Label("Status: "));
+        statusLabel->setComponentID("kbd." + profileTabKey + ".status");
         //statusLabel->setColour(juce::Label::backgroundColourId, juce::Colours::black);
         statusLabel->setColour(juce::Label::textColourId, juce::Colours::grey);
         statusLabel->setJustificationType(juce::Justification::left);
@@ -2912,6 +2914,7 @@ struct KeyboardPanelPage final : public Component,
             int g1height = ygroup + mgroup * rbuttons + bheight * rbuttons + mgroup + sbheight;
             {
                 auto* group = addToList(new GroupComponent("group", buttongrouptitle));
+                group->setComponentID("kbd." + profileTabKey + ".group1");
 
                 group->setColour(GroupComponent::outlineColourId, getGroupOutlineColour(ptrbuttongroup));
 
@@ -3321,6 +3324,7 @@ struct KeyboardPanelPage final : public Component,
             int g2height = ygroup + mgroup * rbuttons + bheight * rbuttons + mgroup + sbheight;
             {
                 auto* group = addToList(new GroupComponent("group", buttongrouptitle));
+                group->setComponentID("kbd." + profileTabKey + ".group2");
 
                 group->setColour(GroupComponent::outlineColourId, getGroupOutlineColour(ptrbuttongroup));
 
@@ -3719,6 +3723,7 @@ struct KeyboardPanelPage final : public Component,
             int g3height = ygroup + mgroup * rbuttons + bheight * rbuttons + mgroup + sbheight;
             {
                 auto* group = addToList(new GroupComponent("group", buttongrouptitle));
+                group->setComponentID("kbd." + profileTabKey + ".group3");
 
                 group->setColour(GroupComponent::outlineColourId, getGroupOutlineColour(ptrbuttongroup));
 
@@ -4096,6 +4101,7 @@ struct KeyboardPanelPage final : public Component,
             int g4height = ygroup + mgroup * rbuttons + bheight * rbuttons + mgroup + sbheight;
             {
                 auto* group = addToList(new GroupComponent("group", buttongrouptitle));
+                group->setComponentID("kbd." + profileTabKey + ".group4");
 
                 group->setColour(GroupComponent::outlineColourId, getGroupOutlineColour(ptrbuttongroup));
 
@@ -4447,6 +4453,7 @@ struct KeyboardPanelPage final : public Component,
             int g6height = mgroup * 3 + bheight;
             {
                 auto* group = addToList(new GroupComponent("group", buttongrouptitle));
+                group->setComponentID("kbd." + profileTabKey + ".voiceEditsGroup");
                 group->setBounds(g6xoffset, ygroup, g6width, g6height);
             }
 
@@ -4552,6 +4559,7 @@ struct KeyboardPanelPage final : public Component,
             int g10height = mgroup * 3 + bheight;
             {
                 auto* group = addToList(new GroupComponent("group", presetgrouptitle));
+                group->setComponentID("kbd." + profileTabKey + ".presetGroup");
                 group->setBounds(g10xoffset, ygroup, g10width, g10height);
             }
 
@@ -4561,6 +4569,7 @@ struct KeyboardPanelPage final : public Component,
             const int presetControlButtonWidth = bwidth;
 
             auto* tbsetpreset = addToList(new PresetButton("Set"));
+            tbsetpreset->setComponentID("kbd." + profileTabKey + ".presetSet");
             tbsetpreset->setClickingTogglesState(true);
             tbsetpreset->setColour(TextButton::textColourOffId, Colours::white);
             tbsetpreset->setColour(TextButton::textColourOnId, Colours::black);
@@ -4588,6 +4597,7 @@ struct KeyboardPanelPage final : public Component,
             // Manual button (index 0 in presetbuttons)
             col = 1;
             auto* manualPresetButton = addToList(new PresetButton());
+            manualPresetButton->setComponentID("kbd." + profileTabKey + ".presetManual");
             presetbuttons.add(manualPresetButton);
             manualPresetButton->setPresetButtonPtr(manualPresetButton);
             manualPresetButton->setButtonId(0);
@@ -4673,6 +4683,7 @@ struct KeyboardPanelPage final : public Component,
             updatePresetBankDisplayButtons();
 
             auto* tbnextpreset = addToList(new PresetButton("Next"));
+            tbnextpreset->setComponentID("kbd." + profileTabKey + ".presetNext");
             tbnextpreset->setClickingTogglesState(false);
             tbnextpreset->setColour(TextButton::textColourOffId, Colours::white);
             tbnextpreset->setColour(TextButton::textColourOnId, Colours::white);
@@ -4708,6 +4719,7 @@ struct KeyboardPanelPage final : public Component,
             int g5height = mgroup * 3 + bheight;
             {
                 rotaryGroupComponent = addToList(new GroupComponent("group", buttongrouptitle));
+                rotaryGroupComponent->setComponentID("kbd." + profileTabKey + ".rotaryGroup");
                 rotaryGroupComponent->setBounds(g5xoffset, ygroup, g5width, g5height);
             }
 
@@ -4904,6 +4916,7 @@ struct KeyboardPanelPage final : public Component,
         {
             if ((tabidx == PTLower) || (tabidx == PTBass)) {
                 auto* toUpperKBD = addToList(new CommandButton());
+                toUpperKBD->setComponentID("kbd." + profileTabKey + ".navUpper");
                 toUpperKBD->setButtonText("Upper");
                 toUpperKBD->setClickingTogglesState(false);
                 toUpperKBD->setColour(TextButton::textColourOffId, Colours::black);
@@ -4911,7 +4924,7 @@ struct KeyboardPanelPage final : public Component,
                 toUpperKBD->setColour(TextButton::buttonColourId, Colours::white);
                 toUpperKBD->setColour(TextButton::buttonOnColourId, Colours::black.brighter());
                 toUpperKBD->setTooltip("Switch to the Upper tab.");
-                toUpperKBD->setBounds(mgroup + xaccess, ygroup + mgroup * 2 + 5, 80, 50);
+                toUpperKBD->setBounds(mgroup + xaccess, ygroup + mgroup * 2, 80, 50);
                 toUpperKBD->setToggleState(true, dontSendNotification);
                 toUpperKBD->onClick = [=, &tabs]()
                     {
@@ -4922,6 +4935,7 @@ struct KeyboardPanelPage final : public Component,
 
             if ((tabidx == PTUpper) || (tabidx == PTBass)) {
                 auto* toLowerKBD = addToList(new CommandButton());
+                toLowerKBD->setComponentID("kbd." + profileTabKey + ".navLower");
                 toLowerKBD->setButtonText("Lower");
                 toLowerKBD->setClickingTogglesState(false);
                 toLowerKBD->setColour(TextButton::textColourOffId, Colours::black);
@@ -4929,7 +4943,7 @@ struct KeyboardPanelPage final : public Component,
                 toLowerKBD->setColour(TextButton::buttonColourId, Colours::white);
                 toLowerKBD->setColour(TextButton::buttonOnColourId, Colours::black.brighter());
                 toLowerKBD->setTooltip("Switch to the Lower tab.");
-                toLowerKBD->setBounds(mgroup + xaccess, ygroup + mgroup * 2 + 5, 80, 50);
+                toLowerKBD->setBounds(mgroup + xaccess, ygroup + mgroup * 2, 80, 50);
                 toLowerKBD->setToggleState(true, dontSendNotification);
                 toLowerKBD->onClick = [=, &tabs]()
                     {
@@ -4940,6 +4954,7 @@ struct KeyboardPanelPage final : public Component,
 
             if ((tabidx == PTUpper) || (tabidx == PTLower)) {
                 auto* toBassKBD = addToList(new CommandButton());
+                toBassKBD->setComponentID("kbd." + profileTabKey + ".navBass");
                 toBassKBD->setButtonText("Bass");
                 toBassKBD->setClickingTogglesState(false);
                 toBassKBD->setColour(TextButton::textColourOffId, Colours::black);
@@ -4947,7 +4962,7 @@ struct KeyboardPanelPage final : public Component,
                 toBassKBD->setColour(TextButton::buttonColourId, Colours::white);
                 toBassKBD->setColour(TextButton::buttonOnColourId, Colours::black.brighter());
                 toBassKBD->setTooltip("Switch to the Bass&Drums tab.");
-                toBassKBD->setBounds(mgroup + xaccess, ygroup + mgroup * 2 + 5, 80, 50);
+                toBassKBD->setBounds(mgroup + xaccess, ygroup + mgroup * 2, 80, 50);
                 toBassKBD->setToggleState(true, dontSendNotification);
                 toBassKBD->onClick = [=, &tabs]()
                     {
@@ -4962,6 +4977,7 @@ struct KeyboardPanelPage final : public Component,
         if ((tabidx == PTUpper) || (tabidx == PTLower) || (tabidx == PTBass))
         {
             auto* tbSave = addToList(new CommandButton());
+            tbSave->setComponentID("kbd." + profileTabKey + ".save");
             cbSave = tbSave;
             tbSave->setButtonText("Save");
             tbSave->setColour(TextButton::textColourOffId, Colours::white);
@@ -4969,7 +4985,7 @@ struct KeyboardPanelPage final : public Component,
             tbSave->setColour(TextButton::buttonColourId, Colours::black.darker());
             tbSave->setColour(TextButton::buttonOnColourId, Colours::black.brighter());
             tbSave->setTooltip("Save the current panel to the existing file.");
-            tbSave->setBounds(mgroup + 1260, 235, 80, 30);
+            tbSave->setBounds(mgroup + 1260, 230, 80, 30);
             tbSave->setToggleState(false, dontSendNotification);
             tbSave->onClick = [=]()
                 {
@@ -4998,6 +5014,7 @@ struct KeyboardPanelPage final : public Component,
             tbSave->setEnabled(false);
 
             auto* tbSaveAs = addToList(new CommandButton());
+            tbSaveAs->setComponentID("kbd." + profileTabKey + ".saveAs");
             cbSaveAs = tbSaveAs;
             tbSaveAs->setButtonText("Save As");
             tbSaveAs->setColour(TextButton::textColourOffId, Colours::white);
@@ -5005,7 +5022,7 @@ struct KeyboardPanelPage final : public Component,
             tbSaveAs->setColour(TextButton::buttonColourId, Colours::black.darker());
             tbSaveAs->setColour(TextButton::buttonOnColourId, Colours::black.brighter());
             tbSaveAs->setTooltip("Save the current panel to a new file name.");
-            tbSaveAs->setBounds(mgroup + 1360, 235, 80, 30);
+            tbSaveAs->setBounds(mgroup + 1360, 230, 80, 30);
             tbSaveAs->setToggleState(false, dontSendNotification);
             tbSaveAs->onClick = [=]()
                 {
@@ -5101,11 +5118,13 @@ struct KeyboardPanelPage final : public Component,
         }   // End - Save and Save As Buttons
 
         lblpanelfile = addToList(new Label("Panel File", appState.panelfname));
+        lblpanelfile->setComponentID("kbd." + profileTabKey + ".panelFile");
         lblpanelfile->setColour(juce::Label::textColourId, juce::Colours::grey);
         lblpanelfile->setJustificationType(juce::Justification::left);
         lblpanelfile->setMinimumHorizontalScale(0.8f);
-        lblpanelfile->setBounds(mgroup + 1260, 205, 200, 30);
+        lblpanelfile->setBounds(mgroup + 1260, 210, 200, 30);
         updatePanelFileStatusLabel();
+        applyCurrentUiProfile();
 
     }   // End KeyboardManual Page Constructor
 
@@ -5466,6 +5485,45 @@ struct KeyboardPanelPage final : public Component,
     void refreshStatusLinesFromAppState()
     {
         updatePanelFileStatusLabel();
+    }
+
+    /** Snapshot current keyboard component ids + bounds for profile override authoring. */
+    std::map<juce::String, juce::Rectangle<int>> buildUiRectSnapshotMap() const
+    {
+        std::map<juce::String, juce::Rectangle<int>> out;
+        for (auto* comp : components)
+        {
+            if (comp == nullptr)
+                continue;
+            const juce::String id = comp->getComponentID().trim();
+            if (id.isEmpty())
+                continue;
+
+            out[id] = comp->getBounds();
+        }
+        return out;
+    }
+
+    /** Re-apply selected UI profile (Config tab selection or startup load). */
+    void applyCurrentUiProfile()
+    {
+        captureUiProfileBaseLayoutIfNeeded();
+        const auto profile = resolveUiProfile(appState.uiProfileId);
+        const float sx = juce::jlimit(0.25f, 8.0f, profile.xScale);
+        const float sy = juce::jlimit(0.25f, 8.0f, profile.yScale);
+
+        for (auto* comp : components)
+        {
+            if (comp == nullptr)
+                continue;
+            const auto it = uiProfileBaseBounds.find(comp);
+            if (it == uiProfileBaseBounds.end())
+                continue;
+            const auto& base = it->second;
+            const auto overrideRect = getKeyboardRectOverride(profile, comp->getComponentID());
+            comp->setBounds(overrideRect.has_value() ? *overrideRect
+                                                     : scaleRectForProfile(base, sx, sy));
+        }
     }
 
     /** After preset recall: update this tab's rotary controls from the currently selected rotary target group. */
@@ -5933,6 +5991,9 @@ private:
     InstrumentPanel* instrumentpanel = nullptr;
     InstrumentModules* instrumentmodules = nullptr;
     AppState& appState;
+    std::unordered_map<Component*, juce::Rectangle<int>> uiProfileBaseBounds;
+    bool uiProfileBaseCaptured = false;
+    int uiProfileComponentOrdinal = 0;
 
     std::unique_ptr<FileChooser> filechooser;
 
@@ -6174,12 +6235,46 @@ private:
         }
     }
 
+    static juce::Rectangle<int> scaleRectForProfile(const juce::Rectangle<int>& base, float sx, float sy)
+    {
+        return {
+            juce::roundToInt((float) base.getX() * sx),
+            juce::roundToInt((float) base.getY() * sy),
+            juce::jmax(1, juce::roundToInt((float) base.getWidth() * sx)),
+            juce::jmax(1, juce::roundToInt((float) base.getHeight() * sy))
+        };
+    }
+
+    void captureUiProfileBaseLayoutIfNeeded()
+    {
+        if (uiProfileBaseCaptured)
+            return;
+        uiProfileBaseBounds.clear();
+        for (auto* comp : components)
+        {
+            if (comp != nullptr)
+                uiProfileBaseBounds.emplace(comp, comp->getBounds());
+        }
+        uiProfileBaseCaptured = true;
+    }
+
+    juce::String getUiProfileTabKey() const
+    {
+        if (currenttabidx == PTLower)
+            return "lower";
+        if (currenttabidx == PTBass)
+            return "bass";
+        return "upper";
+    }
+
 
     //-----------------------------------------------------------------------------
     // Function adds a component to a list and calls addAndMakeVisible on it
     template <typename ComponentType>
     ComponentType* addToList(ComponentType* newComp)
     {
+        if (newComp != nullptr && newComp->getComponentID().isEmpty())
+            newComp->setComponentID("kbd." + getUiProfileTabKey() + ".c" + juce::String(uiProfileComponentOrdinal++));
         components.add(newComp);
         addAndMakeVisible(newComp);
         return newComp;
@@ -6624,17 +6719,19 @@ public:
         newConfigButton.setBounds(380, margin + 205, 90, 50);
         newPanelButton.setBounds(480, margin + 205, 90, 50);
         toConfig.setBounds(820, margin + 205, 90, 50);
+        toConfig.setEnabled(true);
+        toConfig.toFront(false);
 
         // Place Exit in the top-right header area for faster access.
         exitButton.setBounds(getWidth() - 90, 4, 80, 24);
 
-        panelPrefixLabel.setBounds(580, margin + 210, 70, 20);
-        panelfileLabel.setBounds(650, margin + 210, 280, 20);
+        panelPrefixLabel.setBounds(580, margin + 210, 55, 20);
+        panelfileLabel.setBounds(635, margin + 210, 290, 20);
 
-        configPrefixLabel.setBounds(580, margin + 230, 70, 20);
-        configfileLabel.setBounds(650, margin + 230, 280, 20);
+        configPrefixLabel.setBounds(580, margin + 230, 55, 20);
+        configfileLabel.setBounds(635, margin + 230, 290, 20);
 
-        statusLabel.setBounds(1180, margin + 200, 250, 20);
+        statusLabel.setBounds(1170, margin + 200, 300, 20);
         buildInfoLabel.setBounds(getWidth() - 290, getHeight() - 24, 280, 20);
     }
 
@@ -6871,6 +6968,7 @@ private:
         static const juce::Identifier defaultEffectsPanType("defaultEffectsPan");
         static const juce::Identifier presetMidiPcInputChannelType("presetMidiPcInputChannel");
         static const juce::Identifier presetMidiPcValueType("presetMidiPcValue");
+        static const juce::Identifier uiProfileIdType("uiProfileId");
         static const juce::Identifier startupMonitorEnabledType("startupMonitorEnabled");
         static const juce::Identifier indexType("index");
         static const juce::Identifier midikeyboardType("keyboard");
@@ -6912,6 +7010,7 @@ private:
         tempConfig.setProperty(defaultEffectsPanType, appState.defaultEffectsPan, nullptr);
         tempConfig.setProperty(presetMidiPcInputChannelType, appState.presetMidiPcInputChannel, nullptr);
         tempConfig.setProperty(presetMidiPcValueType, appState.presetMidiPcValue, nullptr);
+        tempConfig.setProperty(uiProfileIdType, appState.uiProfileId, nullptr);
         tempConfig.setProperty(startupMonitorEnabledType, appState.startupMonitorEnabled, nullptr);
 
         for (int i = 0; i < numberbuttongroups; ++i)
@@ -8776,7 +8875,8 @@ public:
         loadConfigButton.setColour(TextButton::textColourOnId, Colours::white);
         loadConfigButton.setColour(TextButton::buttonColourId, Colours::black.darker());
         loadConfigButton.setColour(TextButton::buttonOnColourId, Colours::black.brighter());
-        loadConfigButton.setBounds(1140, 235, 106, 30);
+        // Keep a 100px column rhythm with Save/Save As for easier cross-tab muscle memory.
+        loadConfigButton.setBounds(1170, 230, 80, 30);
         loadConfigButton.setToggleState(false, dontSendNotification);
         loadConfigButton.onClick = [=]()
             {
@@ -8899,13 +8999,13 @@ public:
             toUpperKBD.setColour(TextButton::textColourOnId, Colours::white);
             toUpperKBD.setColour(TextButton::buttonColourId, Colours::white);
             toUpperKBD.setColour(TextButton::buttonOnColourId, Colours::black.brighter());
-            toUpperKBD.setBounds(mgroup + xaccess, ygroup + mgroup * 2 + 5, 80, 50);
+            toUpperKBD.setBounds(mgroup + xaccess, ygroup + mgroup * 2, 80, 50);
             toUpperKBD.setToggleState(true, dontSendNotification);
             toUpperKBD.onClick = [=, &tabs]()
                 {
                     tabs.setCurrentTabIndex(PTUpper, false);
                 };
-            xaccess = xaccess + 100;
+            xaccess = xaccess + 90;
 
             addAndMakeVisible(toLowerKBD);
             toLowerKBD.setButtonText("Lower");
@@ -8914,13 +9014,13 @@ public:
             toLowerKBD.setColour(TextButton::textColourOnId, Colours::white);
             toLowerKBD.setColour(TextButton::buttonColourId, Colours::white);
             toLowerKBD.setColour(TextButton::buttonOnColourId, Colours::black.brighter());
-            toLowerKBD.setBounds(mgroup + xaccess, ygroup + mgroup * 2 + 5, 80, 50);
+            toLowerKBD.setBounds(mgroup + xaccess, ygroup + mgroup * 2, 80, 50);
             toLowerKBD.setToggleState(true, dontSendNotification);
             toLowerKBD.onClick = [=, &tabs]()
                 {
                     tabs.setCurrentTabIndex(PTLower, false);
                 };
-            xaccess = xaccess + 100;
+            xaccess = xaccess + 90;
 
             addAndMakeVisible(toBassKBD);
             toBassKBD.setButtonText("Bass");
@@ -8929,7 +9029,7 @@ public:
             toBassKBD.setColour(TextButton::textColourOnId, Colours::white);
             toBassKBD.setColour(TextButton::buttonColourId, Colours::white);
             toBassKBD.setColour(TextButton::buttonOnColourId, Colours::black.brighter());
-            toBassKBD.setBounds(mgroup + xaccess, ygroup + mgroup * 2 + 5, 80, 50);
+            toBassKBD.setBounds(mgroup + xaccess, ygroup + mgroup * 2, 80, 50);
             toBassKBD.setToggleState(true, dontSendNotification);
             toBassKBD.onClick = [=, &tabs]()
                 {
@@ -8939,7 +9039,7 @@ public:
 
         addAndMakeVisible(globalConfigsGroup);
         globalConfigsGroup.setColour(GroupComponent::outlineColourId, Colours::grey.darker());
-        globalConfigsGroup.setBounds(1135, 8, 305, 118);
+        globalConfigsGroup.setBounds(1135, 8, 305, 176);
 
         addAndMakeVisible(lblPassthrough);
         lblPassthrough.setBounds(1150, 32, 135, 24);
@@ -8967,6 +9067,43 @@ public:
             {
                 appState.startupMonitorEnabled = toggleStartupMonitor.getToggleState();
                 setConfigSaveButtonEnabled(true);
+            };
+
+        addAndMakeVisible(lblUiProfile);
+        lblUiProfile.setBounds(1150, 102, 135, 24);
+        lblUiProfile.setText("UI Profile", {});
+
+        addAndMakeVisible(comboUiProfile);
+        comboUiProfile.setBounds(1290, 102, 140, 24);
+        comboUiProfile.setEditableText(false);
+        comboUiProfile.setJustificationType(juce::Justification::centredLeft);
+        {
+            int comboId = 1;
+            for (const auto& p : loadUiProfilesCatalog())
+                comboUiProfile.addItem(p.displayName.isNotEmpty() ? p.displayName : p.id, comboId++);
+            if (comboUiProfile.getNumItems() == 0)
+                comboUiProfile.addItem("1480 x 320 (Default)", 1);
+        }
+        comboUiProfile.onChange = [this]()
+            {
+                const int idx = comboUiProfile.getSelectedItemIndex();
+                const auto profiles = loadUiProfilesCatalog();
+                if (idx < 0 || idx >= profiles.size())
+                    appState.uiProfileId = getDefaultUiProfileId();
+                else
+                    appState.uiProfileId = profiles[(int) idx].id;
+                if (gNotifyUiProfileChanged)
+                    gNotifyUiProfileChanged();
+                setConfigSaveButtonEnabled(true);
+            };
+        refreshUiProfileComboFromAppState();
+
+        addAndMakeVisible(exportUiMapButton);
+        exportUiMapButton.setBounds(1290, 126, 140, 24);
+        exportUiMapButton.setButtonText("Export UI Map");
+        exportUiMapButton.onClick = [this, &tabs]()
+            {
+                exportCurrentUiProfileLayoutSnapshot(tabs);
             };
 
         addAndMakeVisible(lblPresetMidiPc);
@@ -9020,7 +9157,7 @@ public:
         statusLabel.setText("", {});
         statusLabel.setColour(juce::Label::textColourId, juce::Colours::grey);
         statusLabel.setJustificationType(juce::Justification::right);
-        statusLabel.setBounds(900, 210, 200, 20);
+        statusLabel.setBounds(1170, 210, 200, 20);
 
         // Save / Save As: same bounds as Upper/Lower/Bass panel (mgroup + 1240 / + 1340, y=235). Added last so
         // they stack above quick-access buttons and stay clickable.
@@ -9031,7 +9168,7 @@ public:
         saveButton.setColour(TextButton::buttonColourId, Colours::black.darker());
         saveButton.setColour(TextButton::buttonOnColourId, Colours::black.brighter());
         saveButton.setTooltip("Save the current config to the existing file.");
-        saveButton.setBounds(kbPanelMargin + 1260, 235, 80, 30);
+        saveButton.setBounds(kbPanelMargin + 1260, 230, 80, 30);
         setConfigSaveButtonEnabled(false);
         saveButton.onClick = [this]() {
             handleConfigSaveRequest(saveButton);
@@ -9044,7 +9181,7 @@ public:
         saveAsButton.setColour(TextButton::buttonColourId, Colours::black.darker());
         saveAsButton.setColour(TextButton::buttonOnColourId, Colours::black.brighter());
         saveAsButton.setTooltip("Save the current config under a new file name.");
-        saveAsButton.setBounds(kbPanelMargin + 1360, 235, 80, 30);
+        saveAsButton.setBounds(kbPanelMargin + 1360, 230, 80, 30);
         saveAsButton.setToggleState(false, dontSendNotification);
         saveAsButton.onClick = [this]() {
             File fileToSave = File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
@@ -9175,6 +9312,7 @@ private:
     ValueTree vtconfigs;
 
     ComboBox comboConfig{ "ConfigCombo" };
+    ComboBox comboUiProfile{ "UiProfileCombo" };
     GroupComponent group{ "group", "Button Group Configs" };
     GroupComponent effectsDefaultsGroup{ "effectsDefaultsGroup", "Effects Defaults" };
     GroupComponent globalConfigsGroup{ "globalConfigsGroup", "Global Configs" };
@@ -9185,13 +9323,13 @@ private:
     juce::TextEditor txtDefaultEffectsRel, txtDefaultEffectsPan;
     juce::TextEditor txtPresetMidiPcInputChannel, txtPresetMidiPcValue;
     juce::Label lblKeyboard, lblGroupName, lblButtonCount, lblMidiIn, lblMidiOut, lblSplit, lblOctave, lblModule, lblModuleAlias;
-    juce::Label lblPassthrough, lblStartupMonitor, lblVelocity, lblPresetMidiPc, lblPresetMidiPcSeparator;
+    juce::Label lblPassthrough, lblStartupMonitor, lblVelocity, lblPresetMidiPc, lblPresetMidiPcSeparator, lblUiProfile;
     juce::Label lblDefaultEffectsVol, lblDefaultEffectsBri, lblDefaultEffectsExp, lblDefaultEffectsRev;
     juce::Label lblDefaultEffectsCho, lblDefaultEffectsMod, lblDefaultEffectsTim, lblDefaultEffectsAtk;
     juce::Label lblDefaultEffectsRel, lblDefaultEffectsPan;
     juce::Label lblconfigfileprefix, lblconfigfile, label11, label31;
     juce::ToggleButton togglePassthrough, toggleStartupMonitor, toggleVelocity;
-    juce::TextButton loadConfigButton, saveButton, saveAsButton, resetButton, exitButton;
+    juce::TextButton loadConfigButton, saveButton, saveAsButton, resetButton, exitButton, exportUiMapButton;
     juce::TextButton toUpperKBD, toLowerKBD, toBassKBD;
     bool mutestate, velocitystate, passthroughstate;
 
@@ -9306,6 +9444,86 @@ private:
     {
         txtPresetMidiPcInputChannel.setText(std::to_string(juce::jlimit(1, 16, appState.presetMidiPcInputChannel)), false);
         txtPresetMidiPcValue.setText(std::to_string(juce::jlimit(0, 127, appState.presetMidiPcValue)), false);
+    }
+
+    void refreshUiProfileComboFromAppState()
+    {
+        if (comboUiProfile.getNumItems() == 0)
+            return;
+
+        const auto profiles = loadUiProfilesCatalog();
+        int selectedIdx = -1;
+        for (int i = 0; i < profiles.size(); ++i)
+        {
+            if (profiles[i].id == appState.uiProfileId)
+            {
+                selectedIdx = i;
+                break;
+            }
+        }
+
+        if (selectedIdx < 0)
+        {
+            appState.uiProfileId = getDefaultUiProfileId();
+            for (int i = 0; i < profiles.size(); ++i)
+            {
+                if (profiles[i].id == appState.uiProfileId)
+                {
+                    selectedIdx = i;
+                    break;
+                }
+            }
+        }
+
+        if (selectedIdx < 0)
+            selectedIdx = 0;
+        comboUiProfile.setSelectedItemIndex(selectedIdx, juce::dontSendNotification);
+    }
+
+    void exportCurrentUiProfileLayoutSnapshot(juce::TabbedComponent& tabs)
+    {
+        std::map<juce::String, juce::Rectangle<int>> overrides;
+        for (const int tabIdx : { PTUpper, PTLower, PTBass })
+        {
+            auto* keyboardPage = dynamic_cast<KeyboardPanelPage*>(tabs.getTabContentComponent(tabIdx));
+            if (keyboardPage == nullptr)
+                continue;
+            const auto pageMap = keyboardPage->buildUiRectSnapshotMap();
+            for (const auto& kv : pageMap)
+                overrides[kv.first] = kv.second;
+        }
+        juce::String outText;
+        outText << "{\n";
+        outText << "  \"profileId\": " << juce::JSON::toString(juce::var(appState.uiProfileId), false) << ",\n";
+        outText << "  \"keyboardRectOverrides\": {\n";
+        int i = 0;
+        const int total = (int) overrides.size();
+        for (const auto& kv : overrides)
+        {
+            const auto& id = kv.first;
+            const auto& r = kv.second;
+            outText << "    " << juce::JSON::toString(juce::var(id), false)
+                    << ": { \"x\": " << r.getX()
+                    << ", \"y\": " << r.getY()
+                    << ", \"w\": " << r.getWidth()
+                    << ", \"h\": " << r.getHeight() << " }";
+            if (++i < total)
+                outText << ",";
+            outText << "\n";
+        }
+        outText << "  }\n";
+        outText << "}\n";
+
+        const juce::File outDir = getOrganUserDocumentsRoot().getChildFile(appState.configdir);
+        outDir.createDirectory();
+        const juce::String safeProfileId = appState.uiProfileId.retainCharacters("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_");
+        const juce::File outFile = outDir.getChildFile("ui_profile_overrides_"
+            + (safeProfileId.isNotEmpty() ? safeProfileId : getDefaultUiProfileId()) + ".json");
+
+        const bool ok = outFile.replaceWithText(outText);
+        const juce::String msg = ok ? ("Exported:\n" + outFile.getFileName())
+                                    : ("Export failed:\n" + outFile.getFileName());
+        BubbleMessage(exportUiMapButton, msg, bubbleMessage);
     }
 
     /** Match the "Button Group Name" row using the same L&F font + colour resolution JUCE uses when painting. */
@@ -9639,6 +9857,7 @@ private:
         static Identifier defaultEffectsPanType("defaultEffectsPan");
         static Identifier presetMidiPcInputChannelType("presetMidiPcInputChannel");
         static Identifier presetMidiPcValueType("presetMidiPcValue");
+        static Identifier uiProfileIdType("uiProfileId");
         static Identifier startupMonitorEnabledType("startupMonitorEnabled");
 
         static Identifier indexType("index");               // Child Properties
@@ -9672,6 +9891,7 @@ private:
         configsTree.setProperty(defaultEffectsPanType, appState.defaultEffectsPan, nullptr);
         configsTree.setProperty(presetMidiPcInputChannelType, appState.presetMidiPcInputChannel, nullptr);
         configsTree.setProperty(presetMidiPcValueType, appState.presetMidiPcValue, nullptr);
+        configsTree.setProperty(uiProfileIdType, appState.uiProfileId, nullptr);
         configsTree.setProperty(startupMonitorEnabledType, appState.startupMonitorEnabled, nullptr);
 
         for (int i = 0; i < numberbuttongroups; i++) {
@@ -9815,6 +10035,7 @@ private:
         static Identifier defaultEffectsPanType("defaultEffectsPan");
         static Identifier presetMidiPcInputChannelType("presetMidiPcInputChannel");
         static Identifier presetMidiPcValueType("presetMidiPcValue");
+        static Identifier uiProfileIdType("uiProfileId");
         static Identifier startupMonitorEnabledType("startupMonitorEnabled");
 
         static Identifier indexType("index");           // Child Properties
@@ -9903,6 +10124,11 @@ private:
             appState.presetMidiPcValue = juce::jlimit(0, 127, (int)vtconfigs.getProperty(presetMidiPcValueType));
         else
             appState.presetMidiPcValue = 0;
+
+        if (vtconfigs.hasProperty(uiProfileIdType))
+            appState.uiProfileId = vtconfigs.getProperty(uiProfileIdType).toString().trim();
+        if (appState.uiProfileId.isEmpty())
+            appState.uiProfileId = getDefaultUiProfileId();
 
         appState.startupMonitorEnabled = vtconfigs.hasProperty(startupMonitorEnabledType)
             ? static_cast<bool>(vtconfigs.getProperty(startupMonitorEnabledType))
@@ -10024,6 +10250,9 @@ private:
 
         refreshDefaultEffectsEditorsFromAppState();
         refreshPresetMidiPcEditorsFromAppState();
+        refreshUiProfileComboFromAppState();
+        if (gNotifyUiProfileChanged)
+            gNotifyUiProfileChanged();
 
         return true;
     }
@@ -10267,9 +10496,29 @@ public:
                         cfg->refreshStatusLinesFromAppState();
                 }
             };
+        gNotifyUiProfileChanged = [this]()
+            {
+                const auto profile = resolveUiProfile(getAppState().uiProfileId);
+
+                if (auto* host = getParentComponent())
+                    host->setSize(profile.baseWidth, profile.baseHeight);
+
+                if (auto* top = dynamic_cast<juce::ResizableWindow*>(getTopLevelComponent()))
+                {
+                    top->setResizeLimits(profile.baseWidth, profile.baseHeight,
+                                         profile.baseWidth, profile.baseHeight);
+                    top->setSize(profile.baseWidth, profile.baseHeight);
+                }
+
+                for (int i = 0; i < getNumTabs(); ++i)
+                    if (auto* k = dynamic_cast<KeyboardPanelPage*>(getTabContentComponent(i)))
+                        k->applyCurrentUiProfile();
+            };
         updateVoiceEditTabAccessUi();
         if (gNotifyStatusLinesChanged)
             gNotifyStatusLinesChanged();
+        if (gNotifyUiProfileChanged)
+            gNotifyUiProfileChanged();
 
         //this->grabKeyboardFocus();
     }
@@ -10281,6 +10530,7 @@ public:
         gNotifyPresetRotarySyncFromButtonGroups = {};
         gNotifyVoiceEditTabAccessChanged = {};
         gNotifyStatusLinesChanged = {};
+        gNotifyUiProfileChanged = {};
     }
 
     /** Phase 1 hotkeys: recall preset on all keyboard pages (single loadPreset + radio sync). */
@@ -10707,7 +10957,8 @@ public:
         addKeyListener (&shortcutKeyListener);
         tabs.addKeyListener (&shortcutKeyListener);
 
-        setSize (1480, 320);
+        const auto profile = resolveUiProfile(getAppState().uiProfileId);
+        setSize (profile.baseWidth, profile.baseHeight);
     }
 
     ~AMidiControl() override
