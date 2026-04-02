@@ -362,13 +362,12 @@ MigrationBackup/
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
 
-# AMidiOrgan local macOS build/dependency folders
+# AMidiOrgan: local JUCE / third-party source checkouts (not committed)
 .deps/
-build-mac/
-build-release-local/
 
-# Windows (and generic) CMake out-of-tree build — regenerate with: cmake -B build ...
-build/
+# CMake / Visual Studio out-of-tree build directories at repo root (regenerate anytime; see README Build)
+# Matches `build/`, `build-win/`, `build-agent-test/`, `build-mac/`, etc.
+/build*/
 
 # Local editor settings
 .vscode/

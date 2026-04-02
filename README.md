@@ -353,6 +353,8 @@ Letter shortcuts may still fire when focus is on other controls, such as a plain
 
 ### Windows (Visual Studio generator)
 
+If JUCE is checked out at `C:/JUCE`, you can omit `-DJUCE_ROOT`; CMake will pick that path automatically. Otherwise pass `-DJUCE_ROOT` to your JUCE root (the folder that contains JUCE’s top-level `CMakeLists.txt`), or set the `JUCE_ROOT` environment variable to the same path.
+
 From the repository root:
 
 ```powershell

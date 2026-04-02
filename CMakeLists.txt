@@ -20,16 +20,40 @@ if(APPLE)
     endif()
 endif()
 
-# Point this to your local JUCE checkout if JUCE isn't installed as a package.
-# Examples:
-#   -DJUCE_ROOT="${CMAKE_CURRENT_SOURCE_DIR}/.deps/JUCE"
-#   -DJUCE_ROOT="C:/JUCE"
-set(JUCE_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/.deps/JUCE" CACHE PATH "Path to JUCE root")
+# JUCE is used via add_subdirectory (source tree). A normal JUCE checkout does not
+# install JUCEConfig.cmake, so find_package(JUCE) is not used here.
+#
+# Set JUCE_ROOT to a directory that contains JUCE's top-level CMakeLists.txt, e.g.:
+#   cmake -S . -B build -DJUCE_ROOT=C:/JUCE
+# Or clone: git clone https://github.com/juce-framework/JUCE.git .deps/JUCE
+set(JUCE_ROOT "" CACHE PATH "Path to JUCE root (directory containing CMakeLists.txt)")
 
-if(EXISTS "${JUCE_ROOT}/CMakeLists.txt")
-    add_subdirectory("${JUCE_ROOT}" "${CMAKE_BINARY_DIR}/JUCE" EXCLUDE_FROM_ALL)
+set(_juce_source "")
+if(JUCE_ROOT)
+    if(NOT EXISTS "${JUCE_ROOT}/CMakeLists.txt")
+        message(FATAL_ERROR
+            "JUCE_ROOT is set to '${JUCE_ROOT}' but '${JUCE_ROOT}/CMakeLists.txt' was not found.\n"
+            "Point JUCE_ROOT at a full JUCE source checkout, or clear it to use auto-detection.")
+    endif()
+    set(_juce_source "${JUCE_ROOT}")
+elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/.deps/JUCE/CMakeLists.txt")
+    set(_juce_source "${CMAKE_CURRENT_SOURCE_DIR}/.deps/JUCE")
+elseif(WIN32 AND EXISTS "C:/JUCE/CMakeLists.txt")
+    set(_juce_source "C:/JUCE")
+elseif(DEFINED ENV{JUCE_ROOT} AND EXISTS "$ENV{JUCE_ROOT}/CMakeLists.txt")
+    set(_juce_source "$ENV{JUCE_ROOT}")
+endif()
+
+if(_juce_source)
+    message(STATUS "AMidiOrgan: using JUCE from ${_juce_source}")
+    add_subdirectory("${_juce_source}" "${CMAKE_BINARY_DIR}/JUCE" EXCLUDE_FROM_ALL)
 else()
-    find_package(JUCE CONFIG REQUIRED)
+    message(FATAL_ERROR
+        "JUCE source tree not found. Do one of the following:\n"
+        "  1) Clone JUCE: git clone https://github.com/juce-framework/JUCE.git .deps/JUCE\n"
+        "  2) Configure with: cmake -S . -B build -DJUCE_ROOT=<path-to-JUCE>\n"
+        "  On Windows, if JUCE is at C:/JUCE, that path is tried automatically.\n"
+        "  See README.md (Build section).")
 endif()
 
 if(WIN32)
