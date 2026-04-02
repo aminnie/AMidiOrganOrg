@@ -200,13 +200,14 @@ target_compile_definitions(AMidiOrganTests
         JUCE_USE_CURL=0
 )
 
-if(APPLE)
-    # The current header-heavy integration test runner can segfault during
-    # teardown on macOS. Keep build validation in place and track runtime
-    # execution separately.
+option(AMIDIORGAN_ENABLE_MACOS_RUNTIME_TESTS "Run AMidiOrganTests runtime on macOS (default OFF for local stability)." OFF)
+
+if(APPLE AND NOT AMIDIORGAN_ENABLE_MACOS_RUNTIME_TESTS)
+    # Keep a deterministic build-only signal by default on macOS local builds.
     add_test(NAME AMidiOrganTestsBuildSanity
         COMMAND "${CMAKE_COMMAND}" -E echo "AMidiOrganTests built on macOS; runtime execution is temporarily disabled."
     )
 else()
     add_test(NAME AMidiOrganTests COMMAND AMidiOrganTests)
+    set_tests_properties(AMidiOrganTests PROPERTIES TIMEOUT 120)
 endif()

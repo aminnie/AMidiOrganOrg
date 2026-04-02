@@ -37,7 +37,7 @@ jobs:
         if: runner.os == 'macOS'
         shell: bash
         run: |
-          cmake -S . -B build -DJUCE_ROOT="${{ github.workspace }}/juce" -DCMAKE_BUILD_TYPE=Debug
+          cmake -S . -B build -DJUCE_ROOT="${{ github.workspace }}/juce" -DCMAKE_BUILD_TYPE=Debug -DAMIDIORGAN_ENABLE_MACOS_RUNTIME_TESTS=ON
 
       - name: Build tests (Windows)
         if: runner.os == 'Windows'
@@ -61,7 +61,7 @@ jobs:
         if: runner.os == 'macOS'
         shell: bash
         run: |
-          ctest --test-dir build --output-on-failure
+          ctest --test-dir build --output-on-failure --timeout 120
 
       - name: Build app (Windows)
         if: runner.os == 'Windows'

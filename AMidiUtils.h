@@ -68,6 +68,35 @@ inline juce::String getProjectMidiMessageDescription(const juce::MidiMessage& me
     return juce::String::toHexString(message.getRawData(), message.getRawDataSize());
 }
 
+/** Shared keyboard/preset label colour: configured entries use black text; unconfigured use readable mid-grey. */
+inline juce::Colour getConfiguredLabelTextColour(bool configured)
+{
+    return configured ? juce::Colours::black : juce::Colour(0xff888888);
+}
+
+/** Display bank for real preset id (1..6 => bank 0, 7..12 => bank 1). */
+inline int getPresetDisplayBankForRealPresetIdx(int presetIdx)
+{
+    return presetIdx >= 7 ? 1 : 0;
+}
+
+/** First real preset index rendered in each display bank. */
+inline int getBankStartPresetIdxForDisplayBank(int bank)
+{
+    return bank == 1 ? 7 : 1;
+}
+
+/** Slot index (0..5) for a real preset id in the selected display bank, or -1 if not visible. */
+inline int getDisplaySlotForRealPresetIdx(int presetIdx, int displayBank)
+{
+    if (presetIdx <= 0 || presetIdx >= numberpresets)
+        return -1;
+
+    const int bankStart = getBankStartPresetIdxForDisplayBank(displayBank);
+    const int slot = presetIdx - bankStart;
+    return (slot >= 0 && slot < numberdisplaypresets) ? slot : -1;
+}
+
 // Tracking switching between tabs to trigger updates, e.g. from Sounds tab back to Upper
 static int lasttabidx = 1;
 static bool tabchanged = false;

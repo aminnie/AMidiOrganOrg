@@ -295,6 +295,52 @@ namespace
             && expectEqual(check1to16(99), 16, "check1to16(99)", details);
     }
 
+    bool runConfiguredLabelColourHelpers(std::string& details)
+    {
+        const auto configured = getConfiguredLabelTextColour(true);
+        const auto unconfigured = getConfiguredLabelTextColour(false);
+        if (!(configured == juce::Colours::black))
+        {
+            details = "configured label color should be black";
+            return false;
+        }
+        if (!(unconfigured == juce::Colour(0xff888888)))
+        {
+            details = "unconfigured label color should be mid-grey";
+            return false;
+        }
+        return true;
+    }
+
+    bool runPresetDisplayBankHelpers(std::string& details)
+    {
+        if (!expectEqual(getPresetDisplayBankForRealPresetIdx(1), 0, "preset 1 in bank 0", details) ||
+            !expectEqual(getPresetDisplayBankForRealPresetIdx(6), 0, "preset 6 in bank 0", details) ||
+            !expectEqual(getPresetDisplayBankForRealPresetIdx(7), 1, "preset 7 in bank 1", details) ||
+            !expectEqual(getPresetDisplayBankForRealPresetIdx(12), 1, "preset 12 in bank 1", details))
+        {
+            return false;
+        }
+
+        if (!expectEqual(getBankStartPresetIdxForDisplayBank(0), 1, "bank 0 starts at preset 1", details) ||
+            !expectEqual(getBankStartPresetIdxForDisplayBank(1), 7, "bank 1 starts at preset 7", details))
+        {
+            return false;
+        }
+
+        if (!expectEqual(getDisplaySlotForRealPresetIdx(1, 0), 0, "preset 1 slot in bank 0", details) ||
+            !expectEqual(getDisplaySlotForRealPresetIdx(6, 0), 5, "preset 6 slot in bank 0", details) ||
+            !expectEqual(getDisplaySlotForRealPresetIdx(7, 1), 0, "preset 7 slot in bank 1", details) ||
+            !expectEqual(getDisplaySlotForRealPresetIdx(12, 1), 5, "preset 12 slot in bank 1", details) ||
+            !expectEqual(getDisplaySlotForRealPresetIdx(7, 0), -1, "preset 7 not visible in bank 0", details) ||
+            !expectEqual(getDisplaySlotForRealPresetIdx(2, 1), -1, "preset 2 not visible in bank 1", details))
+        {
+            return false;
+        }
+
+        return true;
+    }
+
     bool runVolumeMathHelpers(std::string& details)
     {
         if (!expectEqual(sliderStepToMasterCc7(0), 0, "sliderStepToMasterCc7(0)", details) ||
@@ -1697,6 +1743,158 @@ namespace
         return true;
     }
 
+    bool runPanelOptionalFieldFallbacks(std::string& details)
+    {
+        auto* midiInstruments = MidiInstruments::getInstance();
+        auto* instrumentPanel = InstrumentPanel::getInstance();
+        if (midiInstruments == nullptr || instrumentPanel == nullptr)
+        {
+            details = "MidiInstruments/InstrumentPanel singleton not available";
+            return false;
+        }
+
+        const auto snapshot = takeAppStateSnapshot();
+        auto& state = getAppState();
+        const String testDir = "AMidiOrganTestData";
+        const String testInstrumentFile = "integration_test_instruments.json";
+        const String sourcePanelFile = "integration_optional_fields_source.pnl";
+        const String legacyPanelFile = "integration_optional_fields_legacy.pnl";
+
+        if (!prepareTestInstrumentJson(testDir, testInstrumentFile, details))
+            return false;
+
+        if (!midiInstruments->loadMidiInstruments(state.instrumentfname))
+        {
+            details = "Failed to load test instrument JSON";
+            restoreAppState(snapshot);
+            return false;
+        }
+
+        state.panelfname = sourcePanelFile;
+        state.configfname = "optional_fields.cfg";
+        if (!instrumentPanel->initInstrumentPanel(testDir, sourcePanelFile, false))
+        {
+            details = "initInstrumentPanel for optional field fallback test failed";
+            restoreAppState(snapshot);
+            return false;
+        }
+
+        auto* vb0 = instrumentPanel->getVoiceButton(0);
+        if (vb0 == nullptr)
+        {
+            details = "Failed to get voice button 0";
+            restoreAppState(snapshot);
+            return false;
+        }
+
+        vb0->setSoundConfigured(true);
+        state.upperManualRotaryTargetGroup = 2;
+        state.lowerManualRotaryTargetGroup = 2;
+        if (!instrumentPanel->saveInstrumentPanel(testDir, sourcePanelFile))
+        {
+            details = "saveInstrumentPanel failed in optional field fallback test";
+            restoreAppState(snapshot);
+            return false;
+        }
+
+        const File baseDir = File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
+            .getChildFile(organdir)
+            .getChildFile(state.paneldir);
+        const File sourcePath = baseDir.getChildFile(sourcePanelFile);
+        const File legacyPath = baseDir.getChildFile(legacyPanelFile);
+
+        FileInputStream in(sourcePath);
+        if (!in.openedOk())
+        {
+            details = "Failed to open optional-fields source panel";
+            restoreAppState(snapshot);
+            return false;
+        }
+
+        ValueTree tree = ValueTree::readFromStream(in);
+        if (!tree.isValid())
+        {
+            details = "Failed to parse optional-fields source panel";
+            restoreAppState(snapshot);
+            return false;
+        }
+
+        static const juce::Identifier instrumentType("Instrument");
+        static const juce::Identifier soundConfiguredType("soundConfigured");
+        static const juce::Identifier manualRotaryUpperTargetGroupId("manualRotaryUpperTargetGroup");
+        static const juce::Identifier manualRotaryLowerTargetGroupId("manualRotaryLowerTargetGroup");
+
+        // Simulate legacy/partial data:
+        // - remove one optional root property (upper target group)
+        // - set another root property to an out-of-range value (lower target group)
+        // - remove per-instrument soundConfigured flag.
+        tree.removeProperty(manualRotaryUpperTargetGroupId, nullptr);
+        tree.setProperty(manualRotaryLowerTargetGroupId, 99, nullptr);
+        ValueTree firstInstrument = tree.getChild(0);
+        if (firstInstrument.isValid() && firstInstrument.hasType(instrumentType))
+            firstInstrument.removeProperty(soundConfiguredType, nullptr);
+
+        {
+            FileOutputStream out(legacyPath);
+            if (!out.openedOk())
+            {
+                details = "Failed to write legacy optional-fields panel";
+                restoreAppState(snapshot);
+                return false;
+            }
+            tree.writeToStream(out);
+        }
+
+        // Poison current state, then verify load applies defaults/clamps from partial panel.
+        state.upperManualRotaryTargetGroup = 2;
+        state.lowerManualRotaryTargetGroup = 1;
+        vb0->setSoundConfigured(true);
+
+        if (!instrumentPanel->loadInstrumentPanel(testDir, legacyPanelFile, false))
+        {
+            details = "loadInstrumentPanel failed for optional field fallback test";
+            restoreAppState(snapshot);
+            return false;
+        }
+
+        if (!expectEqual(state.upperManualRotaryTargetGroup, 1, "missing upper target group defaults to 1", details) ||
+            !expectEqual(state.lowerManualRotaryTargetGroup, 2, "invalid lower target group clamps to 2", details) ||
+            !expectEqual(vb0->isSoundConfigured() ? 1 : 0, 0, "missing soundConfigured defaults false", details))
+        {
+            restoreAppState(snapshot);
+            return false;
+        }
+
+        restoreAppState(snapshot);
+        return true;
+    }
+
+    bool runMidiEndpointSmoke(std::string& details)
+    {
+        const auto inputs = juce::MidiInput::getAvailableDevices();
+        const auto outputs = juce::MidiOutput::getAvailableDevices();
+
+        // Presence can vary by CI/host. Enumerating without crash is useful signal already.
+        if (inputs.isEmpty() && outputs.isEmpty())
+        {
+            details = "No MIDI endpoints present; smoke enumeration only";
+            return true;
+        }
+
+        if (!outputs.isEmpty())
+        {
+            auto out = juce::MidiOutput::openDevice(outputs[0].identifier);
+            if (out != nullptr)
+            {
+                auto noteOn = juce::MidiMessage::noteOn(1, 60, (juce::uint8)100);
+                noteOn.setTimeStamp(juce::Time::getMillisecondCounterHiRes() * 0.001);
+                out->sendMessageNow(noteOn);
+            }
+        }
+
+        return true;
+    }
+
     bool runMidiRoutingSplitLayerEdgeCases(std::string& details)
     {
         auto* devices = MidiDevices::getInstance();
@@ -2048,6 +2246,16 @@ int main()
 
     {
         std::string details;
+        results.push_back({ "Configured label colour helper returns black/grey as expected", runConfiguredLabelColourHelpers(details), details });
+    }
+
+    {
+        std::string details;
+        results.push_back({ "Preset display-bank helpers map presets to visible slots correctly", runPresetDisplayBankHelpers(details), details });
+    }
+
+    {
+        std::string details;
         results.push_back({ "MidiInstruments voice lookup bounds (no crash on category slot index)", runMidiInstrumentsVoiceLookupBounds(details), details });
     }
 
@@ -2204,6 +2412,16 @@ int main()
     {
         std::string details;
         results.push_back({ "Legacy panel without soundConfigured defaults all voice flags false", runVoiceSoundConfiguredLegacyDefaultFalse(details), details });
+    }
+
+    {
+        std::string details;
+        results.push_back({ "Partial legacy panel fields fallback to safe defaults", runPanelOptionalFieldFallbacks(details), details });
+    }
+
+    {
+        std::string details;
+        results.push_back({ "MIDI endpoint smoke: enumerate/open/send without crash", runMidiEndpointSmoke(details), details });
     }
 
     {

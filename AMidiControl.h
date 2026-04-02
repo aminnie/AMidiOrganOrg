@@ -6285,17 +6285,17 @@ private:
 
     bool isBankTwoPreset(int presetIdx) const
     {
-        return presetIdx >= 7;
+        return getPresetDisplayBankForRealPresetIdx(presetIdx) == 1;
     }
 
     int getPresetDisplayBankForRealPreset(int presetIdx) const
     {
-        return isBankTwoPreset(presetIdx) ? 1 : 0;
+        return getPresetDisplayBankForRealPresetIdx(presetIdx);
     }
 
     int getBankStartPresetIdx(int bank) const
     {
-        return bank == 1 ? 7 : 1;
+        return getBankStartPresetIdxForDisplayBank(bank);
     }
 
     int getTabVoiceButtonStartIdx() const
@@ -6333,9 +6333,7 @@ private:
 
     int getDisplaySlotForRealPreset(int presetIdx) const
     {
-        if (presetIdx <= 0 || presetIdx >= numberpresets)
-            return -1;
-        return (presetIdx - getBankStartPresetIdx(presetDisplayBank));
+        return getDisplaySlotForRealPresetIdx(presetIdx, presetDisplayBank);
     }
 
     PresetButton* getManualPresetButton() const
@@ -6361,7 +6359,6 @@ private:
         if (instrumentpanel == nullptr)
             return;
 
-        const juce::Colour unconfiguredText(0xff888888);
         const int startIdx = getTabVoiceButtonStartIdx();
         const int endIdx = getTabVoiceButtonEndIdxExclusive();
         for (int panelIdx = startIdx; panelIdx < endIdx; ++panelIdx)
@@ -6374,7 +6371,7 @@ private:
             if (displayButton == nullptr)
                 continue;
 
-            const juce::Colour text = panelVoiceButton->isSoundConfigured() ? Colours::black : unconfiguredText;
+            const juce::Colour text = getConfiguredLabelTextColour(panelVoiceButton->isSoundConfigured());
             displayButton->setColour(TextButton::textColourOffId, text);
             displayButton->setColour(TextButton::textColourOnId, text);
         }
@@ -6396,18 +6393,9 @@ private:
                 b->setButtonText("Preset " + std::to_string(realPresetIdx));
                 const bool configured = (instrumentpanel != nullptr && instrumentpanel->panelpresets != nullptr
                     && instrumentpanel->panelpresets->isPresetExplicitlyConfigured(realPresetIdx));
-                // Unconfigured: mid-grey reads clearly vs black on light/white preset button backgrounds.
-                const juce::Colour unconfiguredText(0xff888888);
-                if (configured)
-                {
-                    b->setColour(TextButton::textColourOffId, Colours::black);
-                    b->setColour(TextButton::textColourOnId, Colours::black);
-                }
-                else
-                {
-                    b->setColour(TextButton::textColourOffId, unconfiguredText);
-                    b->setColour(TextButton::textColourOnId, unconfiguredText);
-                }
+                const auto text = getConfiguredLabelTextColour(configured);
+                b->setColour(TextButton::textColourOffId, text);
+                b->setColour(TextButton::textColourOnId, text);
             }
         }
     }
