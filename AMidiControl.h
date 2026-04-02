@@ -20,6 +20,7 @@
 #include <memory>
 #include <unordered_map>
 #include <vector>
+#include <array>
 #include<iostream>
 #include<fstream>
 
@@ -354,10 +355,28 @@ public:
         activepresetidx = pstidx;
     }
 
+    /** Preset 1..12 only: true after user stored snapshot via Preset Set (savePreset). Visual hint only. */
+    bool isPresetExplicitlyConfigured(int presetIdx) const
+    {
+        if (presetIdx < 1 || presetIdx > 12)
+            return false;
+        return presetExplicitlyConfigured[(size_t) presetIdx];
+    }
+
+    void setPresetExplicitlyConfigured(int presetIdx, bool configured)
+    {
+        if (presetIdx < 1 || presetIdx > 12)
+            return;
+        presetExplicitlyConfigured[(size_t) presetIdx] = configured;
+    }
+
     void resetPresetsToDefaults()
     {
         for (int i = 0; i < numberpresets; ++i)
             initialisePresetDefaults(i);
+
+        for (int i = 1; i <= 12; ++i)
+            presetExplicitlyConfigured[(size_t) i] = false;
 
         activepresetidx = 0;
     }
@@ -450,6 +469,9 @@ private:
 
     int activepresetidx = 0;
     OwnedArray<Preset> presets;
+
+    /** Index 0 unused; indices 1..12 for Preset 1..12. */
+    std::array<bool, 13> presetExplicitlyConfigured{};
 
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PanelPresets)
@@ -932,6 +954,9 @@ public:
 
                 if (gNotifyManualRotarySyncFromAppState)
                     gNotifyManualRotarySyncFromAppState();
+
+                if (gNotifyPresetConfiguredStyle)
+                    gNotifyPresetConfiguredStyle();
             }
         }
 
@@ -1238,6 +1263,8 @@ private:
         static Identifier presetsType("Presets");
         ValueTree vtpresets(presetsType);
 
+        static const juce::Identifier explicitSetId("explicitSet");
+
         for (int i = 0; i < numberpresets; i++) {
 
             static Identifier presetType("Preset");
@@ -1245,6 +1272,9 @@ private:
 
             String presetno = "preset" + std::to_string(i);
             vtpreset.setProperty(presetno, i, nullptr);
+
+            if (i >= 1 && i <= 12)
+                vtpreset.setProperty(explicitSetId, panelpresets->isPresetExplicitlyConfigured(i), nullptr);
 
             // Add Button Group Details
             for (int j = 0; j < numberbuttongroups; j++) {
@@ -1427,6 +1457,8 @@ private:
 
         panelpresets->resetPresetsToDefaults();
 
+        static const juce::Identifier explicitSetId("explicitSet");
+
         if ((vtpresets.isValid()) && (vtpresets.getType() == presetsType)) {
 
             const int presetLoadCount = juce::jmin(numberpresets, vtpresets.getNumChildren());
@@ -1464,6 +1496,13 @@ private:
 
                     int irotary = vtbuttongroup.getProperty("rotary");
                     panelpresets->setRotaryStatus(presetIdx, j, irotary);
+                }
+
+                if (presetIdx >= 1 && presetIdx <= 12)
+                {
+                    // Default false when missing: older .pnl files had no flag — show "unset" (grey) until user Preset Sets.
+                    const bool exp = (bool) vtpreset.getProperty(explicitSetId, false);
+                    panelpresets->setPresetExplicitlyConfigured(presetIdx, exp);
                 }
             }
 
@@ -5658,6 +5697,13 @@ struct KeyboardPanelPage final : public Component,
             instrumentpanel->panelpresets->setRotaryStatus(pstidx, i, ptrbuttongroup->rotary);
         }
 
+        if (pstidx >= 1 && pstidx <= 12)
+        {
+            instrumentpanel->panelpresets->setPresetExplicitlyConfigured(pstidx, true);
+            if (gNotifyPresetConfiguredStyle)
+                gNotifyPresetConfiguredStyle();
+        }
+
         refreshPanelSaveAvailability();
     }
 
@@ -6012,6 +6058,8 @@ struct KeyboardPanelPage final : public Component,
                                                      : scaleRectForProfile(base, sx, sy));
             applyProfileFontScale(profile, comp);
         }
+
+        refreshPresetConfiguredButtonColours();
     }
 
     /** After preset recall: update this tab's rotary controls from the currently selected rotary target group. */
@@ -6090,6 +6138,12 @@ struct KeyboardPanelPage final : public Component,
         if (!isRotarySupportedForCurrentTargetGroup()) return;
         if (!tbrotbrake->isEnabled()) return;
         tbrotbrake->triggerClick();
+    }
+
+    /** Public hook for MenuTabs: refresh Preset 1..12 label colours (configured vs not). */
+    void refreshPresetConfiguredButtonColours()
+    {
+        updatePresetBankDisplayButtons();
     }
 
 private:
@@ -6282,6 +6336,20 @@ private:
             {
                 b->setButtonId(realPresetIdx);
                 b->setButtonText("Preset " + std::to_string(realPresetIdx));
+                const bool configured = (instrumentpanel != nullptr && instrumentpanel->panelpresets != nullptr
+                    && instrumentpanel->panelpresets->isPresetExplicitlyConfigured(realPresetIdx));
+                // Unconfigured: mid-grey reads clearly vs black on light/white preset button backgrounds.
+                const juce::Colour unconfiguredText(0xff888888);
+                if (configured)
+                {
+                    b->setColour(TextButton::textColourOffId, Colours::black);
+                    b->setColour(TextButton::textColourOnId, Colours::black);
+                }
+                else
+                {
+                    b->setColour(TextButton::textColourOffId, unconfiguredText);
+                    b->setColour(TextButton::textColourOnId, unconfiguredText);
+                }
             }
         }
     }
@@ -11513,6 +11581,15 @@ public:
                         k->applyPresetRotaryUiFromStoredGroups();
             };
         gNotifyPresetRotarySyncFromButtonGroups = std::move(syncPresetRotaryKb);
+
+        std::function<void()> syncPresetConfiguredStyle = [this]()
+            {
+                for (int i = 0; i < getNumTabs(); ++i)
+                    if (auto* k = dynamic_cast<KeyboardPanelPage*>(getTabContentComponent(i)))
+                        k->refreshPresetConfiguredButtonColours();
+            };
+        gNotifyPresetConfiguredStyle = std::move(syncPresetConfiguredStyle);
+
         gNotifyVoiceEditTabAccessChanged = [this]()
             {
                 updateVoiceEditTabAccessUi();
@@ -11573,6 +11650,7 @@ public:
         gNotifyPanelSaveAvailabilityChanged = {};
         gNotifyManualRotarySyncFromAppState = {};
         gNotifyPresetRotarySyncFromButtonGroups = {};
+        gNotifyPresetConfiguredStyle = {};
         gNotifyVoiceEditTabAccessChanged = {};
         gNotifyStatusLinesChanged = {};
         gNotifyUiProfileChanged = {};

@@ -809,6 +809,9 @@ inline std::function<void()> gNotifyManualRotarySyncFromAppState;
 /** Optional: after preset recall, sync Upper/Lower rotary UI from ButtonGroup::rotary. */
 inline std::function<void()> gNotifyPresetRotarySyncFromButtonGroups;
 
+/** Optional: refresh Preset 1..12 text colours after Set or panel load (all KeyboardPanelPage tabs). */
+inline std::function<void()> gNotifyPresetConfiguredStyle;
+
 /** Optional: refresh Sounds/Effects tab enabled state when voice-edit gating changes. */
 inline std::function<void()> gNotifyVoiceEditTabAccessChanged;
 
