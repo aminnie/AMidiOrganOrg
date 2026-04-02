@@ -99,6 +99,16 @@ public:
         explicitUserClickHandler = std::move(handler);
     }
 
+    bool isSoundConfigured() const
+    {
+        return soundConfigured;
+    }
+
+    void setSoundConfigured(bool configured)
+    {
+        soundConfigured = configured;
+    }
+
     void mouseUp(const juce::MouseEvent& e) override
     {
         TextButton::mouseUp(e);
@@ -112,6 +122,7 @@ private:
     int buttongroupid;
     int buttonid;
     int panelbuttonidx;
+    bool soundConfigured = false;
     Component::SafePointer<VoiceButton>displaybuttonptr;
     std::function<void(int)> explicitUserClickHandler;
 

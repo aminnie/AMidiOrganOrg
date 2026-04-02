@@ -1499,6 +1499,204 @@ namespace
         return true;
     }
 
+    bool runVoiceSoundConfiguredPersistenceRoundtrip(std::string& details)
+    {
+        auto* midiInstruments = MidiInstruments::getInstance();
+        auto* instrumentPanel = InstrumentPanel::getInstance();
+        if (midiInstruments == nullptr || instrumentPanel == nullptr)
+        {
+            details = "MidiInstruments/InstrumentPanel singleton not available";
+            return false;
+        }
+
+        const auto snapshot = takeAppStateSnapshot();
+        auto& state = getAppState();
+
+        const String testDir = "AMidiOrganTestData";
+        const String testInstrumentFile = "integration_test_instruments.json";
+        const String panelFile = "integration_sound_configured_roundtrip.pnl";
+
+        if (!prepareTestInstrumentJson(testDir, testInstrumentFile, details))
+            return false;
+
+        if (!midiInstruments->loadMidiInstruments(state.instrumentfname))
+        {
+            details = "Failed to load test instrument JSON";
+            restoreAppState(snapshot);
+            return false;
+        }
+
+        state.panelfname = panelFile;
+        state.configfname = "sound_configured_test.cfg";
+
+        if (!instrumentPanel->initInstrumentPanel(testDir, panelFile, false))
+        {
+            details = "initInstrumentPanel for soundConfigured test failed";
+            restoreAppState(snapshot);
+            return false;
+        }
+
+        auto* vb0 = instrumentPanel->getVoiceButton(0);
+        auto* vb1 = instrumentPanel->getVoiceButton(1);
+        if (vb0 == nullptr || vb1 == nullptr)
+        {
+            details = "Failed to get test voice buttons";
+            restoreAppState(snapshot);
+            return false;
+        }
+
+        vb0->setSoundConfigured(true);
+        vb1->setSoundConfigured(false);
+
+        if (!instrumentPanel->saveInstrumentPanel(testDir, panelFile))
+        {
+            details = "saveInstrumentPanel for soundConfigured roundtrip failed";
+            restoreAppState(snapshot);
+            return false;
+        }
+
+        // Poison state so load must restore persisted values.
+        vb0->setSoundConfigured(false);
+        vb1->setSoundConfigured(true);
+
+        if (!instrumentPanel->loadInstrumentPanel(testDir, panelFile, false))
+        {
+            details = "loadInstrumentPanel for soundConfigured roundtrip failed";
+            restoreAppState(snapshot);
+            return false;
+        }
+
+        if (!expectEqual(vb0->isSoundConfigured() ? 1 : 0, 1, "soundConfigured persisted true", details) ||
+            !expectEqual(vb1->isSoundConfigured() ? 1 : 0, 0, "soundConfigured persisted false", details))
+        {
+            restoreAppState(snapshot);
+            return false;
+        }
+
+        restoreAppState(snapshot);
+        return true;
+    }
+
+    bool runVoiceSoundConfiguredLegacyDefaultFalse(std::string& details)
+    {
+        auto* midiInstruments = MidiInstruments::getInstance();
+        auto* instrumentPanel = InstrumentPanel::getInstance();
+        if (midiInstruments == nullptr || instrumentPanel == nullptr)
+        {
+            details = "MidiInstruments/InstrumentPanel singleton not available";
+            return false;
+        }
+
+        const auto snapshot = takeAppStateSnapshot();
+        auto& state = getAppState();
+        const String testDir = "AMidiOrganTestData";
+        const String testInstrumentFile = "integration_test_instruments.json";
+        const String fullPanelFile = "integration_sound_configured_full.pnl";
+        const String legacyPanelFile = "integration_sound_configured_legacy.pnl";
+
+        if (!prepareTestInstrumentJson(testDir, testInstrumentFile, details))
+            return false;
+
+        if (!midiInstruments->loadMidiInstruments(state.instrumentfname))
+        {
+            details = "Failed to load test instrument JSON";
+            restoreAppState(snapshot);
+            return false;
+        }
+
+        state.panelfname = fullPanelFile;
+        state.configfname = "sound_configured_legacy.cfg";
+
+        if (!instrumentPanel->initInstrumentPanel(testDir, fullPanelFile, false))
+        {
+            details = "initInstrumentPanel for soundConfigured legacy test failed";
+            restoreAppState(snapshot);
+            return false;
+        }
+
+        auto* vb0 = instrumentPanel->getVoiceButton(0);
+        auto* vb10 = instrumentPanel->getVoiceButton(10);
+        if (vb0 == nullptr || vb10 == nullptr)
+        {
+            details = "Failed to get test voice buttons";
+            restoreAppState(snapshot);
+            return false;
+        }
+
+        vb0->setSoundConfigured(true);
+        vb10->setSoundConfigured(true);
+
+        if (!instrumentPanel->saveInstrumentPanel(testDir, fullPanelFile))
+        {
+            details = "saveInstrumentPanel for soundConfigured legacy test failed";
+            restoreAppState(snapshot);
+            return false;
+        }
+
+        const File baseDir = File::getSpecialLocation(File::SpecialLocationType::userDocumentsDirectory)
+            .getChildFile(organdir)
+            .getChildFile(state.paneldir);
+        const File fullPanelPath = baseDir.getChildFile(fullPanelFile);
+        const File legacyPanelPath = baseDir.getChildFile(legacyPanelFile);
+
+        FileInputStream in(fullPanelPath);
+        if (!in.openedOk())
+        {
+            details = "Failed to open full panel file for legacy conversion";
+            restoreAppState(snapshot);
+            return false;
+        }
+
+        ValueTree tree = ValueTree::readFromStream(in);
+        if (!tree.isValid())
+        {
+            details = "Failed to parse full panel ValueTree for legacy conversion";
+            restoreAppState(snapshot);
+            return false;
+        }
+
+        static const Identifier instrumentType("Instrument");
+        static const Identifier soundConfiguredType("soundConfigured");
+        for (int i = 0; i < numbervoicebuttons; ++i)
+        {
+            ValueTree instrumentNode = tree.getChild(i);
+            if (instrumentNode.isValid() && instrumentNode.hasType(instrumentType))
+                instrumentNode.removeProperty(soundConfiguredType, nullptr);
+        }
+
+        {
+            FileOutputStream out(legacyPanelPath);
+            if (!out.openedOk())
+            {
+                details = "Failed to write legacy soundConfigured panel file";
+                restoreAppState(snapshot);
+                return false;
+            }
+            tree.writeToStream(out);
+        }
+
+        // Poison in-memory state to ensure missing legacy property reverts to default false.
+        vb0->setSoundConfigured(true);
+        vb10->setSoundConfigured(true);
+
+        if (!instrumentPanel->loadInstrumentPanel(testDir, legacyPanelFile, false))
+        {
+            details = "loadInstrumentPanel failed for legacy soundConfigured panel";
+            restoreAppState(snapshot);
+            return false;
+        }
+
+        if (!expectEqual(vb0->isSoundConfigured() ? 1 : 0, 0, "legacy panel defaults soundConfigured false (button 0)", details) ||
+            !expectEqual(vb10->isSoundConfigured() ? 1 : 0, 0, "legacy panel defaults soundConfigured false (button 10)", details))
+        {
+            restoreAppState(snapshot);
+            return false;
+        }
+
+        restoreAppState(snapshot);
+        return true;
+    }
+
     bool runMidiRoutingSplitLayerEdgeCases(std::string& details)
     {
         auto* devices = MidiDevices::getInstance();
@@ -1996,6 +2194,16 @@ int main()
     {
         std::string details;
         results.push_back({ "InstrumentPanel roundtrip preserves MSB/LSB/program/effects", runInstrumentVoiceAndEffectsRoundtrip(details), details });
+    }
+
+    {
+        std::string details;
+        results.push_back({ "VoiceButton soundConfigured persists across panel save/load", runVoiceSoundConfiguredPersistenceRoundtrip(details), details });
+    }
+
+    {
+        std::string details;
+        results.push_back({ "Legacy panel without soundConfigured defaults all voice flags false", runVoiceSoundConfiguredLegacyDefaultFalse(details), details });
     }
 
     {

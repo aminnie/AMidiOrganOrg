@@ -957,6 +957,8 @@ public:
 
                 if (gNotifyPresetConfiguredStyle)
                     gNotifyPresetConfiguredStyle();
+                if (gNotifyVoiceConfiguredStyle)
+                    gNotifyVoiceConfiguredStyle();
             }
         }
 
@@ -1196,6 +1198,7 @@ private:
         static Identifier panType("ccpan");
 
         static Identifier dirtyType("isdirty");
+        static Identifier soundConfiguredType("soundConfigured");
         static Identifier buttonidxType("buttonidx");
 
         // Instrument ValueTree
@@ -1249,6 +1252,7 @@ private:
             ins.setProperty(panType, instrument.getPan(), nullptr);
 
             ins.setProperty(dirtyType, instrument.getDirty(), nullptr);
+            ins.setProperty(soundConfiguredType, pvb->isSoundConfigured(), nullptr);
 
             if (ins.isValid()) {
                 panelTree.appendChild(ins, nullptr);
@@ -1360,6 +1364,7 @@ private:
         static Identifier panType("ccpan");
 
         static Identifier dirtyType("isdirty");
+        static Identifier soundConfiguredType("soundConfigured");
         static Identifier buttonidxType("buttonidx");
 
         String filename = vtinstrumentpanel.getProperty(filenameType);
@@ -1439,6 +1444,7 @@ private:
             ////VoiceButton* pvb = panelvoicebuttons[i];
             VoiceButton* pvb = (VoiceButton*)panelvoicebuttons.getUnchecked(i);
             pvb->setInstrument(instrument);
+            pvb->setSoundConfigured((bool) childNode.getProperty(soundConfiguredType, false));
             pvb->setButtonText(instrument.getVoice());
 
             // To do: Add button group indexes
@@ -1651,10 +1657,13 @@ public:
             // Set the input Panel Button to the newly selected instrument
             VoiceButton* pvbtn = instrumentpanel->getVoiceButton(panelbuttonidx);
             pvbtn->setInstrument(instrument);
+            pvbtn->setSoundConfigured(true);
 
             // Tab redraw: https://forum.juce.com/t/how-to-capture-tabbedcomponents-tab-active/29203/9
             pvbtn->setButtonText(instrument.getVoice());
             pvbtn->triggerClick();
+            if (gNotifyVoiceConfiguredStyle)
+                gNotifyVoiceConfiguredStyle();
 
             syncVoiceSnapshotFromInstrument();
             selvoice = -1;
@@ -6060,6 +6069,7 @@ struct KeyboardPanelPage final : public Component,
         }
 
         refreshPresetConfiguredButtonColours();
+        refreshVoiceConfiguredButtonColours();
     }
 
     /** After preset recall: update this tab's rotary controls from the currently selected rotary target group. */
@@ -6144,6 +6154,12 @@ struct KeyboardPanelPage final : public Component,
     void refreshPresetConfiguredButtonColours()
     {
         updatePresetBankDisplayButtons();
+    }
+
+    /** Public hook for MenuTabs: refresh keyboard voice button text colours (configured vs not). */
+    void refreshVoiceConfiguredButtonColours()
+    {
+        updateVoiceButtonConfiguredTextColours();
     }
 
 private:
@@ -6282,6 +6298,24 @@ private:
         return bank == 1 ? 7 : 1;
     }
 
+    int getTabVoiceButtonStartIdx() const
+    {
+        if (currenttabidx == PTLower)
+            return 32;
+        if (currenttabidx == PTBass)
+            return 64;
+        return 0;
+    }
+
+    int getTabVoiceButtonEndIdxExclusive() const
+    {
+        if (currenttabidx == PTLower)
+            return 64;
+        if (currenttabidx == PTBass)
+            return 96;
+        return 32;
+    }
+
     bool ensurePresetBankForRealPreset(int presetIdx)
     {
         if (presetIdx <= 0 || presetIdx >= numberpresets)
@@ -6320,6 +6354,30 @@ private:
             return nullptr;
 
         return presetbuttons[buttonIndex];
+    }
+
+    void updateVoiceButtonConfiguredTextColours()
+    {
+        if (instrumentpanel == nullptr)
+            return;
+
+        const juce::Colour unconfiguredText(0xff888888);
+        const int startIdx = getTabVoiceButtonStartIdx();
+        const int endIdx = getTabVoiceButtonEndIdxExclusive();
+        for (int panelIdx = startIdx; panelIdx < endIdx; ++panelIdx)
+        {
+            auto* panelVoiceButton = instrumentpanel->getVoiceButton(panelIdx);
+            if (panelVoiceButton == nullptr)
+                continue;
+
+            auto* displayButton = panelVoiceButton->getDisplayButtonPtr();
+            if (displayButton == nullptr)
+                continue;
+
+            const juce::Colour text = panelVoiceButton->isSoundConfigured() ? Colours::black : unconfiguredText;
+            displayButton->setColour(TextButton::textColourOffId, text);
+            displayButton->setColour(TextButton::textColourOnId, text);
+        }
     }
 
     void updatePresetBankDisplayButtons()
@@ -11590,6 +11648,14 @@ public:
             };
         gNotifyPresetConfiguredStyle = std::move(syncPresetConfiguredStyle);
 
+        std::function<void()> syncVoiceConfiguredStyle = [this]()
+            {
+                for (int i = 0; i < getNumTabs(); ++i)
+                    if (auto* k = dynamic_cast<KeyboardPanelPage*>(getTabContentComponent(i)))
+                        k->refreshVoiceConfiguredButtonColours();
+            };
+        gNotifyVoiceConfiguredStyle = std::move(syncVoiceConfiguredStyle);
+
         gNotifyVoiceEditTabAccessChanged = [this]()
             {
                 updateVoiceEditTabAccessUi();
@@ -11651,6 +11717,7 @@ public:
         gNotifyManualRotarySyncFromAppState = {};
         gNotifyPresetRotarySyncFromButtonGroups = {};
         gNotifyPresetConfiguredStyle = {};
+        gNotifyVoiceConfiguredStyle = {};
         gNotifyVoiceEditTabAccessChanged = {};
         gNotifyStatusLinesChanged = {};
         gNotifyUiProfileChanged = {};

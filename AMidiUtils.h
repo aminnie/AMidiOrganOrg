@@ -812,6 +812,9 @@ inline std::function<void()> gNotifyPresetRotarySyncFromButtonGroups;
 /** Optional: refresh Preset 1..12 text colours after Set or panel load (all KeyboardPanelPage tabs). */
 inline std::function<void()> gNotifyPresetConfiguredStyle;
 
+/** Optional: refresh keyboard voice button text colours after Sounds edits or panel load. */
+inline std::function<void()> gNotifyVoiceConfiguredStyle;
+
 /** Optional: refresh Sounds/Effects tab enabled state when voice-edit gating changes. */
 inline std::function<void()> gNotifyVoiceEditTabAccessChanged;
 
