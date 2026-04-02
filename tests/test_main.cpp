@@ -63,6 +63,7 @@ namespace
         int defaultEffectsPan = 64;
         int presetMidiPcInputChannel = 16;
         int presetMidiPcValue = 0;
+        String uiProfileId = "1480x320";
         bool configreload = false;
         bool configPanelPairingMismatchAcknowledged = false;
         bool upperManualRotaryFast = true;
@@ -95,6 +96,7 @@ namespace
         snapshot.defaultEffectsPan = state.defaultEffectsPan;
         snapshot.presetMidiPcInputChannel = state.presetMidiPcInputChannel;
         snapshot.presetMidiPcValue = state.presetMidiPcValue;
+        snapshot.uiProfileId = state.uiProfileId;
         snapshot.configreload = state.configreload;
         snapshot.configPanelPairingMismatchAcknowledged = state.configPanelPairingMismatchAcknowledged;
         snapshot.upperManualRotaryFast = state.upperManualRotaryFast;
@@ -127,6 +129,7 @@ namespace
         state.defaultEffectsPan = snapshot.defaultEffectsPan;
         state.presetMidiPcInputChannel = snapshot.presetMidiPcInputChannel;
         state.presetMidiPcValue = snapshot.presetMidiPcValue;
+        state.uiProfileId = snapshot.uiProfileId;
         state.configreload = snapshot.configreload;
         state.configPanelPairingMismatchAcknowledged = snapshot.configPanelPairingMismatchAcknowledged;
         state.upperManualRotaryFast = snapshot.upperManualRotaryFast;

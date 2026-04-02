@@ -143,12 +143,14 @@ You can:
 - Create a new panel (`New Panel`) from the currently selected module defaults
 - Select active sound module
 - Verify panel/config status labels
+- Use the Start-row `Exit` button (same behavior as the `Exit` tab)
 
 Behavior:
 
 - Last used panel/config can auto-restore at startup when files still exist.
 - Start tab remembers selected MIDI ports via sticky device storage.
 - `New Panel` opens a save-style prompt; duplicate panel names are blocked, and successful saves auto-load the new panel.
+- Panel/config status lines are displayed as `Panel: <file>` and `Config: <file>`.
 
 Best practice:
 
@@ -320,6 +322,7 @@ Global options note:
   - `PC Value` accepts `0..127` (default `0`)
   - A matching incoming Program Change triggers `Next preset` exactly like the hotkey flow.
   - Matching Program Change is consumed (not routed to outputs) and the trigger check ignores pass-through gating.
+- `UI Profile` applies live across Start/Upper/Lower/Bass/Config/Sounds/Effects/Hotkeys/Monitor and resizes the app window to the selected fixed profile size.
 - Solo split note names use the project-wide `C4 = 60` convention.
 
 Expected result:
@@ -412,6 +415,7 @@ Quick read (look here first):
 
 - Closes application.
 - If panel changes are pending, app may prompt to save first.
+- The Start-tab `Exit` button uses the same exit flow.
 
 ---
 

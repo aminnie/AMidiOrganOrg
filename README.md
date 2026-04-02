@@ -94,6 +94,8 @@ On startup, the app also attempts to auto-restore the last used panel and config
   - on successful save, the new panel is loaded immediately (same flow as `Load Panel`)
 - On launch, restores last used panel/config when available (`Documents/AMidiOrgan/configs/last_session.json`).
 - Checks config and panel pairing when loading, and can warn if the selected files do not belong together.
+- Includes a quick `Exit` button in the Start action row (next to keyboard navigation).
+- Start status lines render as `Panel: <file>` and `Config: <file>` with tight one-space formatting.
 
 #### Upper / Lower / Bass&Drums
 
@@ -156,6 +158,19 @@ On startup, the app also attempts to auto-restore the last used panel and config
 - `Startup Monitor` is a global config option saved in the `.cfg` file.
 - When `Startup Monitor` is **ON**, outgoing MIDI monitoring is enabled automatically during startup so initialization traffic can be reviewed later in the `Monitor` tab.
 - Startup auto-enable does **not** switch the visible tab; the app continues normal startup and you open `Monitor` manually when needed.
+- `UI Profile` selects a fixed-size UI layout profile (currently `1480x320` and `2560x720`).
+- Changing `UI Profile` applies live to Start/Upper/Lower/Bass/Config/Sounds/Effects/Hotkeys/Monitor and also resizes the app window to the selected profile dimensions.
+- Profile catalog file is `Documents/AMidiOrgan/configs/ui_profiles.json`.
+- `Export UI Map` writes a ready-to-edit snapshot file:
+  - `Documents/AMidiOrgan/configs/ui_profile_overrides_<profileId>.json`
+  - currently includes `keyboardRectOverrides` entries with control ids (for example `kbd.upper.*`) and current bounds.
+- Profile overrides in `ui_profiles.json`:
+  - `keyboardRectOverrides`: absolute `x/y/w/h` per keyboard-tab control id.
+  - `startRectOverrides`: absolute `x/y/w/h` per Start-tab control id.
+  - `configRectOverrides`: absolute `x/y/w/h` per Config-tab control id.
+  - `fontScaleOverrides`: per-control font scale multiplier (`0.5..4.0`) by control id.
+- Control-type baseline scales remain available per profile (`buttonFontScale`, `labelFontScale`, `toggleFontScale`, `comboFontScale`).
+- Override precedence: explicit `keyboardRectOverrides`, `startRectOverrides`, `configRectOverrides`, and `fontScaleOverrides` in your `ui_profiles.json` win over built-in defaults shipped by the app.
 - `Preset MIDI PC` is a global config trigger for preset-next automation:
   - `Input Channel` (`1..16`, default `16`)
   - `PC Value` (`0..127`, default `0`)
@@ -193,6 +208,7 @@ On startup, the app also attempts to auto-restore the last used panel and config
 
 - Exits the application.
 - If panel-related changes are pending, the app may ask whether you want to save before quitting.
+- Start-tab `Exit` button triggers the same exit flow as the `Exit` tab.
 
 ### 3. Voice Buttons
 
@@ -509,8 +525,10 @@ The following asset filenames are referenced by code through `BinaryData` symbol
   - Uses custom JSON sound-module device files.
   - Supports hardware/software modules that present as MIDI devices after module file is added.
 - Displays:
-  - Optimized for Waveshare 11.9" capacitive touch screen (1480x320):
+  - Baseline profile optimized for Waveshare 11.9" capacitive touch screen (1480x320):
     - [Waveshare 11.9" HDMI LCD](https://www.waveshare.com/11.9inch-hdmi-lcd.htm)
+  - Additional fixed-size profile available: `2560x720`.
+  - App window size follows the selected UI profile.
   - Application auto-centers on typical HD 15.6" displays.
   - Contact the developer for additional display requests.
 

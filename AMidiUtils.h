@@ -14,6 +14,7 @@
 
 #include <array>
 #include <functional>
+#include <map>
 #include <optional>
 
 //==============================================================================
@@ -130,6 +131,8 @@ struct AppState final
     int presetMidiPcInputChannel = 16;
     /** Config-global MIDI Program Change number (0..127) that triggers Preset Next. */
     int presetMidiPcValue = 0;
+    /** Active UI profile id loaded from configs/ui_profiles.json (e.g. 1480x320, 2560x720). */
+    String uiProfileId = "1480x320";
     bool startupMonitorEnabled = false;
     bool configchanged = false;
     bool configreload = false;
@@ -192,6 +195,7 @@ inline int& defaultEffectsVol = getAppState().defaultEffectsVol;
 inline int& defaultEffectsBri = getAppState().defaultEffectsBri;
 inline int& presetMidiPcInputChannel = getAppState().presetMidiPcInputChannel;
 inline int& presetMidiPcValue = getAppState().presetMidiPcValue;
+inline String& uiProfileId = getAppState().uiProfileId;
 inline bool& startupMonitorEnabled = getAppState().startupMonitorEnabled;
 inline bool& configchanged = getAppState().configchanged;
 inline bool& configreload = getAppState().configreload;
@@ -310,6 +314,336 @@ inline juce::File getLastSessionStateFile()
     if (!dir.isDirectory())
         dir.createDirectory();
     return dir.getChildFile("last_session.json");
+}
+
+struct UiProfileDefinition final
+{
+    juce::String id = "1480x320";
+    juce::String displayName = "1480 x 320";
+    int baseWidth = 1480;
+    int baseHeight = 320;
+    float xScale = 1.0f;
+    float yScale = 1.0f;
+    float buttonFontScale = 1.0f;
+    float labelFontScale = 1.0f;
+    float toggleFontScale = 1.0f;
+    float comboFontScale = 1.0f;
+    float groupTitleFontScale = 1.0f;
+    /** Optional absolute rect overrides for keyboard tab controls (keyed by component id). */
+    std::map<juce::String, juce::Rectangle<int>> keyboardRectOverrides;
+    /** Optional absolute rect overrides for Start tab controls (keyed by component id). */
+    std::map<juce::String, juce::Rectangle<int>> startRectOverrides;
+    /** Optional absolute rect overrides for Config tab controls (keyed by component id). */
+    std::map<juce::String, juce::Rectangle<int>> configRectOverrides;
+    /** Optional per-control font scale overrides (keyed by component id). */
+    std::map<juce::String, float> fontScaleOverrides;
+};
+
+inline juce::String getDefaultUiProfileId()
+{
+    return "1480x320";
+}
+
+inline juce::File getUiProfilesCatalogFile()
+{
+    juce::File dir = getOrganUserDocumentsRoot().getChildFile(getAppState().configdir);
+    if (!dir.isDirectory())
+        dir.createDirectory();
+    return dir.getChildFile("ui_profiles.json");
+}
+
+inline juce::String buildDefaultUiProfilesCatalogJson()
+{
+    // Baseline profile and a larger widescreen profile for 2560x720.
+    return R"json(
+{
+  "profiles": [
+    {
+      "id": "1480x320",
+      "displayName": "1480 x 320 (Default)",
+      "baseWidth": 1480,
+      "baseHeight": 320,
+      "xScale": 1.0,
+      "yScale": 1.0,
+      "buttonFontScale": 1.0,
+      "labelFontScale": 1.0,
+      "toggleFontScale": 1.0,
+      "comboFontScale": 1.0,
+      "groupTitleFontScale": 1.0,
+      "keyboardRectOverrides": {},
+      "startRectOverrides": {},
+      "configRectOverrides": {},
+      "fontScaleOverrides": {}
+    },
+    {
+      "id": "2560x720",
+      "displayName": "2560 x 720",
+      "baseWidth": 2560,
+      "baseHeight": 720,
+      "xScale": 1.7297,
+      "yScale": 2.25,
+      "buttonFontScale": 1.35,
+      "labelFontScale": 1.25,
+      "toggleFontScale": 1.25,
+      "comboFontScale": 1.2,
+      "groupTitleFontScale": 1.2,
+      "keyboardRectOverrides": {
+        "kbd.upper.voiceEditsGroup": { "x": 330, "y": 430, "w": 295, "h": 180 },
+        "kbd.lower.voiceEditsGroup": { "x": 330, "y": 430, "w": 295, "h": 180 },
+        "kbd.bass.voiceEditsGroup": { "x": 330, "y": 430, "w": 295, "h": 180 },
+        "kbd.upper.presetGroup": { "x": 640, "y": 430, "w": 1200, "h": 180 },
+        "kbd.lower.presetGroup": { "x": 640, "y": 430, "w": 1200, "h": 180 },
+        "kbd.bass.presetGroup": { "x": 640, "y": 430, "w": 1200, "h": 180 },
+        "kbd.upper.rotaryGroup": { "x": 20, "y": 430, "w": 295, "h": 180 },
+        "kbd.lower.rotaryGroup": { "x": 20, "y": 430, "w": 295, "h": 180 },
+        "kbd.upper.navLower": { "x": 1860, "y": 473, "w": 138, "h": 113 },
+        "kbd.upper.navBass": { "x": 2020, "y": 473, "w": 138, "h": 113 },
+        "kbd.lower.navUpper": { "x": 1860, "y": 473, "w": 138, "h": 113 },
+        "kbd.lower.navBass": { "x": 2020, "y": 473, "w": 138, "h": 113 },
+        "kbd.bass.navUpper": { "x": 1860, "y": 473, "w": 138, "h": 113 },
+        "kbd.bass.navLower": { "x": 2020, "y": 473, "w": 138, "h": 113 },
+        "kbd.upper.status": { "x": 2175, "y": 420, "w": 346, "h": 46 },
+        "kbd.lower.status": { "x": 2175, "y": 420, "w": 346, "h": 46 },
+        "kbd.bass.status": { "x": 2175, "y": 420, "w": 346, "h": 46 },
+        "kbd.upper.panelFile": { "x": 2175, "y": 473, "w": 346, "h": 68 },
+        "kbd.lower.panelFile": { "x": 2175, "y": 473, "w": 346, "h": 68 },
+        "kbd.bass.panelFile": { "x": 2175, "y": 473, "w": 346, "h": 68 },
+        "kbd.upper.save": { "x": 2175, "y": 518, "w": 138, "h": 68 },
+        "kbd.lower.save": { "x": 2175, "y": 518, "w": 138, "h": 68 },
+        "kbd.bass.save": { "x": 2175, "y": 518, "w": 138, "h": 68 },
+        "kbd.upper.saveAs": { "x": 2348, "y": 518, "w": 138, "h": 68 },
+        "kbd.lower.saveAs": { "x": 2348, "y": 518, "w": 138, "h": 68 },
+        "kbd.bass.saveAs": { "x": 2348, "y": 518, "w": 138, "h": 68 }
+      },
+      "startRectOverrides": {},
+      "configRectOverrides": {},
+      "fontScaleOverrides": {}
+    }
+  ]
+}
+)json";
+}
+
+inline std::map<juce::String, juce::Rectangle<int>> getBuiltIn2560KeyboardRectOverrides()
+{
+    return {
+        { "kbd.upper.voiceEditsGroup", { 330, 430, 295, 180 } },
+        { "kbd.lower.voiceEditsGroup", { 330, 430, 295, 180 } },
+        { "kbd.bass.voiceEditsGroup", { 330, 430, 295, 180 } },
+        { "kbd.upper.presetGroup", { 640, 430, 1200, 180 } },
+        { "kbd.lower.presetGroup", { 640, 430, 1200, 180 } },
+        { "kbd.bass.presetGroup", { 640, 430, 1200, 180 } },
+        { "kbd.upper.rotaryGroup", { 20, 430, 295, 180 } },
+        { "kbd.lower.rotaryGroup", { 20, 430, 295, 180 } },
+        { "kbd.upper.navLower", { 1860, 473, 138, 113 } },
+        { "kbd.upper.navBass", { 2020, 473, 138, 113 } },
+        { "kbd.lower.navUpper", { 1860, 473, 138, 113 } },
+        { "kbd.lower.navBass", { 2020, 473, 138, 113 } },
+        { "kbd.bass.navUpper", { 1860, 473, 138, 113 } },
+        { "kbd.bass.navLower", { 2020, 473, 138, 113 } },
+        { "kbd.upper.status", { 2175, 420, 346, 46 } },
+        { "kbd.lower.status", { 2175, 420, 346, 46 } },
+        { "kbd.bass.status", { 2175, 420, 346, 46 } },
+        { "kbd.upper.panelFile", { 2175, 473, 346, 68 } },
+        { "kbd.lower.panelFile", { 2175, 473, 346, 68 } },
+        { "kbd.bass.panelFile", { 2175, 473, 346, 68 } },
+        { "kbd.upper.save", { 2175, 518, 138, 68 } },
+        { "kbd.lower.save", { 2175, 518, 138, 68 } },
+        { "kbd.bass.save", { 2175, 518, 138, 68 } },
+        { "kbd.upper.saveAs", { 2348, 518, 138, 68 } },
+        { "kbd.lower.saveAs", { 2348, 518, 138, 68 } },
+        { "kbd.bass.saveAs", { 2348, 518, 138, 68 } }
+    };
+}
+
+inline bool ensureUiProfilesCatalogFileExists()
+{
+    const juce::File f = getUiProfilesCatalogFile();
+    if (f.existsAsFile())
+        return true;
+    return f.replaceWithText(buildDefaultUiProfilesCatalogJson());
+}
+
+inline juce::Array<UiProfileDefinition> loadUiProfilesCatalog()
+{
+    juce::Array<UiProfileDefinition> result;
+    if (!ensureUiProfilesCatalogFileExists())
+        return result;
+
+    const juce::File f = getUiProfilesCatalogFile();
+    juce::FileInputStream in(f);
+    if (!in.openedOk())
+        return result;
+
+    const juce::var parsed = juce::JSON::parse(in.readEntireStreamAsString());
+    auto* root = parsed.getDynamicObject();
+    if (root == nullptr)
+        return result;
+
+    const juce::var profilesVar = root->getProperty("profiles");
+    if (!profilesVar.isArray())
+        return result;
+    const auto* profiles = profilesVar.getArray();
+    if (profiles == nullptr)
+        return result;
+
+    auto readString = [](juce::DynamicObject* o, const char* key, const juce::String& fallback)
+        {
+            const juce::String s = o->getProperty(key).toString().trim();
+            return s.isNotEmpty() ? s : fallback;
+        };
+    auto readInt = [](juce::DynamicObject* o, const char* key, int fallback)
+        {
+            const juce::var v = o->getProperty(key);
+            if (v.isInt() || v.isInt64() || v.isDouble())
+                return static_cast<int>(v);
+            return fallback;
+        };
+    auto readFloat = [](juce::DynamicObject* o, const char* key, float fallback)
+        {
+            const juce::var v = o->getProperty(key);
+            if (v.isInt() || v.isInt64() || v.isDouble())
+                return static_cast<float>(static_cast<double>(v));
+            return fallback;
+        };
+    auto readRect = [](const juce::var& v, juce::Rectangle<int>& outRect)
+        {
+            auto* rectObj = v.getDynamicObject();
+            if (rectObj == nullptr)
+                return false;
+            const juce::var xv = rectObj->getProperty("x");
+            const juce::var yv = rectObj->getProperty("y");
+            const juce::var wv = rectObj->getProperty("w");
+            const juce::var hv = rectObj->getProperty("h");
+            if (!(xv.isInt() || xv.isInt64() || xv.isDouble())
+                || !(yv.isInt() || yv.isInt64() || yv.isDouble())
+                || !(wv.isInt() || wv.isInt64() || wv.isDouble())
+                || !(hv.isInt() || hv.isInt64() || hv.isDouble()))
+                return false;
+            const int x = static_cast<int>(xv);
+            const int y = static_cast<int>(yv);
+            const int w = juce::jmax(1, static_cast<int>(wv));
+            const int h = juce::jmax(1, static_cast<int>(hv));
+            outRect = { x, y, w, h };
+            return true;
+        };
+    auto readRectMap = [&readRect](const juce::var& v, std::map<juce::String, juce::Rectangle<int>>& out)
+        {
+            auto* obj = v.getDynamicObject();
+            if (obj == nullptr)
+                return;
+            const auto& props = obj->getProperties();
+            for (int i = 0; i < props.size(); ++i)
+            {
+                const juce::Identifier keyId = props.getName(i);
+                juce::Rectangle<int> r;
+                if (readRect(obj->getProperty(keyId), r))
+                    out[keyId.toString()] = r;
+            }
+        };
+    auto readFloatMap = [](const juce::var& v, std::map<juce::String, float>& out)
+        {
+            auto* obj = v.getDynamicObject();
+            if (obj == nullptr)
+                return;
+            const auto& props = obj->getProperties();
+            for (int i = 0; i < props.size(); ++i)
+            {
+                const juce::Identifier keyId = props.getName(i);
+                const auto vv = obj->getProperty(keyId);
+                if (vv.isInt() || vv.isInt64() || vv.isDouble())
+                    out[keyId.toString()] = juce::jlimit(0.5f, 4.0f, static_cast<float>((double) vv));
+            }
+        };
+
+    for (const auto& item : *profiles)
+    {
+        auto* obj = item.getDynamicObject();
+        if (obj == nullptr)
+            continue;
+
+        UiProfileDefinition p;
+        p.id = readString(obj, "id", getDefaultUiProfileId());
+        p.displayName = readString(obj, "displayName", p.id);
+        p.baseWidth = juce::jmax(1, readInt(obj, "baseWidth", 1480));
+        p.baseHeight = juce::jmax(1, readInt(obj, "baseHeight", 320));
+        p.xScale = juce::jlimit(0.25f, 8.0f, readFloat(obj, "xScale", 1.0f));
+        p.yScale = juce::jlimit(0.25f, 8.0f, readFloat(obj, "yScale", 1.0f));
+        p.buttonFontScale = juce::jlimit(0.50f, 4.0f, readFloat(obj, "buttonFontScale", 1.0f));
+        p.labelFontScale = juce::jlimit(0.50f, 4.0f, readFloat(obj, "labelFontScale", 1.0f));
+        p.toggleFontScale = juce::jlimit(0.50f, 4.0f, readFloat(obj, "toggleFontScale", 1.0f));
+        p.comboFontScale = juce::jlimit(0.50f, 4.0f, readFloat(obj, "comboFontScale", 1.0f));
+        p.groupTitleFontScale = juce::jlimit(0.50f, 4.0f, readFloat(obj, "groupTitleFontScale", 1.0f));
+
+        readRectMap(obj->getProperty("keyboardRectOverrides"), p.keyboardRectOverrides);
+        readRectMap(obj->getProperty("startRectOverrides"), p.startRectOverrides);
+        readRectMap(obj->getProperty("configRectOverrides"), p.configRectOverrides);
+        readFloatMap(obj->getProperty("fontScaleOverrides"), p.fontScaleOverrides);
+        if (p.id == "2560x720" && p.keyboardRectOverrides.empty())
+            p.keyboardRectOverrides = getBuiltIn2560KeyboardRectOverrides();
+        result.add(std::move(p));
+    }
+
+    return result;
+}
+
+inline UiProfileDefinition resolveUiProfile(const juce::String& requestedId)
+{
+    const auto profiles = loadUiProfilesCatalog();
+    if (profiles.isEmpty())
+        return {};
+
+    for (const auto& p : profiles)
+        if (p.id == requestedId)
+            return p;
+
+    for (const auto& p : profiles)
+        if (p.id == getDefaultUiProfileId())
+            return p;
+
+    return profiles.getReference(0);
+}
+
+inline juce::StringArray getUiProfileIds()
+{
+    juce::StringArray ids;
+    for (const auto& p : loadUiProfilesCatalog())
+        ids.addIfNotAlreadyThere(p.id);
+    if (ids.isEmpty())
+        ids.add(getDefaultUiProfileId());
+    return ids;
+}
+
+inline std::optional<juce::Rectangle<int>> getKeyboardRectOverride(const UiProfileDefinition& profile, const juce::String& componentId)
+{
+    const auto it = profile.keyboardRectOverrides.find(componentId);
+    if (it == profile.keyboardRectOverrides.end())
+        return std::nullopt;
+    return it->second;
+}
+
+inline std::optional<juce::Rectangle<int>> getStartRectOverride(const UiProfileDefinition& profile, const juce::String& componentId)
+{
+    const auto it = profile.startRectOverrides.find(componentId);
+    if (it == profile.startRectOverrides.end())
+        return std::nullopt;
+    return it->second;
+}
+
+inline std::optional<juce::Rectangle<int>> getConfigRectOverride(const UiProfileDefinition& profile, const juce::String& componentId)
+{
+    const auto it = profile.configRectOverrides.find(componentId);
+    if (it == profile.configRectOverrides.end())
+        return std::nullopt;
+    return it->second;
+}
+
+inline std::optional<float> getUiFontScaleOverride(const UiProfileDefinition& profile, const juce::String& componentId)
+{
+    const auto it = profile.fontScaleOverrides.find(componentId);
+    if (it == profile.fontScaleOverrides.end())
+        return std::nullopt;
+    return it->second;
 }
 
 /** Restores last used panel/config basenames if those files still exist. */
@@ -480,6 +814,9 @@ inline std::function<void()> gNotifyVoiceEditTabAccessChanged;
 
 /** Optional: refresh Start/Keyboard/Config panel+config status labels after filename/state changes. */
 inline std::function<void()> gNotifyStatusLinesChanged;
+
+/** Optional: apply selected UI profile to live tab layouts when changed in Config tab. */
+inline std::function<void()> gNotifyUiProfileChanged;
 
 /** Preset rotary encoding in .pnl per ButtonGroup: 0=slow, 1=fast, 2=brake (see tests). */
 inline int encodePresetRotaryFromManual(bool isFast, bool brake) noexcept

@@ -45,6 +45,8 @@ Contact the developer for additional module support.
 - `New Panel` creates a new `.pnl` from the currently selected module using that module's first voice for all panel voice buttons.
 - The create flow prompts for a file name, blocks duplicates, then saves and auto-loads the new panel.
 - Checks config/panel pairing when loading and can warn if the selected files do not belong together.
+- Includes a Start-row `Exit` button (same behavior as `Exit` tab).
+- Status lines are shown as `Panel: <file>` and `Config: <file>`.
 
 ### Upper / Lower / Bass&Drums
 
@@ -100,6 +102,7 @@ Contact the developer for additional module support.
   - PC Value (`0..127`, default `0`)
   - Matching Program Change triggers preset-next using the same behavior as the `Next preset` hotkey.
   - Matching Program Change is consumed (not forwarded to outputs) and this trigger check ignores pass-through filtering.
+- `UI Profile` changes apply live across Start/Upper/Lower/Bass/Config/Sounds/Effects/Hotkeys/Monitor and resize the app window to the selected fixed profile size.
 - Config settings are global to the app and are separate from the currently loaded panel.
 
 ### Hotkeys
@@ -118,6 +121,7 @@ Contact the developer for additional module support.
 
 - Exits the application.
 - If panel-related changes are pending, the app may ask whether you want to save before quitting.
+- Start-tab `Exit` button routes through the same exit flow.
 
 ## Performance Behavior
 

@@ -45,6 +45,8 @@ Primary implementation files:
   - Load panel (`.pnl`) and config (`.cfg`)
   - Persist sticky MIDI ports
   - Restore last used panel/config on startup (`last_session.json`) when files exist
+  - Quick `Exit` button in the Start action row (routes through the same flow as Exit tab)
+  - Consolidated status lines rendered as `Panel: <file>` and `Config: <file>`
 - **Upper / Lower / Bass&Drums**
   - Main performance tabs with voice button groups
   - Per-group volume and mute controls
@@ -70,6 +72,10 @@ Primary implementation files:
   - Default effects values
   - Module alias fields
   - Global startup-monitor toggle persisted in config
+  - Global UI profile selector persisted in config (`uiProfileId`)
+  - UI profile changes apply live across Start/Upper/Lower/Bass/Config/Sounds/Effects/Hotkeys/Monitor and resize the top-level app window
+  - Profile catalog source: `Documents/AMidiOrgan/configs/ui_profiles.json`
+  - Utility export action writes current keyboard control bounds to `ui_profile_overrides_<profileId>.json`
   - Global `Preset MIDI PC` trigger (`input channel` + `PC value`) persisted in config
   - Solo split note naming uses project convention `C4 = 60`
   - Validation rules for module/channel uniqueness
@@ -207,6 +213,7 @@ User data root: `Documents/AMidiOrgan`
 - `configs/hotkeys.json`: Shortcut mappings
 - `configs/midi_sticky_devices.json`: Last MIDI in/out selections
 - `configs/last_session.json`: Last loaded panel/config
+- `configs/ui_profiles.json`: UI profile catalog and optional `keyboardRectOverrides`
 - `configs/instrument_modules.json`: Managed module catalog (module index and metadata)
 - `instruments/*.json`: Sound module catalogs
 
@@ -217,6 +224,10 @@ Config persistence notes:
 - Startup managed sync overwrites `configs/instrument_modules.json` and selected shipped instrument catalogs (`midigm.json`, `maxplus.json`, `integra7.json`, `at900mi.json`, `ketronevm.json`) each launch to keep runtime catalogs aligned with bundled docs.
 - Non-managed user catalogs (for example `custom.json`) are preserved.
 - Config root also persists `presetMidiPcInputChannel` and `presetMidiPcValue` for external Program Change preset-next triggering.
+- Config root also persists `uiProfileId` for fixed-size profile selection.
+- UI profile precedence:
+  - explicit user `keyboardRectOverrides` from `ui_profiles.json` are used first;
+  - built-in defaults are used as fallback only when profile overrides are absent.
 - Panel preset payload compatibility:
   - New saves include `Manual + Preset 1..12`.
   - Loading remains backward compatible with legacy panel files containing only `Manual + Preset 1..6`; missing `Preset 7..12` nodes are default-initialized.

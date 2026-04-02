@@ -126,11 +126,13 @@ You can:
 - Load panel (`.pnl`) and config (`.cfg`) files
 - Select active sound module
 - Verify panel/config status labels
+- Use the Start-row `Exit` button (same behavior as the `Exit` tab)
 
 Behavior:
 
 - Last used panel/config can auto-restore at startup when files still exist.
 - Start tab remembers selected MIDI ports via sticky device storage.
+- Panel/config status lines are displayed as `Panel: <file>` and `Config: <file>`.
 
 Best practice:
 
@@ -238,6 +240,7 @@ Operational guidance:
 
 - Apply and verify config changes before live use.
 - Reopen performance tabs and test each affected group after config updates.
+- `UI Profile` applies live across Start/Upper/Lower/Bass/Config/Sounds/Effects/Hotkeys/Monitor and resizes the app window to the selected fixed profile size.
 
 Expected result:
 
@@ -299,6 +302,7 @@ Expected result:
 
 - Closes application.
 - If panel changes are pending, app may prompt to save first.
+- The Start-tab `Exit` button uses the same exit flow.
 
 ---
 
