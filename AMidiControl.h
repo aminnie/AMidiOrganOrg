@@ -86,8 +86,15 @@ public:
     void drawToggleButton(juce::Graphics& g, juce::ToggleButton& button, bool shouldDrawButtonAsHighlighted,
                           bool shouldDrawButtonAsDown) override
     {
-        const auto fontSize = juce::jlimit(8.0f, 72.0f, button.getHeight() * 0.60f * getComponentScale(button));
-        const auto tickWidth = juce::jmin(20.0f, button.getHeight() * 0.75f);
+        const auto id = button.getComponentID();
+        const bool isManualRotaryTargetToggle = id.endsWith(".rotaryToggle1") || id.endsWith(".rotaryToggle2");
+        const auto scale = getComponentScale(button);
+        const auto fontSize = isManualRotaryTargetToggle
+            ? juce::jlimit(10.0f, 72.0f, 15.0f * scale) // Match group-title visual scale for rotary target labels.
+            : juce::jlimit(8.0f, 72.0f, button.getHeight() * 0.60f * scale);
+        const auto tickWidth = isManualRotaryTargetToggle
+            ? juce::jlimit(10.0f, 20.0f, 14.0f * scale)
+            : juce::jmin(20.0f, button.getHeight() * 0.75f);
 
         drawTickBox(g, button, 4.0f, (button.getHeight() - tickWidth) * 0.5f, tickWidth, tickWidth,
                     button.getToggleState(), button.isEnabled(), shouldDrawButtonAsHighlighted, shouldDrawButtonAsDown);
@@ -6046,6 +6053,19 @@ struct KeyboardPanelPage final : public Component,
         return out;
     }
 
+    static bool isManualRotaryTargetToggleComponent(const juce::Component* comp)
+    {
+        if (comp == nullptr)
+            return false;
+        const auto id = comp->getComponentID();
+        return id.endsWith(".rotaryToggle1") || id.endsWith(".rotaryToggle2");
+    }
+
+    static int getManualRotaryToggleVerticalOffsetPx(const UiProfileDefinition& profile)
+    {
+        return profile.id == "2560x720" ? 10 : 5;
+    }
+
     /** Re-apply selected UI profile (Config tab selection or startup load). */
     void applyCurrentUiProfile()
     {
@@ -6065,6 +6085,9 @@ struct KeyboardPanelPage final : public Component,
             const auto overrideRect = getKeyboardRectOverride(profile, comp->getComponentID());
             comp->setBounds(overrideRect.has_value() ? *overrideRect
                                                      : scaleRectForProfile(base, sx, sy));
+            if (isManualRotaryTargetToggleComponent(comp))
+                comp->setBounds(comp->getX(), comp->getY() + getManualRotaryToggleVerticalOffsetPx(profile),
+                                comp->getWidth(), comp->getHeight());
             applyProfileFontScale(profile, comp);
         }
 

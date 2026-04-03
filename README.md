@@ -2,11 +2,25 @@
 
 AMidiOrgan is a live-performance MIDI controller built with [JUCE](https://juce.com). It is designed for rigs with multiple MIDI keyboards and sound modules, bringing routing, layering, preset recall, voice editing, and effect control into one interface.
 
+  
+What problem does AMIDIOrgan solve:
+
+- If when you have more than keyboard, organ or sound module in your gig, then for each performance you have to configure the  
+keyboard and modules seperately for the voices you plan to use.
+- If is challenging to change the configuration of multipe decives at the same time. The 12 presets available in the solution can be configured to voice changes across all devices and will change it synchronously.
+- Voice layering is supported across one or multiple devices, along with assignable keyboard splitw across the Upper and Lower keyboards. 
+- The MIDI implementation for each device is loaded into the solution, tied to a device module that is configured on each button   
+group. This enables you to configure voice buttons for each MIDI devices in the Sounds tab.
+- Multiple MIDI keyboards and sound modules can be interfaced via USB directly in eg. the host Mac or Windows machine. This  
+simplifies the configuration and often you may be able to get buy without external MIDI hardware mergers or routers.
+- OS supported hotkeys for key functions have been integrated into the AMIDIOrgan. This means that you can use an external keypad or a Streamdeck to trigger the hotkey supported functions.
+
+  
 For complete end-user operating instructions (installation, setup, and screen-by-screen usage), see [USER_MANUAL.md](USER_MANUAL.md).
 
 For architecture and implementation details, see [TECHNICAL_OVERVIEW.md](TECHNICAL_OVERVIEW.md).
 
-The application is organized around three performance panels:
+The application is organized around three performance panels plus a number of supporting panels:
 
 - `Upper`
 - `Lower`
@@ -18,44 +32,44 @@ Each panel uses the active configuration and panel data to determine which voice
 
 ### Start Tab
 
-![Start Tab](docs/images/tab-start.png)
+Start Tab
 
 ### Upper Tab
 
-![Upper Tab](docs/images/tab-upper.png)
+Upper Tab
 
 ### Lower Tab
 
-![Lower Tab](docs/images/tab-lower.png)
+Lower Tab
 
 ### Bass Tab
 
-![Bass Tab](docs/images/tab-bass.png)
+Bass Tab
 
 ### Sounds Tab
 
-![Sounds Tab](docs/images/tab-sounds.png)
-![Sounds Tab](docs/images/tab-sounds1.png)
+Sounds Tab  
+Sounds Tab
 
 ### Effects Tab
 
-![Effects Tab](docs/images/tab-effects.png)
+Effects Tab
 
 ### Config Tab
 
-![Config Tab](docs/images/tab-config.png)
+Config Tab
 
 ### Hotkeys Tab
 
-![Config Tab](docs/images/tab-hotkeys.png)
+Config Tab
 
 ### Monitor Tab
 
-![Config Tab](docs/images/tab-monitor.png)
+Config Tab
 
 ### Help Tab
 
-![Config Tab](docs/images/tab-help.png)
+Config Tab
 
 ## Functional Overview
 
@@ -131,17 +145,9 @@ On startup, the app also attempts to auto-restore the last used panel and config
 - The group title is prefixed with the active sound module name when available.
 - Effect changes are applied on the button group's MIDI output channel as you edit them.
 - Use `To Upper`, `To Lower`, or `To Bass` to return to the performance tab.
-- Current effect set:
-  - VOL
-  - EXP
-  - REV
-  - CHO
-  - MOD
-  - TIM
-  - ATK
-  - REL
-  - BRI
-  - PAN
+- The following MIDI effects that can be changed on each voice button:
+  - VOL, EXP, REV, CHO, MOD
+  - TIM, ATK, REL, BRI, PAN
 
 #### Config
 
@@ -163,7 +169,7 @@ On startup, the app also attempts to auto-restore the last used panel and config
 - Profile catalog file is `Documents/AMidiOrgan/configs/ui_profiles.json`.
 - `Export UI Map` writes a ready-to-edit snapshot file:
   - `Documents/AMidiOrgan/configs/ui_profile_overrides_<profileId>.json`
-  - currently includes `keyboardRectOverrides` entries with control ids (for example `kbd.upper.*`) and current bounds.
+  - currently includes `keyboardRectOverrides` entries with control ids (for example `kbd.upper.`*) and current bounds.
 - Profile overrides in `ui_profiles.json`:
   - `keyboardRectOverrides`: absolute `x/y/w/h` per keyboard-tab control id.
   - `startRectOverrides`: absolute `x/y/w/h` per Start-tab control id.
@@ -315,19 +321,21 @@ Important subfolders:
 
 When the main window has focus:
 
-| Action | Key |
-|--------|-----|
-| Preset 1–6 | `1`–`6` |
-| Manual preset | `0` |
-| Next preset | `7` |
+
+| Action                   | Key       |
+| ------------------------ | --------- |
+| Preset 1–6               | `1`–`6`   |
+| Manual preset            | `0`       |
+| Next preset              | `7`       |
 | Upper / Lower / Bass tab | A / S / D |
-| Sounds tab | Z |
-| Effects tab | X |
-| Monitor tab | M |
-| Upper rotary Fast/Slow | F |
-| Upper rotary Brake | B |
-| Lower rotary Fast/Slow | G |
-| Lower rotary Brake | N |
+| Sounds tab               | Z         |
+| Effects tab              | X         |
+| Monitor tab              | M         |
+| Upper rotary Fast/Slow   | F         |
+| Upper rotary Brake       | B         |
+| Lower rotary Fast/Slow   | G         |
+| Lower rotary Brake       | N         |
+
 
 Upper and Lower rotary keys always target their respective manuals, even when another tab is selected.
 
@@ -340,8 +348,6 @@ Current preset hotkeys cover `Manual`, `Preset 1..6`, and `Next preset`. Dedicat
 While a `TextEditor` or `ComboBox` has keyboard focus, including inside modal dialogs, global shortcuts are deferred so normal typing and selection still work.
 
 Letter shortcuts may still fire when focus is on other controls, such as a plain button.
-
-
 
 ## 12. Build
 
@@ -510,7 +516,6 @@ The following asset filenames are referenced by code through `BinaryData` symbol
 - `assets/icons8arrowdown32click.png`
 - `assets/icons8arrowup32click.png`
 
-
 ### 13. General
 
 - Built using JUCE and C++.
@@ -527,18 +532,21 @@ The following asset filenames are referenced by code through `BinaryData` symbol
   - Uses custom JSON sound-module device files.
   - Supports hardware/software modules that present as MIDI devices after module file is added.
 - Displays:
-  - Baseline profile optimized for Waveshare 11.9" capacitive touch screen (1480x320):
-    - [Waveshare 11.9" HDMI LCD](https://www.waveshare.com/11.9inch-hdmi-lcd.htm)
-  - Additional fixed-size profile available: `2560x720`.
-  - App window size follows the selected UI profile.
-  - Application auto-centers on typical HD 15.6" displays.
-  - Contact the developer for additional display requests.
+  - Screen profiles user selectable for
+    - Waveshare 11.9" capacitive touch screen (1480x320)
+      - [Waveshare 11.9" HDMI LCD](https://www.waveshare.com/11.9inch-hdmi-lcd.htm)
+    - Corsair Xenon Edge 14.5" touch screen or equivalent (2560x720)
+      - [https://www.corsair.com/us/en/p/monitors/cc-9011306-ww/xeneon-edge-14-5-lcd-touchscreen-cc-9011306-ww](https://www.corsair.com/us/en/p/monitors/cc-9011306-ww/xeneon-edge-14-5-lcd-touchscreen-cc-9011306-ww)
+
+- App window size follows the selected UI profile.
+- Application auto-centers on typical HD 15.6" displays.
+- Contact the developer for additional display requests.
 
 ### 15. Up Next
 
 - Use JUCE to compile/test controller with Raspberry Pi
   - Goal: cost-effective standalone controller + display without requiring a PC.
-- Add optional hardware support for selected buttons and sliders.
+- Add optional hardware support for selected buttons and sliders, e.g. Elgato Streamdeck
 
 ## Contact Details
 
