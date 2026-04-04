@@ -39,10 +39,10 @@
     },
     {
       "moduleIndex": 2,
-      "displayName": "Roland Integra7",
+      "displayName": "Roland Integra-7",
       "subDirectory": "Integra7",
       "moduleFileName": "integra7.json",
-      "moduleIdString": "INTEGRA",
+      "moduleIdString": "INTEGRA-7",
       "defaultVoiceName": "Piano",
       "defaultMSB": 87,
       "defaultLSB": 64,
