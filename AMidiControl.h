@@ -7171,20 +7171,19 @@ public:
                             instrumentmodules->saveModules();
 
                             // Instantiate Midi Instruments and load sound file into JSON object
-                            // and Update Vendor Button text with new name
+                            // and refresh Start-module label from current button-group module mapping.
                             midiInstruments->loadMidiInstruments(appState.instrumentfname);
-                            String currentVendorName = midiInstruments->getVendor();
-                            toModule.setButtonText(currentVendorName);
+                            refreshStartModuleButtonLabelFromConfigMapping();
 
                             // Instantiate Instrument Panel from Master Panel on Disk when true
                             bool bloaded = instrumentpanel->loadInstrumentPanel(appState.instrumentdname, defpanelfname, false);
 
                             String msgloaded;
                             if (bloaded == true) {
-                                msgloaded = "Loading module:\n " + currentVendorName;
+                                msgloaded = "Loading module:\n " + toModule.getButtonText();
                             }
                             else {
-                                msgloaded = "Module load failed!\n " + currentVendorName;
+                                msgloaded = "Module load failed!\n " + toModule.getButtonText();
                             }
 
                             if (TextButton* focused = &toModule)
@@ -7299,10 +7298,9 @@ public:
         ////vendorname = instrumentmodules->getDisplayName(moduleidx);
 
         // Instantiate Midi Instruments and load sound file into JSON object
-        // and Update Vendor Button text with new name
+        // and update Start-module label from current module mapping.
         midiInstruments->loadMidiInstruments(appState.instrumentfname);
-        String currentVendorName = midiInstruments->getVendor();
-        toModule.setButtonText(currentVendorName);
+        refreshStartModuleButtonLabelFromConfigMapping();
 
         // Instantiate Instrument Panel from Master Panel on Disk when true
         bool bloaded = instrumentpanel->initInstrumentPanel(appState.instrumentdname, appState.panelfname, true);
@@ -7484,6 +7482,7 @@ public:
         // Flag mismatch between panel file and incorrect config file in red.
         configfileLabel.setText("Config: " + appState.configfname, {});
         panelfileLabel.setText("Panel: " + appState.panelfname, {});
+        refreshStartModuleButtonLabelFromConfigMapping();
 
         appState.configreload = (appState.configfname.compare(appState.pnlconfigfname) != 0);
         if (appState.configreload == true)
@@ -7513,6 +7512,56 @@ public:
     }
 
 private:
+    void refreshStartModuleButtonLabelFromConfigMapping()
+    {
+        if (instrumentpanel == nullptr || instrumentmodules == nullptr)
+        {
+            toModule.setButtonText(appState.vendorname);
+            return;
+        }
+
+        const int moduleCount = instrumentmodules->getNumModules();
+        if (moduleCount <= 0)
+        {
+            toModule.setButtonText("No Modules");
+            return;
+        }
+
+        juce::Array<int> uniqueModuleIdx;
+        for (int i = 0; i < numberbuttongroups; ++i)
+        {
+            auto* group = instrumentpanel->getButtonGroup(i);
+            if (group == nullptr)
+                continue;
+            const int idx = juce::jlimit(0, moduleCount - 1, group->moduleidx);
+            uniqueModuleIdx.addIfNotAlreadyThere(idx);
+        }
+
+        if (uniqueModuleIdx.isEmpty())
+        {
+            const int safeIdx = juce::jlimit(0, moduleCount - 1, appState.moduleidx);
+            toModule.setButtonText(instrumentmodules->getDisplayName(safeIdx));
+            return;
+        }
+
+        if (uniqueModuleIdx.size() == 1)
+        {
+            const int idx = uniqueModuleIdx[0];
+            appState.moduleidx = idx;
+            instrumentmodules->setInstrumentModule(appState.moduleidx);
+            toModule.setButtonText(instrumentmodules->getDisplayName(idx));
+            toModule.setTooltip("All button groups use: " + instrumentmodules->getDisplayName(idx));
+            return;
+        }
+
+        juce::StringArray names;
+        for (int i = 0; i < uniqueModuleIdx.size(); ++i)
+            names.add(instrumentmodules->getDisplayName(uniqueModuleIdx[i]));
+
+        toModule.setButtonText("Mixed Modules");
+        toModule.setTooltip("Button groups use multiple modules: " + names.joinIntoString(", "));
+    }
+
     static constexpr const char* kVirtualKeyboardInputId = "virtual-keyboard-internal";
     static constexpr const char* kVirtualKeyboardInputName = "Virtual Keyboard (Internal)";
 

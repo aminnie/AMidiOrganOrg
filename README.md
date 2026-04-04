@@ -195,6 +195,7 @@ On startup, the app also attempts to auto-restore the last used panel and config
 - `Save` applies the current shortcut map and writes it to disk.
 - `Cancel` restores the last applied shortcut map.
 - Duplicate non-empty shortcuts are blocked.
+- Next preset shortcut is also supported via a programmable Program Change.
 
 #### Monitor
 
