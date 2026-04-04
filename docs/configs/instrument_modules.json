@@ -40,7 +40,7 @@
     {
       "moduleIndex": 2,
       "displayName": "Roland Integra-7",
-      "subDirectory": "Integra7",
+      "subDirectory": "Integra-7",
       "moduleFileName": "integra7.json",
       "moduleIdString": "INTEGRA-7",
       "defaultVoiceName": "Piano",

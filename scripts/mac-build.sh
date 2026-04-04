@@ -130,7 +130,8 @@ else
     require_cmd ninja
     GEN_ARGS+=(-G Ninja)
   fi
-  cmake -S . -B "${BUILD_DIR}" "${GEN_ARGS[@]}" -DJUCE_ROOT="${JUCE_ROOT}" -DCMAKE_BUILD_TYPE="${BUILD_TYPE}"
+  # ${GEN_ARGS[@]+...} avoids "unbound variable" under `set -u` when the array is empty (macOS bash 3.2).
+  cmake -S . -B "${BUILD_DIR}" ${GEN_ARGS[@]+"${GEN_ARGS[@]}"} -DJUCE_ROOT="${JUCE_ROOT}" -DCMAKE_BUILD_TYPE="${BUILD_TYPE}"
   cmake --build "${BUILD_DIR}" --target AMidiOrgan
   ART_SUB="${BUILD_TYPE}"
   echo ""
