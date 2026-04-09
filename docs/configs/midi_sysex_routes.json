@@ -1,4 +1,10 @@
 {
   "version": 1,
-  "routes": []
+  "routes": [
+    {
+      "inputIdentifier": "EVM Stream Deck",
+      "outputIdentifier": "MIDI Gadget",
+      "outputModule": "EVM"
+    }
+  ]
 }
