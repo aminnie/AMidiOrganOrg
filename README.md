@@ -315,6 +315,7 @@ Important subfolders:
 
 - `configs/` for `.cfg` files
 - `configs/instrument_modules.json` for module labels and MIDI output device match aliases (`matchStrings`)
+- `configs/midi_sysex_routes.json` for explicit SysEx input-to-output routes
 - `panels/` for `.pnl` files
 - `instruments/` for JSON instrument catalogs
 - `configs/hotkeys.json` for keyboard shortcut bindings
@@ -506,6 +507,7 @@ Recommended upkeep on a Mac mini:
 - On startup, the app seeds `Documents/AMidiOrgan` from `docs/` on first run, then ensures missing files under `configs/`, `instruments/` (JSON instrument catalogs), and `panels/` (`.pnl` panel files) are restored on subsequent runs.
 - Managed startup sync also overwrites selected shipped files every launch to keep runtime data current: `configs/instrument_modules.json` and module catalogs `midigm.json`, `maxplus.json`, `integra7.json`, `at900mi.json`, `ketronevm.json`.
 - User-editable catalogs such as `custom.json` are not part of the managed overwrite set.
+- SysEx routing config (`configs/midi_sysex_routes.json`) is user-editable and not part of the managed overwrite set; unmapped SysEx inputs are dropped with a warning log entry.
 - On macOS, the current test executable is compiled but runtime execution is temporarily disabled in CTest due a shutdown-time crash; app build validation remains fully enabled.
 
 ### Asset Naming Contract

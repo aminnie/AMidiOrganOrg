@@ -10,6 +10,8 @@
 
 #pragma once
 #include <functional>
+#include <map>
+#include <set>
 
 
 //==============================================================================
@@ -102,6 +104,8 @@ inline bool doesAnyModuleMatcherMatchDeviceName(const StringArray& rawMatchers, 
 // ...
 // MySingleton::deleteInstance(); // safely deletes the singleton (if it's been created).
 //==============================================================================
+class InstrumentModules;
+
 static int zinstcntmididevices = 0;
 class MidiDevices : public Component, public MidiInputCallback
 {
@@ -247,18 +251,94 @@ public:
         return outputChannelMuted[outchan];
     }
 
+    void clearSysExRoutes()
+    {
+        const juce::SpinLock::ScopedLockType routeLock(sysexRoutesLock);
+        sysexInputToOutputIndex.clear();
+        sysexInputToRouteLabel.clear();
+        sysexUnmappedLoggedInputs.clear();
+    }
+
+    void setSysExRouteForInputIdentifier(const juce::String& inputIdentifier, int outputDeviceIndex, const juce::String& routeLabel = {})
+    {
+        const juce::String normalizedInput = inputIdentifier.trim().toLowerCase();
+        if (normalizedInput.isEmpty())
+            return;
+
+        const juce::SpinLock::ScopedLockType routeLock(sysexRoutesLock);
+        sysexInputToOutputIndex[normalizedInput] = outputDeviceIndex;
+        sysexInputToRouteLabel[normalizedInput] = routeLabel.trim();
+        sysexUnmappedLoggedInputs.erase(normalizedInput);
+    }
+
+    bool routeIncomingSysExForInputIdentifier(const juce::String& inputIdentifier, const MidiMessage& message)
+    {
+        const juce::String normalizedInput = inputIdentifier.trim().toLowerCase();
+        const juce::String logInput = normalizedInput.isEmpty() ? juce::String("<unknown-input>") : normalizedInput;
+
+        int outmodidx = -1;
+        {
+            const juce::SpinLock::ScopedLockType routeLock(sysexRoutesLock);
+            const auto it = sysexInputToOutputIndex.find(normalizedInput);
+            if (it == sysexInputToOutputIndex.end())
+            {
+                if (sysexUnmappedLoggedInputs.insert(logInput).second)
+                    juce::Logger::writeToLog("*** SysExRouter: dropping unmapped SysEx from input " + logInput);
+                return false;
+            }
+            outmodidx = it->second;
+        }
+
+        juce::String routedModuleName;
+        if (outmodidx >= 0 && outmodidx < midiOutputs.size())
+            routedModuleName = midiOutputs[outmodidx]->deviceInfo.name;
+
+        std::function<void(const MidiMessage&, const juce::String&)> monitorHookCopy;
+        {
+            const juce::SpinLock::ScopedLockType hookLock(outgoingMonitorHookLock);
+            monitorHookCopy = outgoingMonitorHook;
+        }
+
+        if (testSendHook)
+            testSendHook(message);
+        if (monitorHookCopy)
+            monitorHookCopy(message, routedModuleName);
+
+        if (outmodidx < 0 || outmodidx >= midiOutputs.size())
+        {
+            juce::Logger::writeToLog("*** SysExRouter: mapped output index invalid for input " + logInput);
+            return false;
+        }
+
+        if (midiOutputs[outmodidx]->outDevice.get() != nullptr)
+        {
+            midiOutputs[outmodidx]->outDevice->sendMessageNow(message);
+            juce::Logger::writeToLog("*** SysExRouter: routed SysEx from input " + logInput + " to output " + routedModuleName);
+        }
+        else
+        {
+            juce::Logger::writeToLog("*** SysExRouter: mapped output unavailable for input " + logInput);
+        }
+
+        // Keep monitor visibility behavior consistent with other output paths.
+        if (midiviewidx < midiOutputs.size() && midiOutputs[midiviewidx]->outDevice.get() != nullptr)
+            midiOutputs[midiviewidx]->outDevice->sendMessageNow(message);
+
+        return true;
+    }
+
     //-------------------------------------------------------------------------
     // Process Inbound Midi Messages and Send to Output
     //-------------------------------------------------------------------------
-    void handleIncomingMidiMessage(MidiInput*, const MidiMessage& message) override
+    void handleIncomingMidiMessage(MidiInput* sourceInput, const MidiMessage& message) override
     {
         //--- To do: Should we be adding messages to buffer rather than straight out to midiOutput
         int inchan = message.getChannel();
 
-        // Non-channel messages (e.g. SysEx) are forwarded unchanged.
+        // Non-channel messages (e.g. SysEx) route through explicit SysEx input mapping.
         if (!isValidMidiChannel(inchan))
         {
-            sendToOutputs(message);
+            routeIncomingSysExForInputIdentifier(resolveInputIdentifierForSource(sourceInput), message);
             return;
         }
 
@@ -540,6 +620,11 @@ public:
     // Remember the MidiView monitoring output channel for message duplication
     int midiviewidx = 255;
 
+    juce::SpinLock sysexRoutesLock;
+    std::map<juce::String, int> sysexInputToOutputIndex;
+    std::map<juce::String, juce::String> sysexInputToRouteLabel;
+    std::set<juce::String> sysexUnmappedLoggedInputs;
+
     // Test hook for observing emitted output messages without hardware.
     std::function<void(const MidiMessage&)> testSendHook;
     std::function<void()> presetNextTriggerHook;
@@ -552,6 +637,20 @@ public:
     juce_DeclareSingleton(MidiDevices, true)
 
 private:
+    juce::String resolveInputIdentifierForSource(MidiInput* sourceInput) const
+    {
+        if (sourceInput == nullptr)
+            return {};
+
+        for (int i = 0; i < midiInputs.size(); ++i)
+        {
+            if (midiInputs[i] != nullptr && midiInputs[i]->inDevice.get() == sourceInput)
+                return midiInputs[i]->deviceInfo.identifier;
+        }
+
+        return {};
+    }
+
     // Default constructor made private
     MidiDevices() {
         juce::Logger::writeToLog("=S= MidiDevices(): Constructor " + std::to_string(zinstcntmididevices++));

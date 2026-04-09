@@ -2027,6 +2027,116 @@ namespace
         return true;
     }
 
+    bool runExplicitSysExInputRouting(std::string& details)
+    {
+        auto* devices = MidiDevices::getInstance();
+        auto* modules = InstrumentModules::getInstance();
+        if (devices == nullptr || modules == nullptr)
+        {
+            details = "MidiDevices/InstrumentModules singleton not available";
+            return false;
+        }
+
+        devices->clearMidiIOMap();
+        devices->clearSysExRoutes();
+
+        MidiDeviceInfo out;
+        out.identifier = "sysex-out-evm";
+        out.name = "MIDI Gadget";
+
+        devices->midiOutputs.clear();
+        devices->midiOutputs.add(new MidiDeviceListEntry(out));
+
+        juce::Array<MidiSysExRouteEntry> routes;
+        MidiSysExRouteEntry route;
+        route.inputIdentifier = "sysex-input-a";
+        route.outputModule = "EVM";
+        routes.add(route);
+
+        // Mirror production resolution path without requiring UI classes in this unit test.
+        for (const auto& r : routes)
+        {
+            int moduleIdx = -1;
+            for (int m = 0; m < modules->getNumModules() && moduleIdx < 0; ++m)
+            {
+                if (modules->getDisplayName(m).equalsIgnoreCase(r.outputModule)
+                    || modules->getModuleIdString(m).equalsIgnoreCase(r.outputModule))
+                {
+                    moduleIdx = m;
+                    break;
+                }
+
+                for (const auto& matcher : modules->getModuleMatchStrings(m))
+                {
+                    if (matcher.equalsIgnoreCase(r.outputModule))
+                    {
+                        moduleIdx = m;
+                        break;
+                    }
+                }
+            }
+
+            if (moduleIdx < 0)
+            {
+                details = "failed to resolve EVM module for SysEx route test";
+                return false;
+            }
+
+            int outmodidx = -1;
+            for (int i = 0; i < devices->midiOutputs.size(); ++i)
+            {
+                if (modules->deviceNameMatchesModule(moduleIdx, devices->midiOutputs[i]->deviceInfo.name))
+                {
+                    outmodidx = i;
+                    break;
+                }
+            }
+
+            if (outmodidx < 0)
+            {
+                details = "failed to resolve mapped output index for SysEx route test";
+                return false;
+            }
+
+            devices->setSysExRouteForInputIdentifier(r.inputIdentifier, outmodidx, modules->getDisplayName(moduleIdx));
+        }
+
+        std::vector<MidiMessage> sentMessages;
+        devices->testSendHook = [&sentMessages](const MidiMessage& message)
+        {
+            sentMessages.push_back(message);
+        };
+
+        const juce::uint8 sysexData[] { 0xF0, 0x7D, 0x01, 0x02, 0xF7 };
+        const auto sysex = MidiMessage::createSysExMessage(sysexData, static_cast<int>(std::size(sysexData)));
+
+        if (!expectEqual(devices->routeIncomingSysExForInputIdentifier("sysex-input-a", sysex) ? 1 : 0, 1,
+                         "mapped SysEx route forwards to output", details))
+        {
+            devices->testSendHook = nullptr;
+            return false;
+        }
+
+        if (!expectEqual(static_cast<int>(sentMessages.size()), 1, "mapped SysEx emits one output message", details)
+            || !expectEqual(sentMessages[0].isSysEx() ? 1 : 0, 1, "mapped output message is SysEx", details))
+        {
+            devices->testSendHook = nullptr;
+            return false;
+        }
+
+        sentMessages.clear();
+        if (!expectEqual(devices->routeIncomingSysExForInputIdentifier("unknown-input", sysex) ? 1 : 0, 0,
+                         "unmapped SysEx route drops message", details))
+        {
+            devices->testSendHook = nullptr;
+            return false;
+        }
+
+        const bool noExtraSend = sentMessages.empty();
+        devices->testSendHook = nullptr;
+        return expectEqual(noExtraSend ? 1 : 0, 1, "unmapped SysEx does not emit output", details);
+    }
+
     bool runProgramChangePresetNextTriggerAndConsume(std::string& details)
     {
         auto* devices = MidiDevices::getInstance();
@@ -2466,6 +2576,11 @@ int main()
     {
         std::string details;
         results.push_back({ "MIDI non-note routing follows configured channels only", runChannelizedNonNoteStrictRouting(details), details });
+    }
+
+    {
+        std::string details;
+        results.push_back({ "SysEx explicit input routing maps and drops as configured", runExplicitSysExInputRouting(details), details });
     }
 
     {

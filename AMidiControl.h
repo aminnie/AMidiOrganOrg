@@ -58,6 +58,99 @@ inline int getType2RotorFastTarget(InstrumentModules* modules, int moduleIdx)
     return juce::jlimit(0, 127, modules->getRotorFast(moduleIdx));
 }
 
+inline void rebuildSysExRoutesFromConfig(MidiDevices* mididevices, InstrumentModules* instrumentmodules)
+{
+    if (mididevices == nullptr)
+        return;
+
+    mididevices->clearSysExRoutes();
+
+    juce::Array<MidiSysExRouteEntry> routes;
+    loadMidiSysExRoutesFromFile(routes);
+    if (routes.isEmpty())
+        return;
+
+    auto resolveOutputByIdentifier = [mididevices](const juce::String& outputIdentifier) -> int
+    {
+        const juce::String target = outputIdentifier.trim();
+        if (target.isEmpty())
+            return -1;
+
+        for (int i = 0; i < mididevices->midiOutputs.size(); ++i)
+        {
+            if (mididevices->midiOutputs[i] != nullptr
+                && mididevices->midiOutputs[i]->deviceInfo.identifier == target)
+                return i;
+        }
+
+        return -1;
+    };
+
+    auto resolveModuleIndex = [instrumentmodules](const juce::String& moduleRef) -> int
+    {
+        if (instrumentmodules == nullptr)
+            return -1;
+
+        const juce::String target = moduleRef.trim();
+        if (target.isEmpty())
+            return -1;
+
+        const int moduleCount = instrumentmodules->getNumModules();
+        for (int moduleIdx = 0; moduleIdx < moduleCount; ++moduleIdx)
+        {
+            if (instrumentmodules->getDisplayName(moduleIdx).equalsIgnoreCase(target)
+                || instrumentmodules->getModuleIdString(moduleIdx).equalsIgnoreCase(target))
+                return moduleIdx;
+
+            const juce::StringArray matchers = instrumentmodules->getModuleMatchStrings(moduleIdx);
+            for (const auto& matcher : matchers)
+                if (matcher.equalsIgnoreCase(target))
+                    return moduleIdx;
+        }
+
+        return -1;
+    };
+
+    for (const auto& route : routes)
+    {
+        const juce::String inputIdentifier = route.inputIdentifier.trim();
+        if (inputIdentifier.isEmpty())
+            continue;
+
+        int outputIndex = resolveOutputByIdentifier(route.outputIdentifier);
+        juce::String routeLabel;
+        if (outputIndex >= 0 && outputIndex < mididevices->midiOutputs.size() && mididevices->midiOutputs[outputIndex] != nullptr)
+            routeLabel = mididevices->midiOutputs[outputIndex]->deviceInfo.name;
+
+        if (outputIndex < 0 && instrumentmodules != nullptr)
+        {
+            const int moduleIdx = resolveModuleIndex(route.outputModule);
+            if (moduleIdx >= 0)
+            {
+                routeLabel = instrumentmodules->getDisplayName(moduleIdx);
+                for (int outIdx = 0; outIdx < mididevices->midiOutputs.size(); ++outIdx)
+                {
+                    if (mididevices->midiOutputs[outIdx] != nullptr
+                        && instrumentmodules->deviceNameMatchesModule(moduleIdx, mididevices->midiOutputs[outIdx]->deviceInfo.name))
+                    {
+                        outputIndex = outIdx;
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (outputIndex >= 0)
+        {
+            mididevices->setSysExRouteForInputIdentifier(inputIdentifier, outputIndex, routeLabel);
+        }
+        else
+        {
+            juce::Logger::writeToLog("*** SysExRouter: no output route found for input " + inputIdentifier);
+        }
+    }
+}
+
 inline constexpr const char* kUiProfileFontScaleProperty = "uiProfileFontScale";
 inline constexpr const char* kUiProfileDialStrokeScaleProperty = "uiProfileDialStrokeScale";
 
@@ -8659,6 +8752,7 @@ private:
             updateDeviceList(isInput);
 
         midiModulesToOutputChannels();
+        rebuildSysExRoutesFromConfig(mididevices, instrumentmodules);
     }
 
     //-----------------------------------------------------------------------------
@@ -8742,6 +8836,7 @@ private:
             );
         }
 
+        rebuildSysExRoutesFromConfig(mididevices, instrumentmodules);
         return true;
     }
 
@@ -11608,6 +11703,7 @@ private:
             );
         }
 
+        rebuildSysExRoutesFromConfig(mididevices, instrumentmodules);
         return true;
     }
 
