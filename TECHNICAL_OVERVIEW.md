@@ -250,6 +250,25 @@ Config persistence notes:
 - Manual UI smoke checks documented in `README.md`
 - Security scanning (Snyk Code) used for change verification
 
+### Build Metadata Update Semantics
+
+Runtime metadata shown on the Start tab and in the window title uses two compile definitions:
+
+- `AMIDIORGAN_PROJECT_VERSION`: sourced from `project(AMidiOrgan VERSION x.y.z ...)` in `CMakeLists.txt`.
+- `AMIDIORGAN_BUILD_NUMBER`: sourced from `git rev-parse --short=8 HEAD` during CMake configure/generate.
+
+Update timing:
+
+- `AMIDIORGAN_PROJECT_VERSION` changes only when the `VERSION` value in `CMakeLists.txt` is edited and rebuilt.
+- `AMIDIORGAN_BUILD_NUMBER` refreshes when CMake configure runs; a plain `cmake --build ...` may reuse a previously configured SHA if no reconfigure is triggered.
+
+To force-refresh the displayed SHA before building:
+
+```powershell
+cmake -S . -B build
+cmake --build build --config Release --target AMidiOrgan
+```
+
 ### Regression-Sensitive Areas
 
 - Routing map construction and module matching logic

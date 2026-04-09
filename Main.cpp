@@ -10,6 +10,14 @@
 #include "BinaryData.h"
 #include "AMidiControl.h"
 
+#ifndef AMIDIORGAN_PROJECT_VERSION
+#define AMIDIORGAN_PROJECT_VERSION "1.0.0"
+#endif
+
+#ifndef AMIDIORGAN_BUILD_NUMBER
+#define AMIDIORGAN_BUILD_NUMBER "local"
+#endif
+
 class Application : public juce::JUCEApplication
 {
 public:
@@ -17,7 +25,7 @@ public:
     Application() = default;
 
     const juce::String getApplicationName() override       { return "AMidiOrgan"; }
-    const juce::String getApplicationVersion() override    { return "1.0.0"; }
+    const juce::String getApplicationVersion() override    { return juce::String(AMIDIORGAN_PROJECT_VERSION); }
 
     void initialise (const juce::String&) override
     {
@@ -34,7 +42,7 @@ public:
 
         ensureUserDataFolderSeeded();
 
-        mainWindow.reset (new MainWindow ("        ", new AMidiControl, *this));
+        mainWindow.reset (new MainWindow (buildWindowTitle(), new AMidiControl, *this));
     }
 
     void shutdown() override
@@ -64,6 +72,12 @@ public:
     }
 
 private:
+    static juce::String buildWindowTitle()
+    {
+        return "AMidiOrgan v" + juce::String(AMIDIORGAN_PROJECT_VERSION)
+            + " (" + juce::String(AMIDIORGAN_BUILD_NUMBER) + ")";
+    }
+
     static void copyMissingDirectoryContents(const juce::File& sourceDir, const juce::File& targetDir)
     {
         if (!sourceDir.exists() || !sourceDir.isDirectory())

@@ -7381,9 +7381,10 @@ public:
         addAndMakeVisible(buildInfoLabel);
         buildInfoLabel.setColour(juce::Label::textColourId, juce::Colours::grey);
         buildInfoLabel.setJustificationType(juce::Justification::right);
-        buildInfoLabel.setText("Build " + juce::String(AMIDIORGAN_PROJECT_VERSION)
-            + " (" + juce::String(AMIDIORGAN_BUILD_NUMBER) + ")", juce::dontSendNotification);
-        buildInfoLabel.setVisible(false);
+        buildInfoLabel.setText("Version " + juce::String(AMIDIORGAN_PROJECT_VERSION)
+            + "  Build " + juce::String(AMIDIORGAN_BUILD_NUMBER), juce::dontSendNotification);
+        buildInfoLabel.setTooltip("Running build: " + juce::String(AMIDIORGAN_BUILD_NUMBER));
+        buildInfoLabel.setVisible(true);
 
         // Preset Device Modules includig index so we start with the same one as last saved
         instrumentmodules->loadModules();
@@ -7455,6 +7456,7 @@ public:
         configPrefixLabel.setComponentID("start.config.prefix");
         configfileLabel.setComponentID("start.config.value");
         statusLabel.setComponentID("start.status");
+        buildInfoLabel.setComponentID("start.buildInfo");
 
         registerUiProfileComponent(loadConfigButton);
         registerUiProfileComponent(loadPanelButton);
@@ -7475,6 +7477,7 @@ public:
         registerUiProfileComponent(configPrefixLabel);
         registerUiProfileComponent(configfileLabel);
         registerUiProfileComponent(statusLabel);
+        registerUiProfileComponent(buildInfoLabel);
     }
 
     //-----------------------------------------------------------------------------
@@ -7550,6 +7553,8 @@ public:
         configfileLabel.setBounds(580, margin + 230, 345, 20);
 
         statusLabel.setBounds(1170, margin + 200, 300, 20);
+        // Align build info with Exit button left edge and add a little more top spacing.
+        buildInfoLabel.setBounds(1230, margin + 186, 240, 20);
 
         updateBannerPlacementFromMidiLists();
 

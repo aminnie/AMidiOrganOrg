@@ -394,6 +394,25 @@ cmake --build build --config Release --target AMidiOrgan
 Start-Process "build/AMidiOrgan_artefacts/Release/AMidiOrgan.exe"
 ```
 
+### Build Version Metadata (Start tab + title bar)
+
+The app shows two build metadata values:
+
+- `Version` (`AMIDIORGAN_PROJECT_VERSION`) comes from `project(AMidiOrgan VERSION x.y.z ...)` in `CMakeLists.txt`.
+- `Build` (`AMIDIORGAN_BUILD_NUMBER`) comes from `git rev-parse --short=8 HEAD` during CMake configure/generate.
+
+Update behavior:
+
+- `Version` changes only when you edit the `VERSION` value in `CMakeLists.txt`, then rebuild.
+- `Build` SHA updates when CMake configure runs; a plain `cmake --build ...` may reuse a previous configured SHA if reconfigure is not triggered.
+
+To force-refresh the displayed SHA before a build:
+
+```powershell
+cmake -S . -B build
+cmake --build build --config Release --target AMidiOrgan
+```
+
 ### Test (Windows)
 
 From the repository root:
