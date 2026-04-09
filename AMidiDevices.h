@@ -926,7 +926,7 @@ private:
         };
 
         defs.getReference(2).moduleMatchStrings.add("INTEGRA-7");
-        defs.getReference(2).moduleMatchStrings.add("MIDI GADGET");
+        defs.getReference(5).moduleMatchStrings.add("MIDI GADGET");
         return defs;
     }
 

@@ -8378,14 +8378,14 @@ private:
                         5, 0, width, height,
                         Justification::centredLeft, true);
                 else if (rowNumber < lblmididevices->getNumMidiInputs())
-                    g.drawText(lblmididevices->getMidiDevice(rowNumber, true)->deviceInfo.name,
+                    g.drawText(formatDeviceRowLabel(lblmididevices->getMidiDevice(rowNumber, true)->deviceInfo.name),
                         5, 0, width, height,
                         Justification::centredLeft, true);
             }
             else
             {
                 if (rowNumber < lblmididevices->getNumMidiOutputs())
-                    g.drawText(lblmididevices->getMidiDevice(rowNumber, false)->deviceInfo.name,
+                    g.drawText(formatDeviceRowLabel(lblmididevices->getMidiDevice(rowNumber, false)->deviceInfo.name),
                         5, 0, width, height,
                         Justification::centredLeft, true);
             }
@@ -8448,11 +8448,59 @@ private:
         }
 
     private:
+        String findMatchedModuleDisplayNameForDevice(const String& deviceName) const
+        {
+            if (instrumentmodules == nullptr)
+                return {};
+
+            const int moduleCount = instrumentmodules->getNumModules();
+            int fallbackGenericMatch = -1;
+
+            for (int moduleIdx = 0; moduleIdx < moduleCount; ++moduleIdx)
+            {
+                const StringArray matchers = instrumentmodules->getModuleMatchStrings(moduleIdx);
+                bool matchedByGenericOnly = false;
+
+                for (const auto& matcher : matchers)
+                {
+                    const String normalizedMatcher = matcher.trim().toLowerCase();
+                    if (normalizedMatcher.isEmpty() || !doesModuleMatcherMatchDeviceName(matcher, deviceName))
+                        continue;
+
+                    if (normalizedMatcher == "midi")
+                    {
+                        matchedByGenericOnly = true;
+                        continue;
+                    }
+
+                    return instrumentmodules->getDisplayName(moduleIdx);
+                }
+
+                if (matchedByGenericOnly && fallbackGenericMatch < 0)
+                    fallbackGenericMatch = moduleIdx;
+            }
+
+            if (fallbackGenericMatch >= 0)
+                return instrumentmodules->getDisplayName(fallbackGenericMatch);
+
+            return {};
+        }
+
+        String formatDeviceRowLabel(const String& rawDeviceName) const
+        {
+            const String moduleLabel = findMatchedModuleDisplayNameForDevice(rawDeviceName);
+            if (moduleLabel.isEmpty())
+                return rawDeviceName;
+
+            return rawDeviceName + " (" + moduleLabel + ")";
+        }
+
         MidiStartPage& parent;
         bool isInput;
         SparseSet<int> lastSelectedItems;
 
         MidiDevices* lblmididevices = nullptr;
+        InstrumentModules* instrumentmodules = InstrumentModules::getInstance();
 
     };
     //*** End of MidiDeviceListBox Class ***

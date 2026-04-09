@@ -561,10 +561,10 @@ namespace
     bool runModuleMatchAliasBehavior(std::string& details)
     {
         StringArray aliases;
-        aliases.add("INTEGRA-7");
+        aliases.add("EVM");
         aliases.add("MIDI GADGET");
 
-        const StringArray normalizedAliases = normalizeModuleMatchStrings(aliases, "INTEGRA");
+        const StringArray normalizedAliases = normalizeModuleMatchStrings(aliases, "KETRON");
         if (!expectEqual(normalizedAliases.size(), 3, "normalizeModuleMatchStrings keeps aliases + legacy fallback", details))
             return false;
 
@@ -572,8 +572,8 @@ namespace
                          "alias matcher recognizes MIDI driver name", details))
             return false;
 
-        if (!expectEqual(doesAnyModuleMatcherMatchDeviceName(normalizedAliases, "Roland Integra-7 MIDI 1") ? 1 : 0, 1,
-                         "alias matcher recognizes existing Integra naming", details))
+        if (!expectEqual(doesAnyModuleMatcherMatchDeviceName(normalizedAliases, "Ketron EVM MIDI 1") ? 1 : 0, 1,
+                         "alias matcher recognizes existing EVM naming", details))
             return false;
 
         StringArray genericMidiMatcher;
