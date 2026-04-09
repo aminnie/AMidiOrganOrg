@@ -8647,26 +8647,18 @@ private:
                 continue;
             }
 
-            // Lookup Module short/search string and find match in the active Modules.
-            const String modidstring = instrumentmodules->getModuleIdString(grpmidimod).trim().toLowerCase();
-            if (modidstring.isEmpty())
+            // Lookup module match strings and find the first matching active output device.
+            const StringArray moduleMatchStrings = instrumentmodules->getModuleMatchStrings(grpmidimod);
+            if (moduleMatchStrings.isEmpty())
             {
                 juce::Logger::writeToLog("ModuleMapper: Empty module id on Button Group " + ptrbuttongroup->groupname
                     + " and Channel " + std::to_string(grpmidichan));
                 continue;
             }
 
-            const bool genericMidiMatch = (modidstring == "midi");
-
             int outmod = 0;
             for (auto& dev : midiDevices) {
-                String strdevicename = dev->deviceInfo.name.toLowerCase();
-
-                // Avoid broad generic "midi" substring matches (e.g. "Integra ... MIDI 1")
-                // which can incorrectly map unrelated modules.
-                bfound = genericMidiMatch
-                    ? (strdevicename.startsWith("midi") || strdevicename == "midi")
-                    : strdevicename.contains(modidstring);
+                bfound = instrumentmodules->deviceNameMatchesModule(grpmidimod, dev->deviceInfo.name);
                 if (bfound) {
                     // Route this output channel to the configured module (fan-out safe).
                     mididevices->moduleout[grpmidichan].addIfNotAlreadyThere(outmod);
@@ -11520,26 +11512,19 @@ private:
                 continue;
             }
 
-            // Lookup Module short/search string and find match in the active Modules
-            const String modidstring = instrumentmodules->getModuleIdString(grpmidimod).trim().toLowerCase();
-            if (modidstring.isEmpty())
+            // Lookup module match strings and find the first matching active output device.
+            const StringArray moduleMatchStrings = instrumentmodules->getModuleMatchStrings(grpmidimod);
+            if (moduleMatchStrings.isEmpty())
             {
                 juce::Logger::writeToLog("*** ModulesToChannelMap: Empty module id on Button Group " + ptrbuttongroup->groupname
                     + " and Channel " + std::to_string(grpmidichan));
                 continue;
             }
 
-            const bool genericMidiMatch = (modidstring == "midi");
-
             int outmod = 0;
             for (auto& dev : midiDevices) {
-                String strdevicename = dev->deviceInfo.name.toLowerCase();
-
-                // Avoid broad generic "midi" substring matches (e.g. "Integra ... MIDI 1")
-                // which can incorrectly map unrelated modules.
-                bfound = genericMidiMatch
-                    ? (strdevicename.startsWith("midi") || strdevicename == "midi")
-                    : strdevicename.contains(modidstring);
+                const String strdevicename = dev->deviceInfo.name.toLowerCase();
+                bfound = instrumentmodules->deviceNameMatchesModule(grpmidimod, dev->deviceInfo.name);
                 if (bfound) {
                     // Route this output channel to the configured module (fan-out safe).
                     mididevices->moduleout[grpmidichan].addIfNotAlreadyThere(outmod);

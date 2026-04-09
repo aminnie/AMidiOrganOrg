@@ -314,6 +314,7 @@ AMidiOrgan stores user data under:
 Important subfolders:
 
 - `configs/` for `.cfg` files
+- `configs/instrument_modules.json` for module labels and MIDI output device match aliases (`matchStrings`)
 - `panels/` for `.pnl` files
 - `instruments/` for JSON instrument catalogs
 - `configs/hotkeys.json` for keyboard shortcut bindings

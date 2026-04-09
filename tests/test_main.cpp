@@ -558,6 +558,35 @@ namespace
         return true;
     }
 
+    bool runModuleMatchAliasBehavior(std::string& details)
+    {
+        StringArray aliases;
+        aliases.add("INTEGRA-7");
+        aliases.add("MIDI GADGET");
+
+        const StringArray normalizedAliases = normalizeModuleMatchStrings(aliases, "INTEGRA");
+        if (!expectEqual(normalizedAliases.size(), 3, "normalizeModuleMatchStrings keeps aliases + legacy fallback", details))
+            return false;
+
+        if (!expectEqual(doesAnyModuleMatcherMatchDeviceName(normalizedAliases, "MIDI Gadget") ? 1 : 0, 1,
+                         "alias matcher recognizes MIDI driver name", details))
+            return false;
+
+        if (!expectEqual(doesAnyModuleMatcherMatchDeviceName(normalizedAliases, "Roland Integra-7 MIDI 1") ? 1 : 0, 1,
+                         "alias matcher recognizes existing Integra naming", details))
+            return false;
+
+        StringArray genericMidiMatcher;
+        genericMidiMatcher.add("MIDI");
+        if (!expectEqual(doesAnyModuleMatcherMatchDeviceName(genericMidiMatcher, "Integra-7 MIDI 1") ? 1 : 0, 0,
+                         "generic MIDI matcher avoids broad substring matches", details))
+            return false;
+
+        const StringArray legacyOnly = normalizeModuleMatchStrings({}, "Blackbox");
+        return expectEqual(doesAnyModuleMatcherMatchDeviceName(legacyOnly, "Deebach Blackbox Port A") ? 1 : 0, 1,
+                           "legacy moduleIdString remains supported", details);
+    }
+
     bool runLookupPanelGroup(std::string& details)
     {
         return expectEqual(lookupPanelGroup(0), 0, "lookupPanelGroup(0)", details)
@@ -2287,6 +2316,11 @@ int main()
     {
         std::string details;
         results.push_back({ "InstrumentModules writes AppState", runInstrumentModuleWritesAppState(details), details });
+    }
+
+    {
+        std::string details;
+        results.push_back({ "Module match aliases and legacy fallback", runModuleMatchAliasBehavior(details), details });
     }
 
     {

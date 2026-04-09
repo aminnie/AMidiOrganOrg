@@ -33,6 +33,65 @@ struct MidiDeviceListEntry final : ReferenceCountedObject
     }
 };
 
+inline StringArray normalizeModuleMatchStrings(const StringArray& rawMatchers, const String& legacyMatcher = {})
+{
+    StringArray normalized;
+
+    auto addMatcher = [&normalized](String matcher)
+    {
+        matcher = matcher.trim();
+        if (matcher.isEmpty())
+            return;
+
+        bool alreadyPresent = false;
+        for (const auto& existingMatcher : normalized)
+        {
+            if (existingMatcher.equalsIgnoreCase(matcher))
+            {
+                alreadyPresent = true;
+                break;
+            }
+        }
+
+        if (!alreadyPresent)
+            normalized.add(matcher);
+    };
+
+    for (const auto& matcher : rawMatchers)
+        addMatcher(matcher);
+
+    addMatcher(legacyMatcher);
+    return normalized;
+}
+
+inline bool doesModuleMatcherMatchDeviceName(const String& matcher, const String& deviceName)
+{
+    const String normalizedMatcher = matcher.trim().toLowerCase();
+    const String normalizedDeviceName = deviceName.trim().toLowerCase();
+
+    if (normalizedMatcher.isEmpty() || normalizedDeviceName.isEmpty())
+        return false;
+
+    // Avoid broad generic "midi" substring matches (e.g. "Integra ... MIDI 1")
+    // which can incorrectly map unrelated modules.
+    if (normalizedMatcher == "midi")
+        return normalizedDeviceName.startsWith("midi") || normalizedDeviceName == "midi";
+
+    return normalizedDeviceName.contains(normalizedMatcher);
+}
+
+inline bool doesAnyModuleMatcherMatchDeviceName(const StringArray& rawMatchers, const String& deviceName)
+{
+    const StringArray matchers = normalizeModuleMatchStrings(rawMatchers);
+    for (const auto& matcher : matchers)
+    {
+        if (doesModuleMatcherMatchDeviceName(matcher, deviceName))
+            return true;
+    }
+
+    return false;
+}
+
 
 
 //==============================================================================
@@ -562,12 +621,14 @@ public:
         int rotorOff = 0;
         int rotorSlow = 0;
         int rotorFast = 0;
+        StringArray moduleMatchStrings;
     };
 
     bool createInstrumentModule(int moduleIndex, String displayname,
         String subdirectory, String modulename, String moduleidstring,
         String voicename, int MSB, int LSB, int font, bool isZeroBased,
-        bool isRotary, int rotortype, int rotorcc, int rotoroff, int rotorslow, int rotorfast) {
+        bool isRotary, int rotortype, int rotorcc, int rotoroff, int rotorslow, int rotorfast,
+        const StringArray& moduleMatchStrings = {}) {
 
         if ((moduleIndex < 0) || (moduleIndex >= instrumentmodules.size())) {
             return false;
@@ -576,7 +637,7 @@ public:
         instrumentmodules[moduleIndex]->setDisplayName(displayname);
         instrumentmodules[moduleIndex]->setSubDirectory(subdirectory);
         instrumentmodules[moduleIndex]->setModuleFileName(modulename);
-        instrumentmodules[moduleIndex]->setModuleIdString(moduleidstring);
+        instrumentmodules[moduleIndex]->setModuleMatchStrings(moduleMatchStrings, moduleidstring);
 
         instrumentmodules[moduleIndex]->setDefVoiceName(voicename);
         instrumentmodules[moduleIndex]->setDefMSB(MSB);
@@ -630,6 +691,14 @@ public:
 
     String getModuleIdString(int moduleid) {
         return instrumentmodules[moduleid]->getModuleIdString();
+    }
+
+    StringArray getModuleMatchStrings(int moduleid) {
+        return instrumentmodules[moduleid]->getModuleMatchStrings();
+    }
+
+    bool deviceNameMatchesModule(int moduleid, const String& deviceName) {
+        return doesAnyModuleMatcherMatchDeviceName(instrumentmodules[moduleid]->getModuleMatchStrings(), deviceName);
     }
 
     String getDefVoiceName(int moduleid) {
@@ -847,14 +916,18 @@ private:
 
     static juce::Array<ModuleDefinition> getBuiltInModuleDefinitions()
     {
-        return {
+        auto defs = juce::Array<ModuleDefinition>{
             ModuleDefinition{ 0, "MidiGM", "MidiGM", "midigm.json", "MIDI", "Grand Piano", 0, 0, 1, true, false, 0, 0, 0, 0, 0 },
             ModuleDefinition{ 1, "Deebach BlackBox", "BlackBox", "maxplus.json", "Blackbox", "Deebach Grand 1", 121, 8, 0, true, true, 2, 0x74, 0, 20, 63 },
-            ModuleDefinition{ 2, "Roland Integra7", "Integra7", "integra7.json", "INTEGRA", "Piano", 87, 64, 1, false, true, 1, 0x01, 0, 0x10, 0x60 },
+            ModuleDefinition{ 2, "Roland Integra-7", "Integra-7", "integra7.json", "INTEGRA-7", "Piano", 87, 64, 1, false, true, 1, 0x01, 0, 0x10, 0x60 },
             ModuleDefinition{ 3, "Roland AT900", "AT900MI", "at900mi.json", "AT900MI", "Grand Piano1", 121, 0, 0, true, false, 0, 0, 0, 0, 0 },
             ModuleDefinition{ 4, "CustomGM", "Custom", "custom.json", "MIDI", "Grand Piano", 0, 0, 1, true, false, 0, 0, 0, 0, 0 },
             ModuleDefinition{ 5, "Ketron EVM", "KetronEVM", "ketronevm.json", "EVM", "Piano", 0, 0, 0, true, true, 1, 0x1E, 0, 0x40, 0x7F }
         };
+
+        defs.getReference(2).moduleMatchStrings.add("INTEGRA-7");
+        defs.getReference(2).moduleMatchStrings.add("MIDI GADGET");
+        return defs;
     }
 
     static bool loadModuleDefinitionsFromJson(const juce::File& catalogFile, juce::Array<ModuleDefinition>& outDefs)
@@ -888,6 +961,13 @@ private:
             def.subDirectory = obj->getProperty("subDirectory").toString();
             def.moduleFileName = obj->getProperty("moduleFileName").toString();
             def.moduleIdString = obj->getProperty("moduleIdString").toString();
+            const auto matchStringsVar = obj->getProperty("matchStrings");
+            if (matchStringsVar.isArray())
+            {
+                for (const auto& matchVar : *matchStringsVar.getArray())
+                    def.moduleMatchStrings.add(matchVar.toString());
+            }
+
             def.defaultVoiceName = obj->getProperty("defaultVoiceName").toString();
             def.defaultMSB = (int) obj->getProperty("defaultMSB");
             def.defaultLSB = (int) obj->getProperty("defaultLSB");
@@ -949,7 +1029,8 @@ private:
             def.rotorCC,
             def.rotorOff,
             def.rotorSlow,
-            def.rotorFast);
+            def.rotorFast,
+            def.moduleMatchStrings);
     }
 
 
@@ -984,12 +1065,16 @@ private:
             return modulefilename;
         }
 
-        void setModuleIdString(String smoduleidstring) {
-            moduleidstring = smoduleidstring;
+        void setModuleMatchStrings(const StringArray& matchers, const String& legacyMatcher = {}) {
+            modulematchstrings = normalizeModuleMatchStrings(matchers, legacyMatcher);
         }
 
         String getModuleIdString() {
-            return moduleidstring;
+            return modulematchstrings.isEmpty() ? String{} : modulematchstrings[0];
+        }
+
+        StringArray getModuleMatchStrings() {
+            return modulematchstrings;
         }
 
         void setDefVoiceName(String mdefvoicename) {
@@ -1084,7 +1169,7 @@ private:
         String displayname;
         String subdirectory;
         String modulefilename;
-        String moduleidstring;
+        StringArray modulematchstrings;
 
         String defvoicename;
         int defMSB;
