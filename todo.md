@@ -69,6 +69,34 @@
 - [ ] **Forget saved ports**: UI control on Start (or settings) to clear remembered MIDI In/Out without editing `configs/midi_sticky_devices.json` manually.
 - [ ] **Separate profiles**: Named profiles for different rigs (e.g. home vs stage), each with its own saved port set; pick a profile instead of a single global sticky file.
 
+## SysEx routing UI management (phase-2 candidate)
+
+Current status:
+- [x] SysEx backend is live via `configs/midi_sysex_routes.json` (explicit input -> output mapping, unmapped drop+log).
+
+### Go/No-Go checklist (compact)
+
+Go now with Config-section UI if all are true:
+- [ ] JSON-only editing has caused repeated friction in real usage.
+- [ ] At least two rigs have been tested and need quicker route changes.
+- [ ] Existing SysEx backend is stable across startup, reconnect, and route refresh cases.
+
+No-Go for standalone tab (stay lightweight) if any are true:
+- [ ] SysEx route changes are infrequent.
+- [ ] Config page can absorb a small "SysEx Routes" section without crowding.
+- [ ] Team prefers minimal UI scope until more field feedback is collected.
+
+### Phase 1 (preferred): Config subsection
+- [ ] Add compact CRUD rows in Config: input identifier + output identifier/module target.
+- [ ] Validate on save: non-empty input, one destination required, no duplicate input keys.
+- [ ] Reuse existing dirty/save/cancel behavior from Config workflows.
+- [ ] Show unresolved-route status when target devices are unavailable.
+
+### Phase 2: Promote to dedicated tab only if needed
+- [ ] Promote only when Config becomes crowded or SysEx editing becomes frequent.
+- [ ] Keep same JSON schema + resolver path to avoid migration risk.
+- [ ] Add optional test route helper/log action after phase-1 adoption feedback.
+
 ## Keyboard shortcuts (future)
 
 Phase 1 bindings and focus behavior are documented in `README.md`. Optional later work:

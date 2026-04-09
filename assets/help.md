@@ -102,6 +102,7 @@ Contact the developer for additional module support.
   - PC Value (`0..127`, default `0`)
   - Matching Program Change triggers preset-next using the same behavior as the `Next preset` hotkey.
   - Matching Program Change is consumed (not forwarded to outputs) and this trigger check ignores pass-through filtering.
+- SysEx routing is configured via `configs/midi_sysex_routes.json` (advanced workflow; no dedicated UI editor yet).
 - `UI Profile` changes apply live across Start/Upper/Lower/Bass/Config/Sounds/Effects/Hotkeys/Monitor and resize the app window to the selected fixed profile size.
 - Config settings are global to the app and are separate from the currently loaded panel.
 
@@ -224,6 +225,7 @@ Important subfolders:
 - `panels/` for `.pnl` files
 - `instruments/` for JSON instrument catalogs
 - `configs/hotkeys.json` for keyboard shortcut bindings
+- `configs/midi_sysex_routes.json` for explicit SysEx input-to-output routes
 
 ### What Each File Stores
 
@@ -237,6 +239,9 @@ Important subfolders:
 - Panel load remains backward compatible with older `.pnl` files that contain only `Manual + Preset 1..6`; missing `Preset 7..12` values are initialized to defaults.
 - `hotkeys.json`
   - customized keyboard shortcuts
+- `midi_sysex_routes.json`
+  - explicit input-identifier routes for SysEx forwarding to a target output
+  - unmapped SysEx input traffic is dropped and logged
 
 ### Pairing and Save Behavior
 
@@ -271,6 +276,7 @@ Important subfolders:
 - Check `Config` page MIDI In / Out channel mapping.
 - Verify split note settings for solo groups.
 - Confirm the intended config file is loaded.
+- For SysEx, verify `configs/midi_sysex_routes.json` has a valid source input identifier and destination mapping.
 
 ### Unexpected voice or effect
 

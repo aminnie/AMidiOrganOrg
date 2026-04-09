@@ -71,6 +71,7 @@ AMidiOrgan stores user files under:
 Key subfolders/files:
 
 - `configs/` (`.cfg` files, `hotkeys.json`, sticky device/session files)
+- `configs/midi_sysex_routes.json` (explicit SysEx input-to-output routing entries)
 - `panels/` (`.pnl` files)
 - `instruments/` (module definition JSON files)
 
@@ -151,6 +152,7 @@ Behavior:
 - Start tab remembers selected MIDI ports via sticky device storage.
 - `New Panel` opens a save-style prompt; duplicate panel names are blocked, and successful saves auto-load the new panel.
 - Panel/config status lines are displayed as `Panel: <file>` and `Config: <file>`.
+- SysEx routing is configured separately via `configs/midi_sysex_routes.json` (advanced workflow; no dedicated UI editor yet).
 
 Best practice:
 
@@ -496,6 +498,13 @@ Backward-compatible load supports both legacy panels (`Manual + Preset 1..6`) an
 1. Open `Config` and verify group module/channel mapping.
 2. Confirm no invalid assumptions from old config files.
 3. Use `Monitor` tab to verify actual routed output channel/module context.
+
+## SysEx Not Reaching Target Device
+
+1. Verify `Documents/AMidiOrgan/configs/midi_sysex_routes.json` contains the source input `identifier`.
+2. Ensure each route has at least one destination (`outputIdentifier` or `outputModule`).
+3. Confirm the target output device is connected and selected in `Start`.
+4. Check logs for the unmapped-drop warning to identify missing/invalid route keys.
 
 ## MIDI Devices Not Showing
 
