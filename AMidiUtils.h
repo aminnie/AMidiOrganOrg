@@ -54,6 +54,8 @@ inline juce::String getProjectMidiMessageDescription(const juce::MidiMessage& me
     if (message.isAllNotesOff())      return "All notes off";
     if (message.isAllSoundOff())      return "All sound off";
     if (message.isMetaEvent())        return "Meta event";
+    if (message.isSysEx())
+        return "SysEx " + juce::String::toHexString(message.getRawData(), message.getRawDataSize());
 
     if (message.isController())
     {

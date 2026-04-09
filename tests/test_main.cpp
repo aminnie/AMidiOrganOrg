@@ -1365,7 +1365,6 @@ namespace
         {
             sentMessages.push_back(message);
         };
-
         devices->resetAllControllers();
         devices->testSendHook = nullptr;
 
@@ -2106,6 +2105,12 @@ namespace
         {
             sentMessages.push_back(message);
         };
+        int monitorHits = 0;
+        devices->setOutgoingMidiMonitor([&monitorHits](const MidiMessage& message, const juce::String&)
+        {
+            if (message.isSysEx())
+                ++monitorHits;
+        });
 
         const juce::uint8 sysexData[] { 0xF0, 0x7D, 0x01, 0x02, 0xF7 };
         const auto sysex = MidiMessage::createSysExMessage(sysexData, static_cast<int>(std::size(sysexData)));
@@ -2121,6 +2126,14 @@ namespace
             || !expectEqual(sentMessages[0].isSysEx() ? 1 : 0, 1, "mapped output message is SysEx", details))
         {
             devices->testSendHook = nullptr;
+            devices->setOutgoingMidiMonitor({});
+            return false;
+        }
+
+        if (!expectEqual(monitorHits, 1, "mapped SysEx emits one monitor message", details))
+        {
+            devices->testSendHook = nullptr;
+            devices->setOutgoingMidiMonitor({});
             return false;
         }
 
@@ -2129,11 +2142,13 @@ namespace
                          "unmapped SysEx route drops message", details))
         {
             devices->testSendHook = nullptr;
+            devices->setOutgoingMidiMonitor({});
             return false;
         }
 
         const bool noExtraSend = sentMessages.empty();
         devices->testSendHook = nullptr;
+        devices->setOutgoingMidiMonitor({});
         return expectEqual(noExtraSend ? 1 : 0, 1, "unmapped SysEx does not emit output", details);
     }
 

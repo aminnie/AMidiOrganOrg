@@ -9175,6 +9175,16 @@ public:
             };
         setFilterMidiClockEnabled(true);
 
+        addAndMakeVisible(filterMidiNotesToggle);
+        filterMidiNotesToggle.setComponentID("mon.filterNotes");
+        filterMidiNotesToggle.setToggleState(true, juce::dontSendNotification);
+        filterMidiNotesToggle.setTooltip("Hide Note On/Off rows in the monitor display.");
+        filterMidiNotesToggle.onClick = [this]()
+            {
+                setFilterMidiNotesEnabled(filterMidiNotesToggle.getToggleState());
+            };
+        setFilterMidiNotesEnabled(true);
+
         addAndMakeVisible(monitorTextArea);
         monitorTextArea.setComponentID("mon.text");
         monitorTextArea.setMultiLine(true, true);
@@ -9258,6 +9268,8 @@ public:
         clearButton.setBounds(leftButtons.removeFromLeft(scaleX(90)));
         leftButtons.removeFromLeft(scaleX(8));
         filterMidiClockToggle.setBounds(leftButtons.removeFromLeft(scaleX(170)));
+        leftButtons.removeFromLeft(scaleX(8));
+        filterMidiNotesToggle.setBounds(leftButtons.removeFromLeft(scaleX(120)));
         leftInner.removeFromTop(scaleY(8));
         monitorTextArea.setBounds(leftInner);
 
@@ -9290,6 +9302,7 @@ public:
         applyScale(enableButton, currentProfile.buttonFontScale);
         applyScale(clearButton, currentProfile.buttonFontScale);
         applyScale(filterMidiClockToggle, currentProfile.toggleFontScale);
+        applyScale(filterMidiNotesToggle, currentProfile.toggleFontScale);
         applyScale(startOctaveLabel, currentProfile.labelFontScale);
         applyScale(midiChannelLabel, currentProfile.labelFontScale);
         applyScale(startOctaveCombo, currentProfile.comboFontScale);
@@ -9370,20 +9383,33 @@ private:
         filterMidiClockEnabled.store(enabled, std::memory_order_relaxed);
     }
 
+    void setFilterMidiNotesEnabled(bool enabled)
+    {
+        filterMidiNotesToggle.setToggleState(enabled, juce::dontSendNotification);
+        filterMidiNotesEnabled.store(enabled, std::memory_order_relaxed);
+    }
+
     bool shouldFilterOutMessage(const juce::MidiMessage& message) const
     {
-        if (!filterMidiClockEnabled.load(std::memory_order_relaxed))
-            return false;
-
-        if (message.isMidiClock())
+        if (filterMidiNotesEnabled.load(std::memory_order_relaxed)
+            && (message.isNoteOn() || message.isNoteOff()))
             return true;
 
-        const auto* data = message.getRawData();
-        if (data == nullptr)
-            return false;
+        if (filterMidiClockEnabled.load(std::memory_order_relaxed))
+        {
+            if (message.isMidiClock())
+                return true;
 
-        const auto status = (unsigned char) data[0];
-        return status == (unsigned char) 0xF8 || status == (unsigned char) 0xFE;
+            const auto* data = message.getRawData();
+            if (data != nullptr)
+            {
+                const auto status = (unsigned char) data[0];
+                if (status == (unsigned char) 0xF8 || status == (unsigned char) 0xFE)
+                    return true;
+            }
+        }
+
+        return false;
     }
 
     void ensureMonitorHookRegistered()
@@ -9465,6 +9491,9 @@ private:
             return "Ch " + juce::String(channel) + " | " + description + volumeSuffix;
         }
 
+        if (entry.moduleName.isNotEmpty())
+            return description + " (" + entry.moduleName + ")";
+
         return description;
     }
 
@@ -9473,6 +9502,7 @@ private:
     juce::TextButton enableButton{ "Enable" };
     juce::TextButton clearButton{ "Clear" };
     juce::ToggleButton filterMidiClockToggle{ "Filter Clock & Sensing" };
+    juce::ToggleButton filterMidiNotesToggle{ "Filter Notes" };
     juce::TextEditor monitorTextArea;
     juce::Label startOctaveLabel{ "startOctaveLabel", "Octave" };
     juce::ComboBox startOctaveCombo;
@@ -9492,6 +9522,7 @@ private:
 
     std::atomic<bool> monitorEnabled { false };
     std::atomic<bool> filterMidiClockEnabled { true };
+    std::atomic<bool> filterMidiNotesEnabled { true };
     bool isTabActive = false;
     bool monitorHookInstalled = false;
 

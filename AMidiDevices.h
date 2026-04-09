@@ -299,20 +299,17 @@ public:
             monitorHookCopy = outgoingMonitorHook;
         }
 
-        if (testSendHook)
-            testSendHook(message);
-        if (monitorHookCopy)
-            monitorHookCopy(message, routedModuleName);
-
         if (outmodidx < 0 || outmodidx >= midiOutputs.size())
         {
             juce::Logger::writeToLog("*** SysExRouter: mapped output index invalid for input " + logInput);
             return false;
         }
 
+        bool routedToOutput = false;
         if (midiOutputs[outmodidx]->outDevice.get() != nullptr)
         {
             midiOutputs[outmodidx]->outDevice->sendMessageNow(message);
+            routedToOutput = true;
             juce::Logger::writeToLog("*** SysExRouter: routed SysEx from input " + logInput + " to output " + routedModuleName);
         }
         else
@@ -320,11 +317,20 @@ public:
             juce::Logger::writeToLog("*** SysExRouter: mapped output unavailable for input " + logInput);
         }
 
+        if (testSendHook)
+            testSendHook(message);
+
+        if (!routedToOutput && testSendHook == nullptr)
+            return false;
+
+        if (monitorHookCopy)
+            monitorHookCopy(message, routedModuleName);
+
         // Keep monitor visibility behavior consistent with other output paths.
         if (midiviewidx < midiOutputs.size() && midiOutputs[midiviewidx]->outDevice.get() != nullptr)
             midiOutputs[midiviewidx]->outDevice->sendMessageNow(message);
 
-        return true;
+        return routedToOutput || testSendHook != nullptr;
     }
 
     //-------------------------------------------------------------------------
