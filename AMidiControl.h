@@ -7575,6 +7575,9 @@ public:
 
         DBG("*** MiDiStartPage(): Brought To Front Tab " + std::to_string(0));
 
+        // Force a fresh enumeration when returning to Start so hot-plugged
+        // devices reliably appear even if OS change notifications were missed.
+        updateDeviceLists();
         refreshStatusLinesFromAppState();
     }
 
@@ -7671,6 +7674,8 @@ private:
     std::unordered_map<juce::Component*, juce::Rectangle<int>> uiProfileBaseBounds;
     std::unordered_map<juce::Component*, juce::Font> uiProfileBaseFonts;
     bool uiProfileBaseCaptured = false;
+    bool hasLoggedInputDeviceSnapshot = false;
+    bool hasLoggedOutputDeviceSnapshot = false;
     UiProfileFontLookAndFeel uiProfileLookAndFeel;
 
     void registerUiProfileComponent(juce::Component& c)
@@ -8723,7 +8728,13 @@ private:
         auto availableDevices = isInputDeviceList ? MidiInput::getAvailableDevices()
             : MidiOutput::getAvailableDevices();
 
-        if (hasDeviceListChanged(availableDevices, isInputDeviceList))
+        const bool listChanged = hasDeviceListChanged(availableDevices, isInputDeviceList);
+        const bool shouldLogSnapshot = isInputDeviceList ? (!hasLoggedInputDeviceSnapshot || listChanged)
+            : (!hasLoggedOutputDeviceSnapshot || listChanged);
+        if (shouldLogSnapshot)
+            logAvailableMidiDevicesSnapshot(availableDevices, isInputDeviceList);
+
+        if (listChanged)
         {
 
             ReferenceCountedArray<MidiDeviceListEntry>& midiDevices
@@ -8753,6 +8764,25 @@ private:
             if (auto* midiSelector = isInputDeviceList ? midiInputSelector.get() : midiOutputSelector.get())
                 midiSelector->syncSelectedItemsWithDeviceList(midiDevices);
         }
+    }
+
+    void logAvailableMidiDevicesSnapshot(const Array<MidiDeviceInfo>& availableDevices, bool isInputDeviceList)
+    {
+        const juce::String direction = isInputDeviceList ? "IN" : "OUT";
+        juce::Logger::writeToLog("*** MidiStartPage: JUCE MIDI " + direction + " device snapshot count="
+            + juce::String(availableDevices.size()));
+
+        for (int i = 0; i < availableDevices.size(); ++i)
+        {
+            const auto& info = availableDevices.getReference(i);
+            juce::Logger::writeToLog("*** MidiStartPage: JUCE MIDI " + direction + "[" + juce::String(i)
+                + "] name=\"" + info.name + "\" identifier=\"" + info.identifier + "\"");
+        }
+
+        if (isInputDeviceList)
+            hasLoggedInputDeviceSnapshot = true;
+        else
+            hasLoggedOutputDeviceSnapshot = true;
     }
 
     void updateDeviceLists()

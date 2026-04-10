@@ -3,8 +3,13 @@
   "routes": [
     {
       "inputIdentifier": "EVM Stream Deck",
-      "outputIdentifier": "MIDI Gadget",
+      "outputIdentifier": "EVM Stream Deck",
       "outputModule": "EVM"
+    },
+    {
+      "inputIdentifier": "MacroPad RP2040",
+      "outputIdentifier": "MacroPad RP2040",
+      "outputModule": "MacroPad"
     }
   ]
 }
