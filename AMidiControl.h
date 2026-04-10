@@ -9131,6 +9131,7 @@ public:
         monitorKeyboard.setOctaveForMiddleC(kProjectMiddleCOctave);
 
         monitorGroup.setColour(juce::GroupComponent::outlineColourId, juce::Colours::grey.darker());
+        monitorGroup.setText("MIDI In / Out Monitor");
         monitorGroup.setComponentID("mon.group.monitor");
         addAndMakeVisible(monitorGroup);
         keyboardGroup.setColour(juce::GroupComponent::outlineColourId, juce::Colours::grey.darker());
@@ -9162,7 +9163,8 @@ public:
         clearButton.setTooltip("Clear monitor text history.");
         clearButton.onClick = [this]()
             {
-                monitorTextArea.clear();
+                midiInTextArea.clear();
+                midiOutTextArea.clear();
             };
 
         addAndMakeVisible(filterMidiClockToggle);
@@ -9185,17 +9187,39 @@ public:
             };
         setFilterMidiNotesEnabled(true);
 
-        addAndMakeVisible(monitorTextArea);
-        monitorTextArea.setComponentID("mon.text");
-        monitorTextArea.setMultiLine(true, true);
-        monitorTextArea.setReadOnly(true);
-        monitorTextArea.setScrollbarsShown(true);
-        monitorTextArea.setCaretVisible(false);
-        monitorTextArea.setPopupMenuEnabled(true);
-        monitorTextArea.setColour(juce::TextEditor::textColourId, juce::Colours::whitesmoke);
-        monitorTextArea.setColour(juce::TextEditor::backgroundColourId, findColour(juce::ResizableWindow::backgroundColourId));
-        monitorTextArea.setColour(juce::TextEditor::outlineColourId, juce::Colours::grey.withAlpha(0.35f));
-        monitorTextArea.setTextToShowWhenEmpty("Enable monitoring to see outgoing MIDI messages.", juce::Colours::grey);
+        addAndMakeVisible(midiInLabel);
+        midiInLabel.setComponentID("mon.label.in");
+        midiInLabel.setText("MIDI IN", juce::dontSendNotification);
+        midiInLabel.setJustificationType(juce::Justification::centredLeft);
+
+        addAndMakeVisible(midiInTextArea);
+        midiInTextArea.setComponentID("mon.text.in");
+        midiInTextArea.setMultiLine(true, true);
+        midiInTextArea.setReadOnly(true);
+        midiInTextArea.setScrollbarsShown(true);
+        midiInTextArea.setCaretVisible(false);
+        midiInTextArea.setPopupMenuEnabled(true);
+        midiInTextArea.setColour(juce::TextEditor::textColourId, juce::Colours::whitesmoke);
+        midiInTextArea.setColour(juce::TextEditor::backgroundColourId, findColour(juce::ResizableWindow::backgroundColourId));
+        midiInTextArea.setColour(juce::TextEditor::outlineColourId, juce::Colours::grey.withAlpha(0.35f));
+        midiInTextArea.setTextToShowWhenEmpty("Enable monitoring to see incoming MIDI messages.", juce::Colours::grey);
+
+        addAndMakeVisible(midiOutLabel);
+        midiOutLabel.setComponentID("mon.label.out");
+        midiOutLabel.setText("MIDI OUT", juce::dontSendNotification);
+        midiOutLabel.setJustificationType(juce::Justification::centredLeft);
+
+        addAndMakeVisible(midiOutTextArea);
+        midiOutTextArea.setComponentID("mon.text.out");
+        midiOutTextArea.setMultiLine(true, true);
+        midiOutTextArea.setReadOnly(true);
+        midiOutTextArea.setScrollbarsShown(true);
+        midiOutTextArea.setCaretVisible(false);
+        midiOutTextArea.setPopupMenuEnabled(true);
+        midiOutTextArea.setColour(juce::TextEditor::textColourId, juce::Colours::whitesmoke);
+        midiOutTextArea.setColour(juce::TextEditor::backgroundColourId, findColour(juce::ResizableWindow::backgroundColourId));
+        midiOutTextArea.setColour(juce::TextEditor::outlineColourId, juce::Colours::grey.withAlpha(0.35f));
+        midiOutTextArea.setTextToShowWhenEmpty("Enable monitoring to see outgoing MIDI messages.", juce::Colours::grey);
 
         addAndMakeVisible(startOctaveLabel);
         startOctaveLabel.setComponentID("mon.label.octave");
@@ -9240,8 +9264,10 @@ public:
     {
         setLookAndFeel(nullptr);
         monitorKeyboardState.removeListener(this);
-        if (mididevices != nullptr)
+        if (mididevices != nullptr) {
+            mididevices->setIncomingMidiMonitor({});
             mididevices->setOutgoingMidiMonitor({});
+        }
     }
 
     void paint(juce::Graphics& g) override
@@ -9271,7 +9297,18 @@ public:
         leftButtons.removeFromLeft(scaleX(8));
         filterMidiNotesToggle.setBounds(leftButtons.removeFromLeft(scaleX(120)));
         leftInner.removeFromTop(scaleY(8));
-        monitorTextArea.setBounds(leftInner);
+        const int monitorSectionGap = scaleY(6);
+        auto inMonitorArea = leftInner.removeFromTop(leftInner.getHeight() / 2);
+        leftInner.removeFromTop(monitorSectionGap);
+        auto outMonitorArea = leftInner;
+
+        midiInLabel.setBounds(inMonitorArea.removeFromTop(scaleY(18)));
+        inMonitorArea.removeFromTop(scaleY(4));
+        midiInTextArea.setBounds(inMonitorArea);
+
+        midiOutLabel.setBounds(outMonitorArea.removeFromTop(scaleY(18)));
+        outMonitorArea.removeFromTop(scaleY(4));
+        midiOutTextArea.setBounds(outMonitorArea);
 
         auto rightInner = right.reduced(scaleX(12));
         rightInner.removeFromTop(scaleY(10));
@@ -9303,6 +9340,8 @@ public:
         applyScale(clearButton, currentProfile.buttonFontScale);
         applyScale(filterMidiClockToggle, currentProfile.toggleFontScale);
         applyScale(filterMidiNotesToggle, currentProfile.toggleFontScale);
+        applyScale(midiInLabel, currentProfile.labelFontScale);
+        applyScale(midiOutLabel, currentProfile.labelFontScale);
         applyScale(startOctaveLabel, currentProfile.labelFontScale);
         applyScale(midiChannelLabel, currentProfile.labelFontScale);
         applyScale(startOctaveCombo, currentProfile.comboFontScale);
@@ -9329,8 +9368,15 @@ public:
 private:
     struct MonitorMessageEntry
     {
+        enum class Direction
+        {
+            midiIn,
+            midiOut
+        };
+
         juce::MidiMessage message;
-        juce::String moduleName;
+        juce::String endpointName;
+        Direction direction { Direction::midiOut };
     };
 
     bool isVirtualKeyboardInputEnabled() const
@@ -9431,16 +9477,26 @@ private:
                         return;
                     if (safeThis->shouldFilterOutMessage(message))
                         return;
-                    safeThis->enqueueMessage(message, routedModuleName);
+                    safeThis->enqueueMessage(message, routedModuleName, MonitorMessageEntry::Direction::midiOut);
+                });
+            mididevices->setIncomingMidiMonitor([safeThis](const juce::MidiMessage& message, const juce::String& sourceName)
+                {
+                    if (safeThis == nullptr)
+                        return;
+                    if (!safeThis->monitorEnabled.load(std::memory_order_relaxed))
+                        return;
+                    if (safeThis->shouldFilterOutMessage(message))
+                        return;
+                    safeThis->enqueueMessage(message, sourceName, MonitorMessageEntry::Direction::midiIn);
                 });
             monitorHookInstalled = true;
         }
     }
 
-    void enqueueMessage(const juce::MidiMessage& message, const juce::String& routedModuleName)
+    void enqueueMessage(const juce::MidiMessage& message, const juce::String& endpointName, MonitorMessageEntry::Direction direction)
     {
         const juce::ScopedLock lock(queueLock);
-        pendingMessages.add({ message, routedModuleName });
+        pendingMessages.add({ message, endpointName, direction });
         triggerAsyncUpdate();
     }
 
@@ -9455,13 +9511,29 @@ private:
         if (flushMessages.isEmpty())
             return;
 
-        juce::String lines;
-        lines.preallocateBytes(flushMessages.size() * 48);
+        juce::String inLines;
+        juce::String outLines;
+        inLines.preallocateBytes(flushMessages.size() * 32);
+        outLines.preallocateBytes(flushMessages.size() * 32);
         for (const auto& entry : flushMessages)
-            lines << formatMessage(entry, updateAndGetCurrentVolume(entry.message)) << "\n";
+        {
+            const juce::String line = formatMessage(entry, updateAndGetCurrentVolume(entry.message)) + "\n";
+            if (entry.direction == MonitorMessageEntry::Direction::midiIn)
+                inLines << line;
+            else
+                outLines << line;
+        }
 
-        monitorTextArea.moveCaretToEnd();
-        monitorTextArea.insertTextAtCaret(lines);
+        if (inLines.isNotEmpty())
+        {
+            midiInTextArea.moveCaretToEnd();
+            midiInTextArea.insertTextAtCaret(inLines);
+        }
+        if (outLines.isNotEmpty())
+        {
+            midiOutTextArea.moveCaretToEnd();
+            midiOutTextArea.insertTextAtCaret(outLines);
+        }
     }
 
     int updateAndGetCurrentVolume(const juce::MidiMessage& msg)
@@ -9480,21 +9552,22 @@ private:
     {
         const auto& msg = entry.message;
         const juce::String description = getProjectMidiMessageDescription(msg);
+        const juce::String directionPrefix = entry.direction == MonitorMessageEntry::Direction::midiIn ? "IN" : "OUT";
 
         const int channel = msg.getChannel();
         if (channel > 0) {
             const juce::String volumeSuffix = currentVolume >= 0
                 ? " | Vol: " + juce::String(currentVolume)
                 : " | Vol: --";
-            if (entry.moduleName.isNotEmpty())
-                return "Ch " + juce::String(channel) + " | " + description + volumeSuffix + " (" + entry.moduleName + ")";
-            return "Ch " + juce::String(channel) + " | " + description + volumeSuffix;
+            if (entry.endpointName.isNotEmpty())
+                return directionPrefix + " | Ch " + juce::String(channel) + " | " + description + volumeSuffix + " (" + entry.endpointName + ")";
+            return directionPrefix + " | Ch " + juce::String(channel) + " | " + description + volumeSuffix;
         }
 
-        if (entry.moduleName.isNotEmpty())
-            return description + " (" + entry.moduleName + ")";
+        if (entry.endpointName.isNotEmpty())
+            return directionPrefix + " | " + description + " (" + entry.endpointName + ")";
 
-        return description;
+        return directionPrefix + " | " + description;
     }
 
     juce::GroupComponent monitorGroup{ "monitorGroup", "MIDI Out Monitor" };
@@ -9503,7 +9576,10 @@ private:
     juce::TextButton clearButton{ "Clear" };
     juce::ToggleButton filterMidiClockToggle{ "Filter Clock & Sensing" };
     juce::ToggleButton filterMidiNotesToggle{ "Filter Notes" };
-    juce::TextEditor monitorTextArea;
+    juce::Label midiInLabel{ "midiInLabel", "MIDI IN" };
+    juce::TextEditor midiInTextArea;
+    juce::Label midiOutLabel{ "midiOutLabel", "MIDI OUT" };
+    juce::TextEditor midiOutTextArea;
     juce::Label startOctaveLabel{ "startOctaveLabel", "Octave" };
     juce::ComboBox startOctaveCombo;
     juce::Label midiChannelLabel{ "midiChannelLabel", "MIDI Channel" };

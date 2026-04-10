@@ -338,6 +338,14 @@ public:
     //-------------------------------------------------------------------------
     void handleIncomingMidiMessage(MidiInput* sourceInput, const MidiMessage& message) override
     {
+        std::function<void(const MidiMessage&, const juce::String&)> incomingMonitorHookCopy;
+        {
+            const juce::SpinLock::ScopedLockType hookLock(incomingMonitorHookLock);
+            incomingMonitorHookCopy = incomingMonitorHook;
+        }
+        if (incomingMonitorHookCopy)
+            incomingMonitorHookCopy(message, resolveInputLabelForSource(sourceInput));
+
         //--- To do: Should we be adding messages to buffer rather than straight out to midiOutput
         int inchan = message.getChannel();
 
@@ -541,6 +549,12 @@ public:
         outgoingMonitorHook = std::move(hook);
     }
 
+    void setIncomingMidiMonitor(std::function<void(const MidiMessage&, const juce::String&)> hook)
+    {
+        const juce::SpinLock::ScopedLockType hookLock(incomingMonitorHookLock);
+        incomingMonitorHook = std::move(hook);
+    }
+
     void setPresetNextProgramChangeTrigger(std::function<void()> hook)
     {
         presetNextTriggerHook = std::move(hook);
@@ -634,6 +648,8 @@ public:
     // Test hook for observing emitted output messages without hardware.
     std::function<void(const MidiMessage&)> testSendHook;
     std::function<void()> presetNextTriggerHook;
+    juce::SpinLock incomingMonitorHookLock;
+    std::function<void(const MidiMessage&, const juce::String&)> incomingMonitorHook;
     juce::SpinLock outgoingMonitorHookLock;
     std::function<void(const MidiMessage&, const juce::String&)> outgoingMonitorHook;
 
@@ -643,6 +659,26 @@ public:
     juce_DeclareSingleton(MidiDevices, true)
 
 private:
+    juce::String resolveInputLabelForSource(MidiInput* sourceInput) const
+    {
+        if (sourceInput == nullptr)
+            return "<unknown-input>";
+
+        for (int i = 0; i < midiInputs.size(); ++i)
+        {
+            if (midiInputs[i] != nullptr && midiInputs[i]->inDevice.get() == sourceInput)
+            {
+                if (midiInputs[i]->deviceInfo.name.isNotEmpty())
+                    return midiInputs[i]->deviceInfo.name;
+                if (midiInputs[i]->deviceInfo.identifier.isNotEmpty())
+                    return midiInputs[i]->deviceInfo.identifier;
+                break;
+            }
+        }
+
+        return "<unknown-input>";
+    }
+
     juce::String resolveInputIdentifierForSource(MidiInput* sourceInput) const
     {
         if (sourceInput == nullptr)

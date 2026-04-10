@@ -2212,6 +2212,108 @@ namespace
         return true;
     }
 
+    bool runIncomingMonitorCapturesRawAndDropped(std::string& details)
+    {
+        auto* devices = MidiDevices::getInstance();
+        if (devices == nullptr)
+        {
+            details = "MidiDevices::getInstance() returned nullptr";
+            return false;
+        }
+
+        const auto snapshot = takeAppStateSnapshot();
+        auto& state = getAppState();
+        state.presetMidiPcInputChannel = 16;
+        state.presetMidiPcValue = 0;
+
+        devices->clearMidiIOMap();
+        devices->clearSysExRoutes();
+
+        std::vector<MidiMessage> inboundMessages;
+        std::vector<juce::String> inboundSources;
+        std::vector<MidiMessage> sentMessages;
+        devices->setIncomingMidiMonitor([&inboundMessages, &inboundSources](const MidiMessage& message, const juce::String& sourceName)
+        {
+            inboundMessages.push_back(message);
+            inboundSources.push_back(sourceName);
+        });
+        devices->testSendHook = [&sentMessages](const MidiMessage& message)
+        {
+            sentMessages.push_back(message);
+        };
+
+        // Consumed preset-next Program Change still appears in incoming monitor.
+        devices->passthroughin[16] = false;
+        const auto matchingPc = MidiMessage::programChange(16, 0);
+        devices->handleIncomingMidiMessage(nullptr, matchingPc);
+        if (!expectEqual(static_cast<int>(inboundMessages.size()), 1, "incoming monitor logs consumed Program Change", details)
+            || !expectEqual(static_cast<int>(sentMessages.size()), 0, "consumed Program Change does not emit output", details))
+        {
+            devices->setIncomingMidiMonitor({});
+            devices->testSendHook = nullptr;
+            restoreAppState(snapshot);
+            return false;
+        }
+
+        // Passthrough-blocked channelized message is still visible in incoming monitor.
+        const auto blockedCc = MidiMessage::controllerEvent(3, CCVol, 100);
+        devices->passthroughin[3] = false;
+        devices->handleIncomingMidiMessage(nullptr, blockedCc);
+        if (!expectEqual(static_cast<int>(inboundMessages.size()), 2, "incoming monitor logs passthrough-blocked message", details)
+            || !expectEqual(static_cast<int>(sentMessages.size()), 0, "blocked channelized message does not emit output", details))
+        {
+            devices->setIncomingMidiMonitor({});
+            devices->testSendHook = nullptr;
+            restoreAppState(snapshot);
+            return false;
+        }
+
+        // Unmapped SysEx drop should still be visible in incoming monitor.
+        const juce::uint8 sysexData[] { 0xF0, 0x7D, 0x05, 0x01, 0xF7 };
+        const auto sysex = MidiMessage::createSysExMessage(sysexData, static_cast<int>(std::size(sysexData)));
+        devices->handleIncomingMidiMessage(nullptr, sysex);
+        if (!expectEqual(static_cast<int>(inboundMessages.size()), 3, "incoming monitor logs unmapped SysEx", details)
+            || !expectEqual(inboundMessages.back().isSysEx() ? 1 : 0, 1, "incoming monitor preserved SysEx payload", details)
+            || !expectEqual(static_cast<int>(sentMessages.size()), 0, "unmapped SysEx does not emit output", details))
+        {
+            devices->setIncomingMidiMonitor({});
+            devices->testSendHook = nullptr;
+            restoreAppState(snapshot);
+            return false;
+        }
+
+        // Routed non-note still appears incoming once and outputs once.
+        devices->passthroughin[3] = true;
+        devices->iomap[3][0] = 4;
+        const auto routedCc = MidiMessage::controllerEvent(3, CCExp, 90);
+        devices->handleIncomingMidiMessage(nullptr, routedCc);
+        if (!expectEqual(static_cast<int>(inboundMessages.size()), 4, "incoming monitor logs routed channelized message", details)
+            || !expectEqual(static_cast<int>(sentMessages.size()), 1, "routed channelized message emits output once", details)
+            || !expectEqual(sentMessages[0].getChannel(), 4, "routed channelized message rewrites output channel", details))
+        {
+            devices->setIncomingMidiMonitor({});
+            devices->testSendHook = nullptr;
+            restoreAppState(snapshot);
+            return false;
+        }
+
+        for (const auto& sourceName : inboundSources)
+        {
+            if (!expectEqual(sourceName == "<unknown-input>" ? 1 : 0, 1, "null source input is labeled unknown", details))
+            {
+                devices->setIncomingMidiMonitor({});
+                devices->testSendHook = nullptr;
+                restoreAppState(snapshot);
+                return false;
+            }
+        }
+
+        devices->setIncomingMidiMonitor({});
+        devices->testSendHook = nullptr;
+        restoreAppState(snapshot);
+        return true;
+    }
+
     bool runShortcutFocusDeferralGuard(std::string& details)
     {
         TextEditor editor;
@@ -2601,6 +2703,11 @@ int main()
     {
         std::string details;
         results.push_back({ "MIDI Program Change can trigger consumed preset next", runProgramChangePresetNextTriggerAndConsume(details), details });
+    }
+
+    {
+        std::string details;
+        results.push_back({ "MIDI IN monitor captures raw traffic including consumed and dropped paths", runIncomingMonitorCapturesRawAndDropped(details), details });
     }
 
     {
