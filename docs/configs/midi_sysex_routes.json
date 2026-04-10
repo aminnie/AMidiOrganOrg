@@ -7,9 +7,9 @@
       "outputModule": "EVM"
     },
     {
-      "inputIdentifier": "MacroPad RP2040",
-      "outputIdentifier": "MacroPad RP2040",
-      "outputModule": "MacroPad"
+      "inputIdentifier": "CircuitPython Audio",
+      "outputIdentifier": "MidiView",
+      "outputModule": "MidiView"
     }
   ]
 }

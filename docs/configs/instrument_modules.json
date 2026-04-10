@@ -79,9 +79,9 @@
     },
     {
       "moduleIndex": 4,
-      "displayName": "CustomGM",
-      "subDirectory": "Custom",
-      "moduleFileName": "custom.json",
+      "displayName": "MidiView",
+      "subDirectory": "MidiView",
+      "moduleFileName": "midigm.json",
       "moduleIdString": "MIDI",
       "matchStrings": ["MIDI"],
       "defaultVoiceName": "Grand Piano",
