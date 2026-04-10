@@ -22,7 +22,7 @@ presets, and rotary states are available during a performance.
 - Roland Integra7
 - Ketron SD2
 - MIDI GM
-- Custom MIDI (JSON-based)
+- MidiView
 
 Contact the developer for additional module support.
 

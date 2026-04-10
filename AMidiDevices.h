@@ -1074,11 +1074,12 @@ private:
             ModuleDefinition{ 1, "Deebach BlackBox", "BlackBox", "maxplus.json", "Blackbox", "Deebach Grand 1", 121, 8, 0, true, true, 2, 0x74, 0, 20, 63 },
             ModuleDefinition{ 2, "Roland Integra-7", "Integra-7", "integra7.json", "INTEGRA-7", "Piano", 87, 64, 1, false, true, 1, 0x01, 0, 0x10, 0x60 },
             ModuleDefinition{ 3, "Roland AT900", "AT900MI", "at900mi.json", "AT900MI", "Grand Piano1", 121, 0, 0, true, false, 0, 0, 0, 0, 0 },
-            ModuleDefinition{ 4, "MidiView", "MidiView", "midigm.json", "MIDI", "Grand Piano", 0, 0, 1, true, false, 0, 0, 0, 0, 0 },
+            ModuleDefinition{ 4, "MidiView", "MidiView", "midigm.json", "MIDIVIEW", "Grand Piano", 0, 0, 1, true, false, 0, 0, 0, 0, 0 },
             ModuleDefinition{ 5, "Ketron EVM", "KetronEVM", "ketronevm.json", "EVM", "Piano", 0, 0, 0, true, true, 1, 0x1E, 0, 0x40, 0x7F }
         };
 
         defs.getReference(2).moduleMatchStrings.add("INTEGRA-7");
+        defs.getReference(4).moduleMatchStrings.addArray(juce::StringArray{ "MIDIVIEW", "MIDI VIEW", "MIDIVIEW PORT", "MIDIVIEW IN", "MIDIVIEW OUT" });
         defs.getReference(5).moduleMatchStrings.add("MIDI GADGET");
         return defs;
     }
