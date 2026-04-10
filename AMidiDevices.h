@@ -271,7 +271,7 @@ public:
         sysexUnmappedLoggedInputs.erase(normalizedInput);
     }
 
-    bool routeIncomingSysExForInputIdentifier(const juce::String& inputIdentifier, const MidiMessage& message)
+    bool routeIncomingSysExForInputIdentifier(const juce::String& inputIdentifier, const MidiMessage& message, bool logUnmapped = true)
     {
         const juce::String normalizedInput = inputIdentifier.trim().toLowerCase();
         const juce::String logInput = normalizedInput.isEmpty() ? juce::String("<unknown-input>") : normalizedInput;
@@ -282,7 +282,7 @@ public:
             const auto it = sysexInputToOutputIndex.find(normalizedInput);
             if (it == sysexInputToOutputIndex.end())
             {
-                if (sysexUnmappedLoggedInputs.insert(logInput).second)
+                if (logUnmapped && sysexUnmappedLoggedInputs.insert(logInput).second)
                     juce::Logger::writeToLog("*** SysExRouter: dropping unmapped SysEx from input " + logInput);
                 return false;
             }
@@ -352,7 +352,19 @@ public:
         // Non-channel messages (e.g. SysEx) route through explicit SysEx input mapping.
         if (!isValidMidiChannel(inchan))
         {
-            routeIncomingSysExForInputIdentifier(resolveInputIdentifierForSource(sourceInput), message);
+            const juce::String inputIdentifier = resolveInputIdentifierForSource(sourceInput);
+            const juce::String inputLabel = resolveInputLabelForSource(sourceInput);
+
+            bool routed = false;
+            if (inputIdentifier.isNotEmpty())
+                routed = routeIncomingSysExForInputIdentifier(inputIdentifier, message, false);
+
+            if (!routed && inputLabel.isNotEmpty() && !inputLabel.equalsIgnoreCase(inputIdentifier))
+                routed = routeIncomingSysExForInputIdentifier(inputLabel, message, true);
+
+            if (!routed && inputIdentifier.isNotEmpty())
+                routeIncomingSysExForInputIdentifier(inputIdentifier, message, true);
+
             return;
         }
 

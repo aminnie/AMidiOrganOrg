@@ -78,8 +78,12 @@ inline void rebuildSysExRoutesFromConfig(MidiDevices* mididevices, InstrumentMod
 
         for (int i = 0; i < mididevices->midiOutputs.size(); ++i)
         {
-            if (mididevices->midiOutputs[i] != nullptr
-                && mididevices->midiOutputs[i]->deviceInfo.identifier == target)
+            if (mididevices->midiOutputs[i] == nullptr)
+                continue;
+
+            const auto& info = mididevices->midiOutputs[i]->deviceInfo;
+            if (info.identifier.equalsIgnoreCase(target)
+                || info.name.equalsIgnoreCase(target))
                 return i;
         }
 
