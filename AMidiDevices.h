@@ -257,6 +257,7 @@ public:
         sysexInputToOutputIndex.clear();
         sysexInputToRouteLabel.clear();
         sysexUnmappedLoggedInputs.clear();
+        sysexUnmappedRouteHintLogged.clear();
     }
 
     void setSysExRouteForInputIdentifier(const juce::String& inputIdentifier, int outputDeviceIndex, const juce::String& routeLabel = {})
@@ -320,11 +321,13 @@ public:
         if (testSendHook)
             testSendHook(message);
 
-        if (!routedToOutput && testSendHook == nullptr)
-            return false;
-
+        // Outgoing monitor must reflect attempted SysEx routing even when the mapped output
+        // device is closed or unavailable (otherwise IN shows SysEx but OUT appears empty).
         if (monitorHookCopy)
             monitorHookCopy(message, routedModuleName);
+
+        if (!routedToOutput && testSendHook == nullptr)
+            return false;
 
         // Keep monitor visibility behavior consistent with other output paths.
         if (midiviewidx < midiOutputs.size() && midiOutputs[midiviewidx]->outDevice.get() != nullptr)
@@ -363,7 +366,15 @@ public:
                 routed = routeIncomingSysExForInputIdentifier(inputLabel, message, true);
 
             if (!routed && inputIdentifier.isNotEmpty())
-                routeIncomingSysExForInputIdentifier(inputIdentifier, message, true);
+                routed = routeIncomingSysExForInputIdentifier(inputIdentifier, message, true);
+
+            if (!routed && message.isSysEx())
+            {
+                const juce::String hintKey = (inputIdentifier + "\n" + inputLabel).toLowerCase();
+                const juce::SpinLock::ScopedLockType routeLock(sysexRoutesLock);
+                if (sysexUnmappedRouteHintLogged.insert(hintKey).second)
+                    juce::Logger::writeToLog("*** SysExRouter: unmapped SysEx; set \"inputIdentifier\" in midi_sysex_routes.json to identifier or name - identifier=\"" + inputIdentifier + "\" name=\"" + inputLabel + "\"");
+            }
 
             return;
         }
@@ -656,6 +667,8 @@ public:
     std::map<juce::String, int> sysexInputToOutputIndex;
     std::map<juce::String, juce::String> sysexInputToRouteLabel;
     std::set<juce::String> sysexUnmappedLoggedInputs;
+    /** Dedupes one-line identifier/name hint logs for unmapped SysEx (see handleIncomingMidiMessage). */
+    std::set<juce::String> sysexUnmappedRouteHintLogged;
 
     // Test hook for observing emitted output messages without hardware.
     std::function<void(const MidiMessage&)> testSendHook;

@@ -320,6 +320,28 @@ Important subfolders:
 - `instruments/` for JSON instrument catalogs
 - `configs/hotkeys.json` for keyboard shortcut bindings
 
+### Troubleshooting: SysEx routing and MIDI monitor
+
+Use this if SysEx appears on the **Monitor** tab under **MIDI IN** but not under **MIDI OUT**, or the log shows `SysExRouter: dropping unmapped SysEx`.
+
+- **Canonical config path**  
+  SysEx routes are read from **`Documents/AMidiOrgan/configs/midi_sysex_routes.json`** (per-user; OneDrive-backed Documents is fine). The copy under **`docs/configs/` in the repository is a template** only. If that JSON exists only in the repo and not under your Documents tree, routes are empty until you copy the file or let the app seed it (see Build notes below).
+
+- **Seeding on a new machine**  
+  On startup the app copies missing files from the shipped **`docs/`** folder into `Documents/AMidiOrgan`. The SysEx routes file is **user-editable** and is **not** overwritten on every launch once it exists. Release/packaged builds must ship **`docs/`** next to the executable (Windows build copies it beside `AMidiOrgan.exe`; macOS places it under the app bundle `Resources/docs`).
+
+- **`inputIdentifier` must match the port**  
+  Each route’s `inputIdentifier` is matched against the MIDI input’s JUCE **device identifier** or **name** (case-insensitive). If routing still fails, check the log for a line of the form `SysExRouter: unmapped SysEx; set "inputIdentifier" ... identifier="..." name="..."` and copy **either** string into `inputIdentifier` in `midi_sysex_routes.json`.
+
+- **The route must resolve an output**  
+  A route is applied only if the destination **output** (`outputIdentifier` / `outputModule`) can be matched to an **enabled** MIDI output in the app. If the output is missing or not opened, you may see `SysExRouter: no output route found for input ...` and the route will not register.
+
+- **Input vs output device names**  
+  A route such as *CircuitPython → MidiView* forwards SysEx **from** the CircuitPython **input** **to** the MidiView **output**. SysEx arriving on a **MidiView input** port is a different case; add a separate route whose `inputIdentifier` matches that input if you need to forward it.
+
+- **Monitor tab**  
+  **MIDI IN** reflects all incoming messages seen by the app. **MIDI OUT** reflects messages sent to outputs (including routed SysEx). Unmapped SysEx is dropped and does not appear under MIDI OUT.
+
 ### 10. Keyboard Shortcuts (Phase 1)
 
 When the main window has focus:
@@ -523,6 +545,7 @@ Recommended upkeep on a Mac mini:
 
 - UI images are packaged from `assets/*.png` via `juce_add_binary_data(...)` in `CMakeLists.txt`.
 - On macOS, `docs/` is copied into `AMidiOrgan.app/Contents/Resources/docs` during build so first-run data seeding works when launching the bundle outside the repo tree.
+- On Windows, `docs/` is copied next to `AMidiOrgan.exe` at build time for the same reason (portable or install layout should keep that folder beside the executable).
 - On startup, the app seeds `Documents/AMidiOrgan` from `docs/` on first run, then ensures missing files under `configs/`, `instruments/` (JSON instrument catalogs), and `panels/` (`.pnl` panel files) are restored on subsequent runs.
 - Managed startup sync also overwrites selected shipped files every launch to keep runtime data current: `configs/instrument_modules.json` and module catalogs `midigm.json`, `maxplus.json`, `integra7.json`, `at900mi.json`, `ketronevm.json`.
 - User-editable catalogs such as `custom.json` are not part of the managed overwrite set.
