@@ -72,7 +72,7 @@
 ## SysEx routing UI management (phase-2 candidate)
 
 Current status:
-- [x] SysEx backend is live via `configs/midi_sysex_routes.json` (explicit input -> output mapping, unmapped drop+log).
+- [x] Removed `configs/midi_sysex_routes.json` backend and associated route-management logic.
 
 ### Go/No-Go checklist (compact)
 

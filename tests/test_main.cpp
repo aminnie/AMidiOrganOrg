@@ -2026,79 +2026,35 @@ namespace
         return true;
     }
 
-    bool runExplicitSysExInputRouting(std::string& details)
+    bool runConfigManagedSysExThroughRouting(std::string& details)
     {
         auto* devices = MidiDevices::getInstance();
-        auto* modules = InstrumentModules::getInstance();
-        if (devices == nullptr || modules == nullptr)
+        auto* panel = InstrumentPanel::getInstance();
+        if (devices == nullptr || panel == nullptr)
         {
-            details = "MidiDevices/InstrumentModules singleton not available";
+            details = "MidiDevices/InstrumentPanel singleton not available";
             return false;
         }
 
-        devices->clearMidiIOMap();
-        devices->clearSysExRoutes();
+        if (!expectEqual(panel->getButtonGroup(0)->sysexThrough ? 1 : 0, 0, "button group defaults SysEx Through to false", details)
+            || !expectEqual(panel->getButtonGroup(0)->sysexInputIdentifier.isEmpty() ? 1 : 0, 1, "button group defaults SysEx input identifier to empty", details))
+            return false;
 
-        MidiDeviceInfo out;
-        out.identifier = "sysex-out-evm";
-        out.name = "MIDI Gadget";
-
+        devices->clearSysExThroughRoutes();
         devices->midiOutputs.clear();
-        devices->midiOutputs.add(new MidiDeviceListEntry(out));
 
-        juce::Array<MidiSysExRouteEntry> routes;
-        MidiSysExRouteEntry route;
-        route.inputIdentifier = "sysex-input-a";
-        route.outputModule = "EVM";
-        routes.add(route);
+        MidiDeviceInfo outA;
+        outA.identifier = "sysex-out-a";
+        outA.name = "SysEx Out A";
+        MidiDeviceInfo outB;
+        outB.identifier = "sysex-out-b";
+        outB.name = "SysEx Out B";
+        devices->midiOutputs.add(new MidiDeviceListEntry(outA));
+        devices->midiOutputs.add(new MidiDeviceListEntry(outB));
 
-        // Mirror production resolution path without requiring UI classes in this unit test.
-        for (const auto& r : routes)
-        {
-            int moduleIdx = -1;
-            for (int m = 0; m < modules->getNumModules() && moduleIdx < 0; ++m)
-            {
-                if (modules->getDisplayName(m).equalsIgnoreCase(r.outputModule)
-                    || modules->getModuleIdString(m).equalsIgnoreCase(r.outputModule))
-                {
-                    moduleIdx = m;
-                    break;
-                }
-
-                for (const auto& matcher : modules->getModuleMatchStrings(m))
-                {
-                    if (matcher.equalsIgnoreCase(r.outputModule))
-                    {
-                        moduleIdx = m;
-                        break;
-                    }
-                }
-            }
-
-            if (moduleIdx < 0)
-            {
-                details = "failed to resolve EVM module for SysEx route test";
-                return false;
-            }
-
-            int outmodidx = -1;
-            for (int i = 0; i < devices->midiOutputs.size(); ++i)
-            {
-                if (modules->deviceNameMatchesModule(moduleIdx, devices->midiOutputs[i]->deviceInfo.name))
-                {
-                    outmodidx = i;
-                    break;
-                }
-            }
-
-            if (outmodidx < 0)
-            {
-                details = "failed to resolve mapped output index for SysEx route test";
-                return false;
-            }
-
-            devices->setSysExRouteForInputIdentifier(r.inputIdentifier, outmodidx, modules->getDisplayName(moduleIdx));
-        }
+        juce::Array<int> routeOutA;
+        routeOutA.add(0);
+        devices->addSysExThroughRouteForInputIdentifier("sysex-input-a", routeOutA);
 
         std::vector<MidiMessage> sentMessages;
         devices->testSendHook = [&sentMessages](const MidiMessage& message)
@@ -2112,44 +2068,51 @@ namespace
                 ++monitorHits;
         });
 
-        const juce::uint8 sysexData[] { 0xF0, 0x7D, 0x01, 0x02, 0xF7 };
+        const juce::uint8 sysexData[] { 0xF0, 0x7D, 0x33, 0x44, 0xF7 };
         const auto sysex = MidiMessage::createSysExMessage(sysexData, static_cast<int>(std::size(sysexData)));
 
         if (!expectEqual(devices->routeIncomingSysExForInputIdentifier("sysex-input-a", sysex) ? 1 : 0, 1,
-                         "mapped SysEx route forwards to output", details))
+                         "matching SysEx input routes to output", details)
+            || !expectEqual(static_cast<int>(sentMessages.size()), 1, "matching SysEx emits test hook once", details)
+            || !expectEqual(monitorHits, 1, "matching SysEx emits one monitor event", details))
         {
+            devices->setOutgoingMidiMonitor({});
             devices->testSendHook = nullptr;
             return false;
         }
 
-        if (!expectEqual(static_cast<int>(sentMessages.size()), 1, "mapped SysEx emits one output message", details)
-            || !expectEqual(sentMessages[0].isSysEx() ? 1 : 0, 1, "mapped output message is SysEx", details))
-        {
-            devices->testSendHook = nullptr;
-            devices->setOutgoingMidiMonitor({});
-            return false;
-        }
+        juce::Array<int> routeOutBAgainA;
+        routeOutBAgainA.add(1);
+        routeOutBAgainA.add(0);
+        devices->addSysExThroughRouteForInputIdentifier("sysex-input-a", routeOutBAgainA);
+        sentMessages.clear();
+        monitorHits = 0;
 
-        if (!expectEqual(monitorHits, 1, "mapped SysEx emits one monitor message", details))
+        if (!expectEqual(devices->routeIncomingSysExForInputIdentifier("sysex-input-a", sysex) ? 1 : 0, 1,
+                         "matching SysEx fanout routes", details)
+            || !expectEqual(static_cast<int>(sentMessages.size()), 1, "fanout SysEx still emits one test hook event", details)
+            || !expectEqual(monitorHits, 2, "fanout SysEx emits monitor events per output route", details))
         {
-            devices->testSendHook = nullptr;
             devices->setOutgoingMidiMonitor({});
+            devices->testSendHook = nullptr;
             return false;
         }
 
         sentMessages.clear();
-        if (!expectEqual(devices->routeIncomingSysExForInputIdentifier("unknown-input", sysex) ? 1 : 0, 0,
-                         "unmapped SysEx route drops message", details))
+        monitorHits = 0;
+        if (!expectEqual(devices->routeIncomingSysExForInputIdentifier("other-input", sysex) ? 1 : 0, 0,
+                         "non-matching SysEx input is dropped", details)
+            || !expectEqual(static_cast<int>(sentMessages.size()), 0, "non-matching SysEx emits no test hook", details)
+            || !expectEqual(monitorHits, 0, "non-matching SysEx emits no monitor event", details))
         {
-            devices->testSendHook = nullptr;
             devices->setOutgoingMidiMonitor({});
+            devices->testSendHook = nullptr;
             return false;
         }
 
-        const bool noExtraSend = sentMessages.empty();
-        devices->testSendHook = nullptr;
         devices->setOutgoingMidiMonitor({});
-        return expectEqual(noExtraSend ? 1 : 0, 1, "unmapped SysEx does not emit output", details);
+        devices->testSendHook = nullptr;
+        return true;
     }
 
     bool runProgramChangePresetNextTriggerAndConsume(std::string& details)
@@ -2227,7 +2190,6 @@ namespace
         state.presetMidiPcValue = 0;
 
         devices->clearMidiIOMap();
-        devices->clearSysExRoutes();
 
         std::vector<MidiMessage> inboundMessages;
         std::vector<juce::String> inboundSources;
@@ -2697,7 +2659,7 @@ int main()
 
     {
         std::string details;
-        results.push_back({ "SysEx explicit input routing maps and drops as configured", runExplicitSysExInputRouting(details), details });
+        results.push_back({ "Config-managed SysEx through routes by input identifier with fanout dedupe", runConfigManagedSysExThroughRouting(details), details });
     }
 
     {

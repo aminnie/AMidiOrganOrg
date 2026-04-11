@@ -71,9 +71,9 @@ AMidiOrgan stores user files under:
 Key subfolders/files:
 
 - `configs/` (`.cfg` files, `hotkeys.json`, sticky device/session files)
-- `configs/midi_sysex_routes.json` (explicit SysEx input-to-output routing entries)
 - `panels/` (`.pnl` files)
 - `instruments/` (module definition JSON files)
+- Per-group SysEx Through settings are stored in each `.cfg` (`sysexThrough`, `sysexInputIdentifier`).
 
 Startup sync behavior:
 
@@ -152,7 +152,6 @@ Behavior:
 - Start tab remembers selected MIDI ports via sticky device storage.
 - `New Panel` opens a save-style prompt; duplicate panel names are blocked, and successful saves auto-load the new panel.
 - Panel/config status lines are displayed as `Panel: <file>` and `Config: <file>`.
-- SysEx routing is configured separately via `configs/midi_sysex_routes.json` (advanced workflow; no dedicated UI editor yet).
 
 Best practice:
 
@@ -324,6 +323,10 @@ Global options note:
   - `PC Value` accepts `0..127` (default `0`)
   - A matching incoming Program Change triggers `Next preset` exactly like the hotkey flow.
   - Matching Program Change is consumed (not routed to outputs) and the trigger check ignores pass-through gating.
+- `SysEx Through` is configured per button group:
+  - Enable `SysEx Through` to allow SysEx forwarding for that group.
+  - Select `SysEx Input` to bind forwarding to one MIDI input device identifier.
+  - Matching inbound SysEx fans out to all matching groups and is deduped per output device.
 - `UI Profile` applies live across Start/Upper/Lower/Bass/Config/Sounds/Effects/Hotkeys/Monitor and resizes the app window to the selected fixed profile size.
 - Solo split note names use the project-wide `C4 = 60` convention.
 
@@ -499,12 +502,12 @@ Backward-compatible load supports both legacy panels (`Manual + Preset 1..6`) an
 2. Confirm no invalid assumptions from old config files.
 3. Use `Monitor` tab to verify actual routed output channel/module context.
 
-## SysEx Not Reaching Target Device
+## SysEx Through Not Forwarding
 
-1. Verify `Documents/AMidiOrgan/configs/midi_sysex_routes.json` contains the source input `identifier`.
-2. Ensure each route has at least one destination (`outputIdentifier` or `outputModule`).
-3. Confirm the target output device is connected and selected in `Start`.
-4. Check logs for the unmapped-drop warning to identify missing/invalid route keys.
+1. Open `Config` and verify the target group has `SysEx Through` enabled.
+2. Confirm `SysEx Input` matches the input device currently sending SysEx.
+3. Confirm that group has a valid module + `Midi Out` mapping to an active output device.
+4. Save/reload the `.cfg` and retest.
 
 ## MIDI Devices Not Showing
 

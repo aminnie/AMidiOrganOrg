@@ -58,103 +58,6 @@ inline int getType2RotorFastTarget(InstrumentModules* modules, int moduleIdx)
     return juce::jlimit(0, 127, modules->getRotorFast(moduleIdx));
 }
 
-inline void rebuildSysExRoutesFromConfig(MidiDevices* mididevices, InstrumentModules* instrumentmodules)
-{
-    if (mididevices == nullptr)
-        return;
-
-    mididevices->clearSysExRoutes();
-
-    juce::Array<MidiSysExRouteEntry> routes;
-    loadMidiSysExRoutesFromFile(routes);
-    if (routes.isEmpty())
-        return;
-
-    auto resolveOutputByIdentifier = [mididevices](const juce::String& outputIdentifier) -> int
-    {
-        const juce::String target = outputIdentifier.trim();
-        if (target.isEmpty())
-            return -1;
-
-        for (int i = 0; i < mididevices->midiOutputs.size(); ++i)
-        {
-            if (mididevices->midiOutputs[i] == nullptr)
-                continue;
-
-            const auto& info = mididevices->midiOutputs[i]->deviceInfo;
-            if (info.identifier.equalsIgnoreCase(target)
-                || info.name.equalsIgnoreCase(target))
-                return i;
-        }
-
-        return -1;
-    };
-
-    auto resolveModuleIndex = [instrumentmodules](const juce::String& moduleRef) -> int
-    {
-        if (instrumentmodules == nullptr)
-            return -1;
-
-        const juce::String target = moduleRef.trim();
-        if (target.isEmpty())
-            return -1;
-
-        const int moduleCount = instrumentmodules->getNumModules();
-        for (int moduleIdx = 0; moduleIdx < moduleCount; ++moduleIdx)
-        {
-            if (instrumentmodules->getDisplayName(moduleIdx).equalsIgnoreCase(target)
-                || instrumentmodules->getModuleIdString(moduleIdx).equalsIgnoreCase(target))
-                return moduleIdx;
-
-            const juce::StringArray matchers = instrumentmodules->getModuleMatchStrings(moduleIdx);
-            for (const auto& matcher : matchers)
-                if (matcher.equalsIgnoreCase(target))
-                    return moduleIdx;
-        }
-
-        return -1;
-    };
-
-    for (const auto& route : routes)
-    {
-        const juce::String inputIdentifier = route.inputIdentifier.trim();
-        if (inputIdentifier.isEmpty())
-            continue;
-
-        int outputIndex = resolveOutputByIdentifier(route.outputIdentifier);
-        juce::String routeLabel;
-        if (outputIndex >= 0 && outputIndex < mididevices->midiOutputs.size() && mididevices->midiOutputs[outputIndex] != nullptr)
-            routeLabel = mididevices->midiOutputs[outputIndex]->deviceInfo.name;
-
-        if (outputIndex < 0 && instrumentmodules != nullptr)
-        {
-            const int moduleIdx = resolveModuleIndex(route.outputModule);
-            if (moduleIdx >= 0)
-            {
-                routeLabel = instrumentmodules->getDisplayName(moduleIdx);
-                for (int outIdx = 0; outIdx < mididevices->midiOutputs.size(); ++outIdx)
-                {
-                    if (mididevices->midiOutputs[outIdx] != nullptr
-                        && instrumentmodules->deviceNameMatchesModule(moduleIdx, mididevices->midiOutputs[outIdx]->deviceInfo.name))
-                    {
-                        outputIndex = outIdx;
-                        break;
-                    }
-                }
-            }
-        }
-
-        if (outputIndex >= 0)
-        {
-            mididevices->setSysExRouteForInputIdentifier(inputIdentifier, outputIndex, routeLabel);
-        }
-        else
-        {
-            juce::Logger::writeToLog("*** SysExRouter: no output route found for input " + inputIdentifier);
-        }
-    }
-}
-
 inline constexpr const char* kUiProfileFontScaleProperty = "uiProfileFontScale";
 inline constexpr const char* kUiProfileDialStrokeScaleProperty = "uiProfileDialStrokeScale";
 
@@ -600,6 +503,8 @@ struct ButtonGroup final : Component
         midiout = out;
         muted = mute;
         velocity = true;
+        sysexThrough = false;
+        sysexInputIdentifier = {};
         rotary = 0;
         moduleidx = 1;
     }
@@ -693,6 +598,8 @@ struct ButtonGroup final : Component
 
     int midiin = 1;
     int midiout = 1;
+    bool sysexThrough = false;
+    juce::String sysexInputIdentifier;
 
     int rotary = 0;
     bool muted = true;
@@ -7989,6 +7896,8 @@ private:
         static const juce::Identifier splitoutType("splitout");
         static const juce::Identifier splitoutnameType("splitoutname");
         static const juce::Identifier isvelocityType("isvelocity");
+        static const juce::Identifier sysexThroughType("sysexThrough");
+        static const juce::Identifier sysexInputIdentifierType("sysexInputIdentifier");
         static const juce::Identifier ispassthroughType("ispassthrough");
         static const juce::Identifier moduleidxType("moduleidx");
         static const juce::Identifier modulealiasType("modulealias");
@@ -8042,6 +7951,8 @@ private:
             child.setProperty(splitoutType, group->splitout, nullptr);
             child.setProperty(splitoutnameType, group->splitoutname, nullptr);
             child.setProperty(isvelocityType, group->velocity, nullptr);
+            child.setProperty(sysexThroughType, false, nullptr);
+            child.setProperty(sysexInputIdentifierType, "", nullptr);
             child.setProperty(ispassthroughType, false, nullptr);
             child.setProperty(moduleidxType, appState.moduleidx, nullptr);
             child.setProperty(modulealiasType, "", nullptr);
@@ -8791,7 +8702,7 @@ private:
             updateDeviceList(isInput);
 
         midiModulesToOutputChannels();
-        rebuildSysExRoutesFromConfig(mididevices, instrumentmodules);
+        rebuildSysExThroughRoutesFromCurrentConfig();
     }
 
     //-----------------------------------------------------------------------------
@@ -8875,8 +8786,33 @@ private:
             );
         }
 
-        rebuildSysExRoutesFromConfig(mididevices, instrumentmodules);
+        rebuildSysExThroughRoutesFromCurrentConfig();
+
         return true;
+    }
+
+    void rebuildSysExThroughRoutesFromCurrentConfig()
+    {
+        if (mididevices == nullptr || instrumentpanel == nullptr)
+            return;
+
+        mididevices->clearSysExThroughRoutes();
+        for (int i = 0; i < numberbuttongroups; ++i)
+        {
+            auto* const groupCfg = instrumentpanel->getButtonGroup(i);
+            if (groupCfg == nullptr || !groupCfg->sysexThrough)
+                continue;
+
+            const juce::String inputIdentifier = groupCfg->sysexInputIdentifier.trim();
+            if (inputIdentifier.isEmpty())
+                continue;
+
+            const int outchan = groupCfg->midiout;
+            if (outchan <= 0 || outchan >= 17)
+                continue;
+
+            mididevices->addSysExThroughRouteForInputIdentifier(inputIdentifier, mididevices->moduleout[outchan]);
+        }
     }
 
     //-----------------------------------------------------------------------------
@@ -9681,6 +9617,7 @@ public:
         // 2. Prepare Midi IO Map router Map by reading initial Confg into IOMap array
         //    for quick access during Midi IO routing (sendToOutputs())
         presetMidiIOMap();
+        rebuildSysExThroughRoutes();
 
         int xgroup = 10, ygroup = 10, gwidth = 660, gheight = 260;
         addAndMakeVisible(group);
@@ -9747,6 +9684,9 @@ public:
                 toggleVelocity.setToggleState(true, dontSendNotification);
             else
                 toggleVelocity.setToggleState(false, dontSendNotification);
+
+            toggleSysExThrough.setToggleState(instrumentpanel->getButtonGroup(i)->sysexThrough, dontSendNotification);
+            selectSysExInputInCombo(instrumentpanel->getButtonGroup(i)->sysexInputIdentifier);
             };
 
         for (int i = 1; i < 13; ++i) {
@@ -9929,6 +9869,56 @@ public:
 
             setConfigSaveButtonEnabled(true);
             };
+
+        addAndMakeVisible(lblSysExThrough);
+        lblSysExThrough.setBounds(400, 165, 140, 24);
+        lblSysExThrough.setText("SysEx Through", {});
+
+        addAndMakeVisible(toggleSysExThrough);
+        toggleSysExThrough.setBounds(560, 165, 100, 24);
+        toggleSysExThrough.onClick = [this]()
+            {
+                const int i = comboConfig.getSelectedId() - 1;
+                if (i < 0 || i >= numberbuttongroups)
+                    return;
+                instrumentpanel->getButtonGroup(i)->sysexThrough = toggleSysExThrough.getToggleState();
+                setConfigSaveButtonEnabled(true);
+                rebuildSysExThroughRoutes();
+            };
+
+        addAndMakeVisible(lblSysExInput);
+        lblSysExInput.setBounds(400, 195, 140, 24);
+        lblSysExInput.setText("SysEx Input", {});
+
+        addAndMakeVisible(comboSysExInput);
+        comboSysExInput.setBounds(520, 195, 140, 24);
+        comboSysExInput.setEditableText(false);
+        comboSysExInput.setJustificationType(juce::Justification::centredLeft);
+        refreshSysExInputComboItems();
+        comboSysExInput.onChange = [this]()
+            {
+                const int i = comboConfig.getSelectedId() - 1;
+                if (i < 0 || i >= numberbuttongroups)
+                    return;
+
+                const int selIdx = comboSysExInput.getSelectedItemIndex();
+                juce::String selectedIdentifier;
+                if (selIdx > 0 && selIdx - 1 < sysexInputComboIdentifiers.size())
+                    selectedIdentifier = sysexInputComboIdentifiers[selIdx - 1];
+
+                if (instrumentpanel->getButtonGroup(i)->sysexInputIdentifier != selectedIdentifier)
+                {
+                    instrumentpanel->getButtonGroup(i)->sysexInputIdentifier = selectedIdentifier;
+                    setConfigSaveButtonEnabled(true);
+                    rebuildSysExThroughRoutes();
+                }
+            };
+        if (const int initialGroup = comboConfig.getSelectedId() - 1;
+            initialGroup >= 0 && initialGroup < numberbuttongroups)
+        {
+            toggleSysExThrough.setToggleState(instrumentpanel->getButtonGroup(initialGroup)->sysexThrough, juce::dontSendNotification);
+            selectSysExInputInCombo(instrumentpanel->getButtonGroup(initialGroup)->sysexInputIdentifier);
+        }
 
         // Keyboard Split
         addAndMakeVisible(lblSplit);
@@ -10520,6 +10510,10 @@ public:
         txtMidiIn.setComponentID("cfg.bg.text.midiIn");
         lblMidiOut.setComponentID("cfg.bg.label.midiOut");
         txtMidiOut.setComponentID("cfg.bg.text.midiOut");
+        lblSysExThrough.setComponentID("cfg.bg.label.sysexThrough");
+        toggleSysExThrough.setComponentID("cfg.bg.toggle.sysexThrough");
+        lblSysExInput.setComponentID("cfg.bg.label.sysexInput");
+        comboSysExInput.setComponentID("cfg.bg.combo.sysexInput");
         lblOctave.setComponentID("cfg.bg.label.octave");
         txtOctave.setComponentID("cfg.bg.text.octave");
         lblSplit.setComponentID("cfg.bg.label.split");
@@ -10584,6 +10578,10 @@ public:
         registerUiProfileComponent(txtMidiIn);
         registerUiProfileComponent(lblMidiOut);
         registerUiProfileComponent(txtMidiOut);
+        registerUiProfileComponent(lblSysExThrough);
+        registerUiProfileComponent(toggleSysExThrough);
+        registerUiProfileComponent(lblSysExInput);
+        registerUiProfileComponent(comboSysExInput);
         registerUiProfileComponent(lblOctave);
         registerUiProfileComponent(txtOctave);
         registerUiProfileComponent(lblSplit);
@@ -10711,6 +10709,7 @@ private:
 
     ComboBox comboConfig{ "ConfigCombo" };
     ComboBox comboUiProfile{ "UiProfileCombo" };
+    ComboBox comboSysExInput{ "SysExInputCombo" };
     GroupComponent group{ "group", "Button Group Configs" };
     GroupComponent effectsDefaultsGroup{ "effectsDefaultsGroup", "Effects Defaults" };
     GroupComponent globalConfigsGroup{ "globalConfigsGroup", "Global Configs" };
@@ -10721,12 +10720,13 @@ private:
     juce::TextEditor txtDefaultEffectsRel, txtDefaultEffectsPan;
     juce::TextEditor txtPresetMidiPcInputChannel, txtPresetMidiPcValue;
     juce::Label lblKeyboard, lblGroupName, lblButtonCount, lblMidiIn, lblMidiOut, lblSplit, lblOctave, lblModule, lblModuleAlias;
+    juce::Label lblSysExThrough, lblSysExInput;
     juce::Label lblPassthrough, lblStartupMonitor, lblVelocity, lblPresetMidiPc, lblPresetMidiPcSeparator, lblUiProfile;
     juce::Label lblDefaultEffectsVol, lblDefaultEffectsBri, lblDefaultEffectsExp, lblDefaultEffectsRev;
     juce::Label lblDefaultEffectsCho, lblDefaultEffectsMod, lblDefaultEffectsTim, lblDefaultEffectsAtk;
     juce::Label lblDefaultEffectsRel, lblDefaultEffectsPan;
     juce::Label lblconfigfileprefix, lblconfigfile, label11, label31;
-    juce::ToggleButton togglePassthrough, toggleStartupMonitor, toggleVelocity;
+    juce::ToggleButton togglePassthrough, toggleStartupMonitor, toggleVelocity, toggleSysExThrough;
     juce::TextButton loadConfigButton, saveButton, saveAsButton, resetButton, exitButton, exportUiMapButton;
     juce::TextButton toUpperKBD, toLowerKBD, toBassKBD;
     bool mutestate, velocitystate, passthroughstate;
@@ -10742,6 +10742,7 @@ private:
     juce::Label statusLabel;
 
     std::array<int, numberbuttongroups> cfgModuleIdxBaseline{};
+    juce::StringArray sysexInputComboIdentifiers;
     std::vector<juce::Component*> uiProfileComponents;
     std::unordered_map<juce::Component*, juce::Rectangle<int>> uiProfileBaseBounds;
     std::unordered_map<juce::Component*, juce::Font> uiProfileBaseFonts;
@@ -10944,6 +10945,86 @@ private:
     {
         txtPresetMidiPcInputChannel.setText(std::to_string(juce::jlimit(1, 16, appState.presetMidiPcInputChannel)), false);
         txtPresetMidiPcValue.setText(std::to_string(juce::jlimit(0, 127, appState.presetMidiPcValue)), false);
+    }
+
+    void refreshSysExInputComboItems()
+    {
+        sysexInputComboIdentifiers.clear();
+        comboSysExInput.clear(juce::dontSendNotification);
+        comboSysExInput.addItem("(None)", 1);
+
+        const auto availableInputs = juce::MidiInput::getAvailableDevices();
+        int itemId = 2;
+        for (const auto& input : availableInputs)
+        {
+            const juce::String identifier = input.identifier.trim();
+            if (identifier.isEmpty())
+                continue;
+
+            bool duplicate = false;
+            for (const auto& existing : sysexInputComboIdentifiers)
+            {
+                if (existing.equalsIgnoreCase(identifier))
+                {
+                    duplicate = true;
+                    break;
+                }
+            }
+            if (duplicate)
+                continue;
+
+            sysexInputComboIdentifiers.add(identifier);
+            const juce::String label = input.name.isNotEmpty() ? input.name : identifier;
+            comboSysExInput.addItem(label, itemId++);
+        }
+
+        if (comboSysExInput.getNumItems() > 0)
+            comboSysExInput.setSelectedId(1, juce::dontSendNotification);
+    }
+
+    void selectSysExInputInCombo(const juce::String& identifier)
+    {
+        const juce::String normalized = identifier.trim();
+        if (normalized.isEmpty())
+        {
+            comboSysExInput.setSelectedId(1, juce::dontSendNotification);
+            return;
+        }
+
+        for (int i = 0; i < sysexInputComboIdentifiers.size(); ++i)
+        {
+            if (sysexInputComboIdentifiers[i].equalsIgnoreCase(normalized))
+            {
+                comboSysExInput.setSelectedItemIndex(i + 1, juce::dontSendNotification);
+                return;
+            }
+        }
+
+        comboSysExInput.setSelectedId(1, juce::dontSendNotification);
+    }
+
+    void rebuildSysExThroughRoutes()
+    {
+        if (mididevices == nullptr || instrumentpanel == nullptr)
+            return;
+
+        mididevices->clearSysExThroughRoutes();
+        for (int i = 0; i < numberbuttongroups; ++i)
+        {
+            auto* const groupCfg = instrumentpanel->getButtonGroup(i);
+            if (groupCfg == nullptr || !groupCfg->sysexThrough)
+                continue;
+
+            const juce::String inputIdentifier = groupCfg->sysexInputIdentifier.trim();
+            if (inputIdentifier.isEmpty())
+                continue;
+
+            const int outchan = groupCfg->midiout;
+            if (outchan <= 0 || outchan >= 17)
+                continue;
+
+            mididevices->addSysExThroughRouteForInputIdentifier(inputIdentifier, mididevices->moduleout[outchan]);
+        }
     }
 
     void refreshUiProfileComboFromAppState()
@@ -11372,6 +11453,8 @@ private:
         static Identifier splitoutType("splitout");
         static Identifier splitoutnameType("splitoutname");
         static Identifier isvelocityType("isvelocity");
+        static Identifier sysexThroughType("sysexThrough");
+        static Identifier sysexInputIdentifierType("sysexInputIdentifier");
 
         static Identifier ispassthroughType("ispassthrough");
         static Identifier moduleidxType("moduleidx");
@@ -11419,6 +11502,9 @@ private:
                 vtcfg.setProperty(isvelocityType, true, nullptr);
             else
                 vtcfg.setProperty(isvelocityType, false, nullptr);
+
+            vtcfg.setProperty(sysexThroughType, instrumentpanel->getButtonGroup(i)->sysexThrough, nullptr);
+            vtcfg.setProperty(sysexInputIdentifierType, instrumentpanel->getButtonGroup(i)->sysexInputIdentifier, nullptr);
 
             if (passthroughstate == true)
                 vtcfg.setProperty(ispassthroughType, true, nullptr);
@@ -11550,6 +11636,8 @@ private:
         static Identifier splitoutType("splitout");
         static Identifier splitoutnameType("splitoutname");
         static Identifier isvelocityType("isvelocity");
+        static Identifier sysexThroughType("sysexThrough");
+        static Identifier sysexInputIdentifierType("sysexInputIdentifier");
 
         static Identifier ispassthroughType("ispassthrough");
         static Identifier moduleidxType("moduleidx");
@@ -11662,6 +11750,10 @@ private:
             instrumentpanel->getButtonGroup(i)->splitout = vtcfg.getProperty(splitoutType);
             instrumentpanel->getButtonGroup(i)->splitoutname = vtcfg.getProperty(splitoutnameType);
             instrumentpanel->getButtonGroup(i)->velocity = vtcfg.getProperty(isvelocityType);
+            instrumentpanel->getButtonGroup(i)->sysexThrough = vtcfg.hasProperty(sysexThroughType)
+                ? static_cast<bool>(vtcfg.getProperty(sysexThroughType))
+                : false;
+            instrumentpanel->getButtonGroup(i)->sysexInputIdentifier = vtcfg.getProperty(sysexInputIdentifierType, "").toString().trim();
 
             passthroughstate = vtcfg.getProperty(ispassthroughType);
             instrumentpanel->getButtonGroup(i)->moduleidx = vtcfg.getProperty(moduleidxType);
@@ -11737,6 +11829,7 @@ private:
 
         // Update Keyboard Handler fast lookup variables
         presetMidiIOMap();
+        ModulesToChannelMap();
 
         // Preset MIDI Passthrough checkbox to passthrough state
         if (passthroughstate == true) {
@@ -11750,9 +11843,18 @@ private:
 
         refreshDefaultEffectsEditorsFromAppState();
         refreshPresetMidiPcEditorsFromAppState();
+        refreshSysExInputComboItems();
+        if (const int selectedGroup = comboConfig.getSelectedId() - 1;
+            selectedGroup >= 0 && selectedGroup < numberbuttongroups)
+        {
+            toggleSysExThrough.setToggleState(instrumentpanel->getButtonGroup(selectedGroup)->sysexThrough, juce::dontSendNotification);
+            selectSysExInputInCombo(instrumentpanel->getButtonGroup(selectedGroup)->sysexInputIdentifier);
+        }
         refreshUiProfileComboFromAppState();
         if (gNotifyUiProfileChanged)
             gNotifyUiProfileChanged();
+
+        rebuildSysExThroughRoutes();
 
         return true;
     }
@@ -11849,7 +11951,8 @@ private:
             );
         }
 
-        rebuildSysExRoutesFromConfig(mididevices, instrumentmodules);
+        rebuildSysExThroughRoutes();
+
         return true;
     }
 

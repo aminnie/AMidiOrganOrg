@@ -93,7 +93,7 @@ if(APPLE)
     )
 elseif(WIN32)
     # Ship docs/ next to the .exe so findDocsSeedDirectory() can seed
-    # Documents/AMidiOrgan/configs/ (e.g. midi_sysex_routes.json) on any machine,
+    # Documents/AMidiOrgan/configs/ defaults on any machine,
     # matching the macOS bundle Resources/docs layout.
     add_custom_command(TARGET AMidiOrgan POST_BUILD
         COMMAND "${CMAKE_COMMAND}" -E copy_directory

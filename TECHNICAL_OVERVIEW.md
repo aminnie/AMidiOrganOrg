@@ -212,7 +212,6 @@ User data root: `Documents/AMidiOrgan`
 - `panels/*.pnl`: Voice assignments and presets
 - `configs/hotkeys.json`: Shortcut mappings
 - `configs/midi_sticky_devices.json`: Last MIDI in/out selections
-- `configs/midi_sysex_routes.json`: Explicit SysEx input-to-output routes
 - `configs/last_session.json`: Last loaded panel/config
 - `configs/ui_profiles.json`: UI profile catalog and optional `keyboardRectOverrides`
 - `configs/instrument_modules.json`: Managed module catalog (module index and metadata)
@@ -224,9 +223,11 @@ Config persistence notes:
 - Missing property in older configs defaults to `false`
 - Startup managed sync overwrites `configs/instrument_modules.json` and selected shipped instrument catalogs (`midigm.json`, `maxplus.json`, `integra7.json`, `at900mi.json`, `ketronevm.json`) each launch to keep runtime catalogs aligned with bundled docs.
 - Non-managed user catalogs (for example `custom.json`) are preserved.
-- `configs/midi_sysex_routes.json` is user-editable and not part of managed overwrite.
 - Config root also persists `presetMidiPcInputChannel` and `presetMidiPcValue` for external Program Change preset-next triggering.
 - Config root also persists `uiProfileId` for fixed-size profile selection.
+- Each `group` child also persists SysEx-through settings:
+  - `sysexThrough` (bool, default `false`)
+  - `sysexInputIdentifier` (MIDI input device identifier, default empty)
 - UI profile precedence:
   - explicit user `keyboardRectOverrides` from `ui_profiles.json` are used first;
   - built-in defaults are used as fallback only when profile overrides are absent.
@@ -237,6 +238,7 @@ Config persistence notes:
 ## 7. Threading and Runtime Considerations
 
 - MIDI input callbacks may run off the UI thread.
+- SysEx Through routing is resolved from a lock-protected snapshot (`input identifier -> output device indices`) and read from `MidiDevices::handleIncomingMidiMessage(...)` on the MIDI callback path.
 - UI mutations should use message-thread-safe handoff patterns.
 - Output path should stay low-latency and allocation-light.
 - Monitor output buffering/flush should avoid heavy work in callback context.
