@@ -74,6 +74,7 @@ Key subfolders/files:
 - `panels/` (`.pnl` files)
 - `instruments/` (module definition JSON files)
 - Per-group SysEx Through settings are stored in each `.cfg` (`sysexThrough`, `sysexInputIdentifier`).
+- Per-group Global CC Through settings are stored in each `.cfg` (`globalCcThrough`, bool; defaults to `false` when missing in older configs).
 
 Startup sync behavior:
 
@@ -327,6 +328,12 @@ Global options note:
   - Enable `SysEx Through` to allow SysEx forwarding for that group.
   - Select `SysEx Input` to bind forwarding to one MIDI input device identifier.
   - Matching inbound SysEx fans out to all matching groups and is deduped per output device.
+- `Global CC Through` is configured per button group (default OFF):
+  - Inbound MIDI **CC** on channel `16` is evaluated against all 12 button groups.
+  - If a group has `Global CC Through` ON, that channel-16 CC is forwarded to that group's configured MIDI OUT device routes.
+  - If OFF, that group drops the channel-16 CC.
+  - Forwarded CC remains on channel `16` (no channel rewrite).
+  - If multiple enabled groups target the same physical output device, duplicate sends are expected (one per enabled group).
 - `UI Profile` applies live across Start/Upper/Lower/Bass/Config/Sounds/Effects/Hotkeys/Monitor and resizes the app window to the selected fixed profile size.
 - Solo split note names use the project-wide `C4 = 60` convention.
 
@@ -508,6 +515,14 @@ Backward-compatible load supports both legacy panels (`Manual + Preset 1..6`) an
 2. Confirm `SysEx Input` matches the input device currently sending SysEx.
 3. Confirm that group has a valid module + `Midi Out` mapping to an active output device.
 4. Save/reload the `.cfg` and retest.
+
+## Channel 16 CC Global Through Not Forwarding
+
+1. Open `Config` and verify `Global CC Through` is enabled for the intended button group(s).
+2. Confirm your controller is transmitting **CC** on MIDI channel `16` (other channels use normal routing rules).
+3. Confirm each enabled group has valid MIDI routing (`Midi Out` and module/output device mapping).
+4. If testing multiple groups, remember duplicate sends to the same physical output are expected by design.
+5. Save/reload the `.cfg` and retest to confirm persisted state.
 
 ## MIDI Devices Not Showing
 

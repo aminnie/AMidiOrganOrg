@@ -327,6 +327,12 @@ public:
         if (passthroughin[inchan] == false)
             return;
 
+        if (message.isController() && inchan == 16)
+        {
+            routeGlobalCcThroughForChannel16(message);
+            return;
+        }
+
         // Route non-note channelized messages only to configured output channels.
         if (!(message.isNoteOn()) && !(message.isNoteOff()))
         {
@@ -454,29 +460,7 @@ public:
         bool hasMappedRoute = false;
         if (outchan > 0 && outchan < 17)
         {
-            const auto& mappedModules = moduleout[outchan];
-            for (int i = 0; i < mappedModules.size(); ++i)
-            {
-                const int outmodidx = mappedModules.getUnchecked(i);
-                juce::String routedModuleName;
-                if (outmodidx >= 0 && outmodidx < midiOutputs.size())
-                    routedModuleName = midiOutputs[outmodidx]->deviceInfo.name;
-
-                if (monitorHookCopy)
-                    monitorHookCopy(msg, routedModuleName);
-
-                if (outmodidx >= 0 && outmodidx < midiOutputs.size()) {
-                    hasMappedRoute = true;
-                    if (midiOutputs[outmodidx]->outDevice.get() != nullptr) {
-                        midiOutputs[outmodidx]->outDevice->sendMessageNow(msg);
-
-                        DBG("*** sendToOutputs " << outchan << " to module " << outmodidx << " sent!");
-                    }
-                    else {
-                        DBG("*** sendToOutputs " << outchan << " to module " << outmodidx << " failed!");
-                    }
-                }
-            }
+            hasMappedRoute = sendToMappedOutputsForRouteChannel(msg, outchan, monitorHookCopy, true);
         }
 
         // Keep monitor visibility for unmapped channel traffic.
@@ -488,6 +472,41 @@ public:
             if (midiOutputs[midiviewidx]->outDevice.get() != nullptr)
                 midiOutputs[midiviewidx]->outDevice->sendMessageNow(msg);
         }
+    }
+
+    bool routeGlobalCcThroughForChannel16(const MidiMessage& message)
+    {
+        bool routed = false;
+        std::function<void(const MidiMessage&, const juce::String&)> monitorHookCopy;
+        {
+            const juce::SpinLock::ScopedLockType hookLock(outgoingMonitorHookLock);
+            monitorHookCopy = outgoingMonitorHook;
+        }
+
+        for (int groupIndex = 0; groupIndex < numberbuttongroups; ++groupIndex)
+        {
+            if (!globalCcThroughEnabledByGroup[groupIndex])
+                continue;
+
+            const int routeChannel = globalCcThroughOutputChannelByGroup[groupIndex];
+            if (!isValidMidiChannel(routeChannel))
+                continue;
+
+            const bool sent = sendToMappedOutputsForRouteChannel(message, routeChannel, monitorHookCopy, false);
+            routed = routed || sent;
+
+            DBG("*** routeGlobalCcThroughForChannel16(): Routed CC to group " << groupIndex << " via midiout " << routeChannel);
+        }
+
+        if (!routed && monitorHookCopy)
+            monitorHookCopy(message, {});
+
+        if (midiviewidx < midiOutputs.size()) {
+            if (midiOutputs[midiviewidx]->outDevice.get() != nullptr)
+                midiOutputs[midiviewidx]->outDevice->sendMessageNow(message);
+        }
+
+        return routed;
     }
 
     void setOutgoingMidiMonitor(std::function<void(const MidiMessage&, const juce::String&)> hook)
@@ -573,6 +592,11 @@ public:
         for (int i = 0; i < 17; i++) {
             outputChannelMuted[i] = false;
         }
+
+        for (int i = 0; i < numberbuttongroups; ++i) {
+            globalCcThroughEnabledByGroup[i] = false;
+            globalCcThroughOutputChannelByGroup[i] = 0;
+        }
     };
 
     // Array 17, so that we can keep mapping at the 1 -16 channels instead of zero based
@@ -583,6 +607,8 @@ public:
     bool passthroughin[17];
     bool velocityout[17];
     bool outputChannelMuted[17];
+    bool globalCcThroughEnabledByGroup[numberbuttongroups];
+    int globalCcThroughOutputChannelByGroup[numberbuttongroups];
 
     // Remember the MidiView monitoring output channel for message duplication
     int midiviewidx = 255;
@@ -603,6 +629,45 @@ public:
     juce_DeclareSingleton(MidiDevices, true)
 
 private:
+    bool sendToMappedOutputsForRouteChannel(const MidiMessage& msg,
+                                            int routeChannel,
+                                            const std::function<void(const MidiMessage&, const juce::String&)>& monitorHookCopy,
+                                            bool logOnSuccess)
+    {
+        if (!isValidMidiChannel(routeChannel))
+            return false;
+
+        bool sentToOutput = false;
+        const auto& mappedModules = moduleout[routeChannel];
+        for (int i = 0; i < mappedModules.size(); ++i)
+        {
+            const int outmodidx = mappedModules.getUnchecked(i);
+            juce::String routedModuleName;
+            if (outmodidx >= 0 && outmodidx < midiOutputs.size())
+                routedModuleName = midiOutputs[outmodidx]->deviceInfo.name;
+
+            if (monitorHookCopy)
+                monitorHookCopy(msg, routedModuleName);
+
+            if (outmodidx >= 0 && outmodidx < midiOutputs.size())
+            {
+                sentToOutput = true;
+                if (midiOutputs[outmodidx]->outDevice.get() != nullptr)
+                {
+                    midiOutputs[outmodidx]->outDevice->sendMessageNow(msg);
+                    if (logOnSuccess)
+                        DBG("*** sendToOutputs " << routeChannel << " to module " << outmodidx << " sent!");
+                }
+                else if (logOnSuccess)
+                {
+                    DBG("*** sendToOutputs " << routeChannel << " to module " << outmodidx << " failed!");
+                }
+            }
+        }
+
+        return sentToOutput;
+    }
+
     bool routeIncomingSysExForInputIdentifierInternal(const juce::String& inputIdentifier, const MidiMessage& message)
     {
         const juce::String normalizedInput = inputIdentifier.trim().toLowerCase();

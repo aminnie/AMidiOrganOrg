@@ -100,6 +100,7 @@ Primary implementation files:
 - Support for output channel fan-out to multiple modules
 - Defensive module/channel validation during config mapping
 - Channelized non-note messages obey explicit routing decisions
+- Inbound channel-16 **CC** has a dedicated global-through fan-out path gated per button group (`globalCcThrough`)
 - Incoming Program Change can trigger preset-next when it matches global config (`Preset MIDI PC`), using message-thread handoff to the hotkey-equivalent preset-next path
 - Matched Program Change trigger events are consumed and not forwarded
 - Output monitoring hook captures final routed messages
@@ -228,6 +229,8 @@ Config persistence notes:
 - Each `group` child also persists SysEx-through settings:
   - `sysexThrough` (bool, default `false`)
   - `sysexInputIdentifier` (MIDI input device identifier, default empty)
+- Each `group` child also persists channel-16 CC global-through setting:
+  - `globalCcThrough` (bool, default `false`)
 - UI profile precedence:
   - explicit user `keyboardRectOverrides` from `ui_profiles.json` are used first;
   - built-in defaults are used as fallback only when profile overrides are absent.
@@ -239,6 +242,8 @@ Config persistence notes:
 
 - MIDI input callbacks may run off the UI thread.
 - SysEx Through routing is resolved from a lock-protected snapshot (`input identifier -> output device indices`) and read from `MidiDevices::handleIncomingMidiMessage(...)` on the MIDI callback path.
+- Channel-16 CC global-through is evaluated in `MidiDevices::handleIncomingMidiMessage(...)` for controller messages and routed using precomputed per-group metadata rebuilt by `ConfigPage::presetMidiIOMap()`.
+- Global-through forwarding intentionally preserves channel `16` and allows duplicate device sends when multiple enabled groups share the same target output device.
 - UI mutations should use message-thread-safe handoff patterns.
 - Output path should stay low-latency and allocation-light.
 - Monitor output buffering/flush should avoid heavy work in callback context.

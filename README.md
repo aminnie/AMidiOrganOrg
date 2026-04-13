@@ -305,6 +305,8 @@ On startup, the app also attempts to auto-restore the last used panel and config
 - If you change a sound module assignment inside a config that other panels depend on, saving that same config name may be blocked so older panels are not silently broken.
 - Duplicate **module + MIDI Out channel** across button groups is detected on config save and blocks the write until fixed.
 - Each button group can optionally forward SysEx by enabling `SysEx Through` and selecting a `SysEx Input` device identifier on the Config tab.
+- Each button group now includes `Global CC Through` (default OFF). For inbound MIDI **CC** on channel `16`, AMidiOrgan evaluates all 12 groups and forwards CC only for groups where this toggle is ON.
+- Channel-16 CC forwarded by `Global CC Through` remains on channel `16` (no channel rewrite). If multiple enabled groups target the same physical MIDI OUT device, duplicate sends are expected by design (one send per enabled group).
 
 ### 9. File Locations
 
@@ -321,6 +323,7 @@ Important subfolders:
 - `configs/hotkeys.json` for keyboard shortcut bindings
 
 `SysEx Through` settings are stored inside each config `.cfg` as per-group values (`sysexThrough`, `sysexInputIdentifier`).
+`Global CC Through` is also stored per group in `.cfg` (`globalCcThrough`, bool, default `false` when missing in older configs).
 
 ### 10. Keyboard Shortcuts (Phase 1)
 

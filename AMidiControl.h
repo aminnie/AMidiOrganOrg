@@ -505,6 +505,7 @@ struct ButtonGroup final : Component
         velocity = true;
         sysexThrough = false;
         sysexInputIdentifier = {};
+        globalCcThrough = false;
         rotary = 0;
         moduleidx = 1;
     }
@@ -600,6 +601,7 @@ struct ButtonGroup final : Component
     int midiout = 1;
     bool sysexThrough = false;
     juce::String sysexInputIdentifier;
+    bool globalCcThrough = false;
 
     int rotary = 0;
     bool muted = true;
@@ -9686,6 +9688,7 @@ public:
                 toggleVelocity.setToggleState(false, dontSendNotification);
 
             toggleSysExThrough.setToggleState(instrumentpanel->getButtonGroup(i)->sysexThrough, dontSendNotification);
+            toggleGlobalCcThrough.setToggleState(instrumentpanel->getButtonGroup(i)->globalCcThrough, dontSendNotification);
             selectSysExInputInCombo(instrumentpanel->getButtonGroup(i)->sysexInputIdentifier);
             };
 
@@ -9917,6 +9920,7 @@ public:
             initialGroup >= 0 && initialGroup < numberbuttongroups)
         {
             toggleSysExThrough.setToggleState(instrumentpanel->getButtonGroup(initialGroup)->sysexThrough, juce::dontSendNotification);
+            toggleGlobalCcThrough.setToggleState(instrumentpanel->getButtonGroup(initialGroup)->globalCcThrough, juce::dontSendNotification);
             selectSysExInputInCombo(instrumentpanel->getButtonGroup(initialGroup)->sysexInputIdentifier);
         }
 
@@ -9995,6 +9999,23 @@ public:
             juce::String stateString = velocitystate ? "ON" : "OFF";
             juce::Logger::outputDebugString("Velocity changed to " + stateString);
         };
+
+        addAndMakeVisible(lblGlobalCcThrough);
+        lblGlobalCcThrough.setBounds(400, 225, 140, 24);
+        lblGlobalCcThrough.setText("Global CC Through", {});
+
+        addAndMakeVisible(toggleGlobalCcThrough);
+        toggleGlobalCcThrough.setBounds(560, 225, 100, 24);
+        toggleGlobalCcThrough.onClick = [this]()
+            {
+                const int i = comboConfig.getSelectedId() - 1;
+                if (i < 0 || i >= numberbuttongroups)
+                    return;
+
+                instrumentpanel->getButtonGroup(i)->globalCcThrough = toggleGlobalCcThrough.getToggleState();
+                presetMidiIOMap();
+                setConfigSaveButtonEnabled(true);
+            };
 
         // Two columns (5 + 5) inside "Effects Defaults" group (border matches Button Group Configs).
         const int defFxLabelX0 = 750;
@@ -10514,6 +10535,8 @@ public:
         toggleSysExThrough.setComponentID("cfg.bg.toggle.sysexThrough");
         lblSysExInput.setComponentID("cfg.bg.label.sysexInput");
         comboSysExInput.setComponentID("cfg.bg.combo.sysexInput");
+        lblGlobalCcThrough.setComponentID("cfg.bg.label.globalCcThrough");
+        toggleGlobalCcThrough.setComponentID("cfg.bg.toggle.globalCcThrough");
         lblOctave.setComponentID("cfg.bg.label.octave");
         txtOctave.setComponentID("cfg.bg.text.octave");
         lblSplit.setComponentID("cfg.bg.label.split");
@@ -10582,6 +10605,8 @@ public:
         registerUiProfileComponent(toggleSysExThrough);
         registerUiProfileComponent(lblSysExInput);
         registerUiProfileComponent(comboSysExInput);
+        registerUiProfileComponent(lblGlobalCcThrough);
+        registerUiProfileComponent(toggleGlobalCcThrough);
         registerUiProfileComponent(lblOctave);
         registerUiProfileComponent(txtOctave);
         registerUiProfileComponent(lblSplit);
@@ -10720,13 +10745,13 @@ private:
     juce::TextEditor txtDefaultEffectsRel, txtDefaultEffectsPan;
     juce::TextEditor txtPresetMidiPcInputChannel, txtPresetMidiPcValue;
     juce::Label lblKeyboard, lblGroupName, lblButtonCount, lblMidiIn, lblMidiOut, lblSplit, lblOctave, lblModule, lblModuleAlias;
-    juce::Label lblSysExThrough, lblSysExInput;
+    juce::Label lblSysExThrough, lblSysExInput, lblGlobalCcThrough;
     juce::Label lblPassthrough, lblStartupMonitor, lblVelocity, lblPresetMidiPc, lblPresetMidiPcSeparator, lblUiProfile;
     juce::Label lblDefaultEffectsVol, lblDefaultEffectsBri, lblDefaultEffectsExp, lblDefaultEffectsRev;
     juce::Label lblDefaultEffectsCho, lblDefaultEffectsMod, lblDefaultEffectsTim, lblDefaultEffectsAtk;
     juce::Label lblDefaultEffectsRel, lblDefaultEffectsPan;
     juce::Label lblconfigfileprefix, lblconfigfile, label11, label31;
-    juce::ToggleButton togglePassthrough, toggleStartupMonitor, toggleVelocity, toggleSysExThrough;
+    juce::ToggleButton togglePassthrough, toggleStartupMonitor, toggleVelocity, toggleSysExThrough, toggleGlobalCcThrough;
     juce::TextButton loadConfigButton, saveButton, saveAsButton, resetButton, exitButton, exportUiMapButton;
     juce::TextButton toUpperKBD, toLowerKBD, toBassKBD;
     bool mutestate, velocitystate, passthroughstate;
@@ -11378,6 +11403,11 @@ private:
             mididevices->passthroughin[16] = true;
         }
 
+        for (i = 0; i < numberbuttongroups; i++) {
+            mididevices->globalCcThroughEnabledByGroup[i] = false;
+            mididevices->globalCcThroughOutputChannelByGroup[i] = 0;
+        }
+
         // Now update and add additional channel mappings (layering) 
         for (i = 0; i < numberbuttongroups; i++) {
             ButtonGroup* buttongroup = instrumentpanel->getButtonGroup(i);
@@ -11387,6 +11417,7 @@ private:
             int octxpose = buttongroup->octxpose;
             int splitout = buttongroup->splitout;
             bool velocityout = buttongroup->velocity;
+            bool globalCcThrough = buttongroup->globalCcThrough;
 
             // Overwrite the first 0 valued member in midi out array for this Button Group
             j = 0;
@@ -11410,6 +11441,8 @@ private:
             // Enable only Midi Inputs configured in Button Groups if passthrough 
             // opion is selected in Config.
             mididevices->passthroughin[midiin] = true;
+            mididevices->globalCcThroughEnabledByGroup[i] = globalCcThrough;
+            mididevices->globalCcThroughOutputChannelByGroup[i] = midiout;
         }
 
         // To do: See how to eliminate static variables
@@ -11455,6 +11488,7 @@ private:
         static Identifier isvelocityType("isvelocity");
         static Identifier sysexThroughType("sysexThrough");
         static Identifier sysexInputIdentifierType("sysexInputIdentifier");
+        static Identifier globalCcThroughType("globalCcThrough");
 
         static Identifier ispassthroughType("ispassthrough");
         static Identifier moduleidxType("moduleidx");
@@ -11505,6 +11539,7 @@ private:
 
             vtcfg.setProperty(sysexThroughType, instrumentpanel->getButtonGroup(i)->sysexThrough, nullptr);
             vtcfg.setProperty(sysexInputIdentifierType, instrumentpanel->getButtonGroup(i)->sysexInputIdentifier, nullptr);
+            vtcfg.setProperty(globalCcThroughType, instrumentpanel->getButtonGroup(i)->globalCcThrough, nullptr);
 
             if (passthroughstate == true)
                 vtcfg.setProperty(ispassthroughType, true, nullptr);
@@ -11638,6 +11673,7 @@ private:
         static Identifier isvelocityType("isvelocity");
         static Identifier sysexThroughType("sysexThrough");
         static Identifier sysexInputIdentifierType("sysexInputIdentifier");
+        static Identifier globalCcThroughType("globalCcThrough");
 
         static Identifier ispassthroughType("ispassthrough");
         static Identifier moduleidxType("moduleidx");
@@ -11754,6 +11790,9 @@ private:
                 ? static_cast<bool>(vtcfg.getProperty(sysexThroughType))
                 : false;
             instrumentpanel->getButtonGroup(i)->sysexInputIdentifier = vtcfg.getProperty(sysexInputIdentifierType, "").toString().trim();
+            instrumentpanel->getButtonGroup(i)->globalCcThrough = vtcfg.hasProperty(globalCcThroughType)
+                ? static_cast<bool>(vtcfg.getProperty(globalCcThroughType))
+                : false;
 
             passthroughstate = vtcfg.getProperty(ispassthroughType);
             instrumentpanel->getButtonGroup(i)->moduleidx = vtcfg.getProperty(moduleidxType);
@@ -11848,6 +11887,7 @@ private:
             selectedGroup >= 0 && selectedGroup < numberbuttongroups)
         {
             toggleSysExThrough.setToggleState(instrumentpanel->getButtonGroup(selectedGroup)->sysexThrough, juce::dontSendNotification);
+            toggleGlobalCcThrough.setToggleState(instrumentpanel->getButtonGroup(selectedGroup)->globalCcThrough, juce::dontSendNotification);
             selectSysExInputInCombo(instrumentpanel->getButtonGroup(selectedGroup)->sysexInputIdentifier);
         }
         refreshUiProfileComboFromAppState();
