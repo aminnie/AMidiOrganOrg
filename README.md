@@ -32,44 +32,43 @@ Each panel uses the active configuration and panel data to determine which voice
 
 ### Start Tab
 
-Start Tab
+![Start Tab](docs/images/tab-start.png)
 
 ### Upper Tab
 
-Upper Tab
+![Upper Tab](docs/images/tab-upper.png)
 
 ### Lower Tab
 
-Lower Tab
+![Lower Tab](docs/images/tab-lower.png)
 
 ### Bass Tab
 
-Bass Tab
+![Bass&Drums Tab](docs/images/tab-bass.png)
 
 ### Sounds Tab
 
-Sounds Tab  
-Sounds Tab
+![Sounds Tab](docs/images/tab-sounds.png)
 
 ### Effects Tab
 
-Effects Tab
+![Effects Tab](docs/images/tab-effects.png)
 
 ### Config Tab
 
-Config Tab
+![Config Tab](docs/images/tab-config.png)
 
 ### Hotkeys Tab
 
-Config Tab
+![Hotkeys Tab](docs/images/tab-hotkeys.png)
 
 ### Monitor Tab
 
-Config Tab
+![Monitor Tab](docs/images/tab-monitor.png)
 
 ### Help Tab
 
-Config Tab
+![Help Tab](docs/images/tab-help.png)
 
 ## Functional Overview
 
