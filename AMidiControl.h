@@ -7510,6 +7510,8 @@ public:
     {
         captureUiProfileBaseIfNeeded();
         const auto profile = resolveUiProfile(appState.uiProfileId);
+        const float sx = profile.xScale;
+        const float sy = profile.yScale;
 
         for (auto* comp : uiProfileComponents)
         {
@@ -7520,7 +7522,8 @@ public:
                 continue;
 
             const auto overrideRect = getStartRectOverride(profile, comp->getComponentID());
-            comp->setBounds(overrideRect.has_value() ? *overrideRect : it->second);
+            comp->setBounds(overrideRect.has_value() ? *overrideRect
+                                                     : scaleRectForProfile(it->second, sx, sy));
             applyProfileFontScale(profile, comp);
         }
     }
@@ -7607,6 +7610,16 @@ private:
                 uiProfileBaseFonts.emplace(comp, l->getFont());
         }
         uiProfileBaseCaptured = true;
+    }
+
+    static juce::Rectangle<int> scaleRectForProfile(const juce::Rectangle<int>& base, float sx, float sy)
+    {
+        return {
+            juce::roundToInt((float) base.getX() * sx),
+            juce::roundToInt((float) base.getY() * sy),
+            juce::jmax(1, juce::roundToInt((float) base.getWidth() * sx)),
+            juce::jmax(1, juce::roundToInt((float) base.getHeight() * sy))
+        };
     }
 
     void applyProfileFontScale(const UiProfileDefinition& profile, juce::Component* comp)
