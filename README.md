@@ -5,28 +5,25 @@ AMidiOrgan is a live-performance MIDI controller built with [JUCE](https://juce.
   
 What problem does AMIDIOrgan solve:
 
-- If when you have more than keyboard, organ or sound module in your gig, then for each performance you have to configure the  
-keyboard and modules seperately for the voices you plan to use.
+- If when you have more than keyboard, organ or sound module in your gig, then for each performance you have to configure the keyboard and modules seperately for the voices you plan to use.
 - If is challenging to change the configuration of multipe decives at the same time. The 12 presets available in the solution can be configured to voice changes across all devices and will change it synchronously.
-- Voice layering is supported across one or multiple devices, along with assignable keyboard splitw across the Upper and Lower keyboards. 
-- The MIDI implementation for each device is loaded into the solution, tied to a device module that is configured on each button   
-group. This enables you to configure voice buttons for each MIDI devices in the Sounds tab.
-- Multiple MIDI keyboards and sound modules can be interfaced via USB directly in eg. the host Mac or Windows machine. This  
-simplifies the configuration and often you may be able to get buy without external MIDI hardware mergers or routers.
+- Voice layering is supported across one or multiple devices, along with assignable keyboard splits on the Upper and Lower keyboards. 
+- The MIDI implementation for each device is loaded into the solution, tied to a device module that is configured on each button group. This enables you to configure voice buttons for each of the MIDI devices in the Sounds tab.
+- Multiple MIDI keyboards and sound modules can be interfaced via USB directly in eg. the host Mac or Windows machine. This  simplifies the configuration and often you may be able to get buy without external MIDI hardware mergers or routers.
 - OS supported hotkeys for key functions have been integrated into the AMIDIOrgan. This means that you can use an external keypad or a Streamdeck to trigger the hotkey supported functions.
 
-  
 For complete end-user operating instructions (installation, setup, and screen-by-screen usage), see [USER_MANUAL.md](USER_MANUAL.md).
 
 For architecture and implementation details, see [TECHNICAL_OVERVIEW.md](TECHNICAL_OVERVIEW.md).
 
-The application is organized around three performance panels plus a number of supporting panels:
-
+The application is organized around three performance panels (tabs) plus a number of supporting tabs:
 - `Upper`
 - `Lower`
 - `Bass&Drums`
 
-Each panel uses the active configuration and panel data to determine which voices, routing, effects, presets, and rotary states are available during a performance. A panel can represent an organ style, a layered setup, or a song-specific registration.
+Instrument panels use the active configuration and panel data to determine which features such as voices, routing, effects, presets, and rotary states are available during a performance. Multiple panels can be configured and panel each can represent registrations sucb as:
+- music style (jazz, rock, classical, etc) for casual play and quick recall of your favorite voices across multiple sound modules, 
+- song-specific (one or more songs).
 
 ## UI Screenshots
 
@@ -73,10 +70,9 @@ Each panel uses the active configuration and panel data to determine which voice
 ## Functional Overview
 
 Supported MIDI hardware and software sound modules:
-
 - Deebach BlackBox
 - Roland Integra7
-- Roland AT900
+- Roland AT-900
 - Ketron EVM
 - MIDI GM / Custom GM
 - Contact developer for additional module support.
@@ -573,7 +569,7 @@ The following asset filenames are referenced by code through `BinaryData` symbol
 
 - Use JUCE to compile/test controller with Raspberry Pi
   - Goal: cost-effective standalone controller + display without requiring a PC.
-- Add optional hardware support for selected buttons and sliders, e.g. Elgato Streamdeck
+- Add optional hardware support for hotkey/buttons and sliders, e.g. Elgato Streamdeck or custom built
 
 ## Contact Details
 
