@@ -1039,6 +1039,9 @@ namespace
         presets->setRotaryStatus(presetIdx, 0, 2);
         presets->setRotaryStatus(presetIdx, 5, 1);
         presets->setRotaryStatus(presetIdx, 11, 0);
+        presets->setMasterVolStep(presetIdx, 0, 2);
+        presets->setMasterVolStep(presetIdx, 5, 7);
+        presets->setMasterVolStep(presetIdx, 11, 10);
 
         if (!instrumentPanel->saveInstrumentPanel(testDir, panelFile))
         {
@@ -1057,6 +1060,9 @@ namespace
         presets->setRotaryStatus(presetIdx, 0, 0);
         presets->setRotaryStatus(presetIdx, 5, 0);
         presets->setRotaryStatus(presetIdx, 11, 0);
+        presets->setMasterVolStep(presetIdx, 0, 9);
+        presets->setMasterVolStep(presetIdx, 5, 1);
+        presets->setMasterVolStep(presetIdx, 11, 0);
 
         if (!instrumentPanel->loadInstrumentPanel(testDir, panelFile, false))
         {
@@ -1073,7 +1079,10 @@ namespace
             !expectEqual(presets->getMuteStatus(presetIdx, 11) ? 1 : 0, 1, "preset mute group 11", details) ||
             !expectEqual(presets->getRotaryStatus(presetIdx, 0), 2, "preset rotary group 0", details) ||
             !expectEqual(presets->getRotaryStatus(presetIdx, 5), 1, "preset rotary group 5", details) ||
-            !expectEqual(presets->getRotaryStatus(presetIdx, 11), 0, "preset rotary group 11", details))
+            !expectEqual(presets->getRotaryStatus(presetIdx, 11), 0, "preset rotary group 11", details) ||
+            !expectEqual(presets->getMasterVolStep(presetIdx, 0), 2, "preset volume step group 0", details) ||
+            !expectEqual(presets->getMasterVolStep(presetIdx, 5), 7, "preset volume step group 5", details) ||
+            !expectEqual(presets->getMasterVolStep(presetIdx, 11), 10, "preset volume step group 11", details))
         {
             restoreAppState(snapshot);
             return false;
@@ -1144,9 +1153,11 @@ namespace
         presets->setPanelButtonIdx(3, 0, 40);
         presets->setMuteStatus(3, 0, true);
         presets->setRotaryStatus(3, 0, 2);
+        presets->setMasterVolStep(3, 0, 6);
         presets->setPanelButtonIdx(10, 0, 84);
         presets->setMuteStatus(10, 0, true);
         presets->setRotaryStatus(10, 0, 1);
+        presets->setMasterVolStep(10, 0, 9);
 
         if (!instrumentPanel->saveInstrumentPanel(testDir, fullPanelFile))
         {
@@ -1188,6 +1199,17 @@ namespace
         while (presetsNode.getNumChildren() > 7)
             presetsNode.removeChild(presetsNode.getNumChildren() - 1, nullptr);
 
+        // Simulate pre-volume legacy payload: no mastervolstep on any preset button group nodes.
+        for (int p = 0; p < presetsNode.getNumChildren(); ++p)
+        {
+            ValueTree presetNode = presetsNode.getChild(p);
+            for (int bg = 0; bg < presetNode.getNumChildren(); ++bg)
+            {
+                ValueTree groupNode = presetNode.getChild(bg);
+                groupNode.removeProperty("mastervolstep", nullptr);
+            }
+        }
+
         {
             FileOutputStream out(legacyPanelPath);
             if (!out.openedOk())
@@ -1203,6 +1225,7 @@ namespace
         presets->setPanelButtonIdx(10, 0, 90);
         presets->setMuteStatus(10, 0, false);
         presets->setRotaryStatus(10, 0, 2);
+        presets->setMasterVolStep(10, 0, 1);
 
         if (!instrumentPanel->loadInstrumentPanel(testDir, legacyPanelFile, false))
         {
@@ -1214,9 +1237,11 @@ namespace
         if (!expectEqual(presets->getPanelButtonIdx(3, 0), 40, "legacy load keeps preset 3 payload", details) ||
             !expectEqual(presets->getMuteStatus(3, 0) ? 1 : 0, 1, "legacy load keeps preset 3 mute", details) ||
             !expectEqual(presets->getRotaryStatus(3, 0), 2, "legacy load keeps preset 3 rotary", details) ||
+            !expectEqual(presets->getMasterVolStep(3, 0), 8, "legacy load defaults preset 3 volume step", details) ||
             !expectEqual(presets->getPanelButtonIdx(10, 0), 0, "legacy load resets missing preset 10 button", details) ||
             !expectEqual(presets->getMuteStatus(10, 0) ? 1 : 0, 0, "legacy load resets missing preset 10 mute", details) ||
-            !expectEqual(presets->getRotaryStatus(10, 0), 0, "legacy load resets missing preset 10 rotary", details))
+            !expectEqual(presets->getRotaryStatus(10, 0), 0, "legacy load resets missing preset 10 rotary", details) ||
+            !expectEqual(presets->getMasterVolStep(10, 0), 8, "legacy load resets missing preset 10 volume step", details))
         {
             restoreAppState(snapshot);
             return false;

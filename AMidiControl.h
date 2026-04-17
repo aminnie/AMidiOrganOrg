@@ -308,7 +308,7 @@ public:
         clearSingletonInstance();
     };
 
-    bool createPreset(int presetid, int buttongroupid, int panelbuttonidx, bool mutestate, int rotarystate) {
+    bool createPreset(int presetid, int buttongroupid, int panelbuttonidx, bool mutestate, int rotarystate, int mastervolstep = 8) {
 
         if ((presetid < 0) || (presetid >= numberpresets)) {
             return false;
@@ -325,6 +325,7 @@ public:
         presets[presetid]->setActiveButton(buttongroupid, panelbuttonidx);
         presets[presetid]->setMuteStatus(buttongroupid, mutestate);
         presets[presetid]->setRotaryStatus(buttongroupid, rotarystate);
+        presets[presetid]->setMasterVolStep(buttongroupid, mastervolstep);
 
         return true;
     };
@@ -351,6 +352,14 @@ public:
 
     void setRotaryStatus(int presetid, int buttongroupid, int rotarystate) {
         presets[presetid]->setRotaryStatus(buttongroupid, rotarystate);
+    }
+
+    int getMasterVolStep(int presetid, int buttongroupid) {
+        return presets[presetid]->getMasterVolStep(buttongroupid);
+    }
+
+    void setMasterVolStep(int presetid, int buttongroupid, int sliderstep) {
+        presets[presetid]->setMasterVolStep(buttongroupid, sliderstep);
     }
 
     // Track Last Preset Button Pressed
@@ -404,20 +413,20 @@ private:
 
     void initialisePresetDefaults(int presetid)
     {
-        createPreset(presetid, 0, 0, false, 0);
-        createPreset(presetid, 1, 12, true, 0);
-        createPreset(presetid, 2, 20, true, 0);
-        createPreset(presetid, 3, 26, true, 0);
+        createPreset(presetid, 0, 0, false, 0, 8);
+        createPreset(presetid, 1, 12, true, 0, 8);
+        createPreset(presetid, 2, 20, true, 0, 8);
+        createPreset(presetid, 3, 26, true, 0, 8);
 
-        createPreset(presetid, 4, 32, false, 0);
-        createPreset(presetid, 5, 44, true, 0);
-        createPreset(presetid, 6, 52, true, 0);
-        createPreset(presetid, 7, 58, true, 0);
+        createPreset(presetid, 4, 32, false, 0, 8);
+        createPreset(presetid, 5, 44, true, 0, 8);
+        createPreset(presetid, 6, 52, true, 0, 8);
+        createPreset(presetid, 7, 58, true, 0, 8);
 
-        createPreset(presetid, 8, 64, false, 0);
-        createPreset(presetid, 9, 76, true, 0);
-        createPreset(presetid, 10, 84, true, 0);
-        createPreset(presetid, 11, 90, true, 0);
+        createPreset(presetid, 8, 64, false, 0, 8);
+        createPreset(presetid, 9, 76, true, 0, 8);
+        createPreset(presetid, 10, 84, true, 0, 8);
+        createPreset(presetid, 11, 90, true, 0, 8);
     }
 
     // Each Preset captures all the clicked/acthive VoiceButtons, Mute and Rotary States in each of the 12 Button Groups
@@ -466,12 +475,23 @@ private:
             presetloaded = true;
         };
 
+        int getMasterVolStep(int buttongroupid) {
+            return mastervolsteps[buttongroupid];
+        };
+
+        void setMasterVolStep(int buttongroupid, int sliderstep) {
+            mastervolsteps[buttongroupid] = juce::jlimit(0, 10, sliderstep);
+
+            presetloaded = true;
+        };
+
     private:
         bool presetloaded = false;
 
         std::array<int, 12> activebuttons;
         std::array<bool, 12> mutestatus;
         std::array<int, 12> rotarystatus;
+        std::array<int, 12> mastervolsteps;
     };
 
     int activepresetidx = 0;
@@ -577,6 +597,14 @@ struct ButtonGroup final : Component
         mutebuttonptr = mutebtnptr;
     }
 
+    Slider* getMasterVolSliderPtr() {
+        return mastervolsliderptr;
+    }
+
+    void setMasterVolSliderPtr(Slider* sliderptr) {
+        mastervolsliderptr = sliderptr;
+    }
+
     // Link between Buttons on the Display Component and Button Group
     GroupComponent* getGroupComponentPtr() {
         return groupcomponentptr;
@@ -616,6 +644,7 @@ struct ButtonGroup final : Component
 
     int activevoicebutton = 0;
     Component::SafePointer<MuteButton>mutebuttonptr;
+    Component::SafePointer<Slider>mastervolsliderptr;
     Component::SafePointer<GroupComponent>groupcomponentptr;
 
     //==============================================================================
@@ -1311,6 +1340,9 @@ private:
                 int irotary = panelpresets->getRotaryStatus(i, j);
                 vtbuttongroup.setProperty("rotary", irotary, nullptr);
 
+                int ivolstep = panelpresets->getMasterVolStep(i, j);
+                vtbuttongroup.setProperty("mastervolstep", juce::jlimit(0, 10, ivolstep), nullptr);
+
                 DBG("createVTInstrumentPanel(): Preset: " + std::to_string(i) + " ButtonGroup: "
                     + std::to_string(j) + " Button: " + std::to_string(pbtnidx));
 
@@ -1515,6 +1547,9 @@ private:
 
                     int irotary = vtbuttongroup.getProperty("rotary");
                     panelpresets->setRotaryStatus(presetIdx, j, irotary);
+
+                    const int ivolstep = juce::jlimit(0, 10, (int) vtbuttongroup.getProperty("mastervolstep", 8));
+                    panelpresets->setMasterVolStep(presetIdx, j, ivolstep);
                 }
 
                 if (presetIdx >= 1 && presetIdx <= 12)
@@ -3703,6 +3738,7 @@ struct KeyboardPanelPage final : public Component,
             g1svol->setBounds(g1xoffset + mgroup + (cbuttonsdisplayed / rbuttons) * bwidth + mgroup, ygroup + mgroup * 2, 20, mgroup + bheight * rbuttons + sbheight);
             g1svol->setPopupDisplayEnabled(true, true, this);
             g1svol->setValue(ptrbuttongroup->getMasterVolStep());
+            ptrbuttongroup->setMasterVolSliderPtr(g1svol);
             g1svol->onValueChange = [=]()
                 {
                     ButtonGroup* selectedButtonGroup = instrumentpanel->getButtonGroup(buttongroupidx);
@@ -4109,6 +4145,7 @@ struct KeyboardPanelPage final : public Component,
             g2svol->setBounds(g2xoffset + mgroup + col * bwidth + mgroup, ygroup + mgroup * 2, 20, mgroup + bheight * rbuttons + sbheight);
             g2svol->setPopupDisplayEnabled(true, true, this);
             g2svol->setValue(ptrbuttongroup->getMasterVolStep());
+            ptrbuttongroup->setMasterVolSliderPtr(g2svol);
             g2svol->onValueChange = [=]()
                 {
                     ButtonGroup* selectedButtonGroup = instrumentpanel->getButtonGroup(buttongroupidx);
@@ -4511,6 +4548,7 @@ struct KeyboardPanelPage final : public Component,
             g3svol->setBounds(g3xoffset + mgroup + col * bwidth + mgroup, ygroup + mgroup * 2, 20, mgroup + bheight * rbuttons + sbheight);
             g3svol->setPopupDisplayEnabled(true, true, this);
             g3svol->setValue(ptrbuttongroup->getMasterVolStep());
+            ptrbuttongroup->setMasterVolSliderPtr(g3svol);
             g3svol->onValueChange = [=]()
                 {
                     ButtonGroup* selectedButtonGroup = instrumentpanel->getButtonGroup(buttongroupidx);
@@ -4887,6 +4925,7 @@ struct KeyboardPanelPage final : public Component,
             g4svol->setBounds(g4xoffset + mgroup + col * bwidth + mgroup, ygroup + mgroup * 2, 20, mgroup + bheight * rbuttons + sbheight);
             g4svol->setPopupDisplayEnabled(true, true, this);
             g4svol->setValue(ptrbuttongroup->getMasterVolStep());
+            ptrbuttongroup->setMasterVolSliderPtr(g4svol);
             g4svol->onValueChange = [=]()
                 {
                     ButtonGroup* selectedButtonGroup = instrumentpanel->getButtonGroup(buttongroupidx);
@@ -5719,6 +5758,12 @@ struct KeyboardPanelPage final : public Component,
             instrumentpanel->panelpresets->setRotaryStatus(pstidx, i, ptrbuttongroup->rotary);
         }
 
+        // Read Group Volume step for every Button Group (0..10)
+        for (int i = 0; i < numberbuttongroups; i++) {
+            ButtonGroup* ptrbuttongroup = instrumentpanel->getButtonGroup(i);
+            instrumentpanel->panelpresets->setMasterVolStep(pstidx, i, ptrbuttongroup->getMasterVolStep());
+        }
+
         if (pstidx >= 1 && pstidx <= 12)
         {
             instrumentpanel->panelpresets->setPresetExplicitlyConfigured(pstidx, true);
@@ -5767,6 +5812,22 @@ struct KeyboardPanelPage final : public Component,
 
             // Keep device-side mute gate synchronized with preset state.
             mididevices->setOutputChannelMuted(ptrbuttongroup->midiout, bmuted);
+        }
+
+        // Restore Group Volume for every Button Group and always resend CC7 to modules.
+        for (int i = 0; i < numberbuttongroups; i++) {
+            ButtonGroup* ptrbuttongroup = instrumentpanel->getButtonGroup(i);
+            const int ivolstep = juce::jlimit(0, 10, instrumentpanel->panelpresets->getMasterVolStep(pstidx, i));
+            ptrbuttongroup->setMasterVolStep(ivolstep);
+
+            if (auto* groupSlider = ptrbuttongroup->getMasterVolSliderPtr(); groupSlider != nullptr) {
+                groupSlider->setValue(ivolstep, juce::dontSendNotification);
+                updateVolumeSliderDebugText(groupSlider, sliderStepToMasterCc7(ivolstep));
+            }
+
+            const int activeButtonIdx = ptrbuttongroup->getActiveVoiceButton();
+            const int effectiveCc7 = computeEffectiveCc7ForStoredGroupStep(ptrbuttongroup, activeButtonIdx);
+            sendCombinedGroupVolume(ptrbuttongroup, ptrbuttongroup->midiout, effectiveCc7, true);
         }
 
         // Activate Rotary for every Button Group (snapshot + MIDI + Upper/Lower UI)
@@ -6776,15 +6837,29 @@ private:
         return buttonGroup->getMuteButtonStatus() ? 0 : effectiveCc7;
     }
 
-    void sendCombinedGroupVolume(ButtonGroup* buttonGroup, int midiOut, int effectiveCc7)
+    int computeEffectiveCc7ForStoredGroupStep(ButtonGroup* buttonGroup, int panelbtnidx) const
+    {
+        if (buttonGroup == nullptr)
+            return 0;
+
+        auto* voiceButton = instrumentpanel->getVoiceButton(panelbtnidx);
+        if (voiceButton == nullptr)
+            return 0;
+
+        const int masterCc7 = sliderStepToMasterCc7(buttonGroup->getMasterVolStep());
+        const int effectVol = voiceButton->getInstrument().getVol();
+        const int effectiveCc7 = computeEffectiveVolumeCc7(masterCc7, effectVol, appState.defaultEffectsVol);
+        return buttonGroup->getMuteButtonStatus() ? 0 : effectiveCc7;
+    }
+
+    void sendCombinedGroupVolume(ButtonGroup* buttonGroup, int midiOut, int effectiveCc7, bool forceSend = false)
     {
         if (buttonGroup == nullptr)
             return;
-        if (buttonGroup->getMuteButtonStatus())
-            return;
 
-        const int clampedCc7 = juce::jlimit(0, 127, effectiveCc7);
-        if (!buttonGroup->isEffectDirty(0, clampedCc7))
+        const int clampedCc7 = buttonGroup->getMuteButtonStatus() ? 0 : juce::jlimit(0, 127, effectiveCc7);
+        const bool changed = buttonGroup->isEffectDirty(0, clampedCc7);
+        if (!forceSend && !changed)
             return;
 
         auto ccMessage = juce::MidiMessage::controllerEvent(midiOut, CCVol, clampedCc7);
