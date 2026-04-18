@@ -61,6 +61,9 @@ inline int getType2RotorFastTarget(InstrumentModules* modules, int moduleIdx)
 inline constexpr const char* kUiProfileFontScaleProperty = "uiProfileFontScale";
 inline constexpr const char* kUiProfileDialStrokeScaleProperty = "uiProfileDialStrokeScale";
 
+/** When set, Sounds/Effects "To Player" applies the edited instrument to the Player tab (MIDI channel 1..16). */
+inline std::function<void(int midiChannelFrom1, Instrument instrument)> gPlayerTabCommitInstrument;
+
 /** Profile-aware font scaling hook for JUCE controls without direct font setters. */
 class UiProfileFontLookAndFeel final : public juce::LookAndFeel_V4
 {
@@ -1642,6 +1645,48 @@ public:
         tbroute->setBounds(margin, 225, 80, 30);
         tbroute->onClick = [=, &tabs]()
         {
+            if (currenttabidx == PTPlayer)
+            {
+                if ((selvoicebank < 0) || (selvoice < 0))
+                    return;
+                if (!gPlayerTabCommitInstrument)
+                    return;
+
+                Instrument instrument;
+                instrument.setMSB(midiInstruments->getMSB(selvoicebank, selvoice));
+                instrument.setLSB(midiInstruments->getLSB(selvoicebank, selvoice));
+                instrument.setFont(midiInstruments->getFont(selvoicebank, selvoice));
+                instrument.setVoice(midiInstruments->getVoice(selvoicebank, selvoice));
+                instrument.setChannel(mchannel);
+                auto& st = getAppState();
+                instrument.setVol(st.defaultEffectsVol);
+                instrument.setBri(st.defaultEffectsBri);
+                instrument.setExp(st.defaultEffectsExp);
+                instrument.setRev(st.defaultEffectsRev);
+                instrument.setCho(st.defaultEffectsCho);
+                instrument.setMod(st.defaultEffectsMod);
+                instrument.setTim(st.defaultEffectsTim);
+                instrument.setAtk(st.defaultEffectsAtk);
+                instrument.setRel(st.defaultEffectsRel);
+                instrument.setPan(st.defaultEffectsPan);
+
+                gPlayerTabCommitInstrument(mchannel, instrument);
+                clearPendingSoundEditPrompt();
+                bvoiceupdated = true;
+                tabs.setCurrentTabIndex(PTPlayer, true);
+
+                snapMSB = instrument.getMSB();
+                snapLSB = instrument.getLSB();
+                snapFont = instrument.getFont();
+                ptrvoicebutton = nullptr;
+                lblsvoicetxt.setText(instrument.getVoice(), {});
+                selvoice = -1;
+                selvoicebank = -1;
+                tbroute->setEnabled(false);
+                updateVoicesRouteButtonDirtyStyle();
+                return;
+            }
+
             // Check if we still waiting for async voice select
             if ((selvoicebank < 0) || (selvoice < 0)) return;
 
@@ -1739,6 +1784,14 @@ public:
                 // Populate the Effects Page with last Button Instrument pressed and switch to tab
                 tabs.setCurrentTabIndex(currenttabidx, true);
                 //String sname = tabs.getCurrentTabName();
+
+                if (currenttabidx == PTPlayer)
+                {
+                    selvoice = -1;
+                    selvoicebank = -1;
+                    updateVoicesRouteButtonDirtyStyle();
+                    return;
+                }
 
                 // Tab redraw: https://forum.juce.com/t/how-to-capture-tabbedcomponents-tab-active/29203/9
                 VoiceButton* pvbtn = instrumentpanel->getVoiceButton(panelbuttonidx);
@@ -1930,6 +1983,49 @@ public:
     }
 
     bool hasPanelContext() const { return hasPanelContextFlag; }
+
+    bool setPlayerButton(int playerChannel, Instrument instrument, const juce::String& soundFile)
+    {
+        const int midiChannel = juce::jlimit(1, 16, playerChannel);
+        currenttabidx = PTPlayer;
+        panelbuttonidx = -1;
+        buttongroupmidiout = midiChannel;
+        mchannel = midiChannel;
+        ptrvoicebutton = nullptr;
+
+        group->setColour(GroupComponent::outlineColourId, Colours::slategrey);
+        lblsgrouptxt.setText("Midi Channels   [Out:" + juce::String(midiChannel) + "]", {});
+        lblskeyboardtxt.setText("Player", {});
+        lblsvoicetxt.setText(instrument.getVoice(), {});
+        tbroute->setButtonText("To Player");
+        tbroute->setEnabled(false);
+        updateVoicesRouteButtonDirtyStyle();
+
+        instrumentfname = soundFile;
+        if (soundFile.isNotEmpty())
+            midiInstruments->loadMidiInstruments(soundFile);
+
+        const juce::String moduleName = midiInstruments->getVendor().trim();
+        group->setText(moduleName.isNotEmpty()
+            ? (moduleName + " - Voice Button Config")
+            : "Voice Button Config");
+
+        setVoiceBrowserInteractive(true);
+        voiceSearchEditor.setText("", dontSendNotification);
+        refreshVoiceSearchResults(true);
+        browserLevel = BrowserLevel::categories;
+        selectedCategoryIdx = -1;
+        browserPage = 0;
+        renderVoiceBrowser();
+
+        snapMSB = instrument.getMSB();
+        snapLSB = instrument.getLSB();
+        snapFont = instrument.getFont();
+        selvoice = -1;
+        selvoicebank = -1;
+        hasPanelContextFlag = true;
+        return true;
+    }
 
     //-------------------------------------------------------------------------
     ~VoicesPage() {
@@ -2268,6 +2364,8 @@ private:
 
                     if ((currenttabidx == PTUpper) || (currenttabidx == PTLower) || (currenttabidx == PTBass))
                         tbroute->setEnabled(true);
+                    if (currenttabidx == PTPlayer)
+                        tbroute->setEnabled(true);
                     updateVoicesRouteButtonDirtyStyle();
                 };
             }
@@ -2296,6 +2394,8 @@ private:
                     sendPreviewMidiForSelection(selvoicebank, selvoice);
 
                     if ((currenttabidx == PTUpper) || (currenttabidx == PTLower) || (currenttabidx == PTBass))
+                        tbroute->setEnabled(true);
+                    if (currenttabidx == PTPlayer)
                         tbroute->setEnabled(true);
                     updateVoicesRouteButtonDirtyStyle();
                 };
@@ -2519,6 +2619,14 @@ public:
         slvol->onValueChange = [=]()
             {
                 int sval = (int)slvol->getValue();
+                if (currenttabidx == PTPlayer && playerRouteActive)
+                {
+                    changeEffect(panelbuttonidx, CCVol, sval);
+                    auto ccMessage = juce::MidiMessage::controllerEvent(buttongroupmidiout, CCVol, sval);
+                    ccMessage.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
+                    mididevices->sendToOutputs(ccMessage);
+                    return;
+                }
                 changeEffect(panelbuttonidx, CCVol, sval);
 
                 const int panelgroup = lookupPanelGroup(panelbuttonidx);
@@ -2708,6 +2816,29 @@ public:
         tbroute->setBounds(margin, 225, 80, 30);
         tbroute->onClick = [=, &tabs]()
             {
+                if (currenttabidx == PTPlayer && playerRouteActive)
+                {
+                    if (gPlayerTabCommitInstrument)
+                        gPlayerTabCommitInstrument(buttongroupmidiout, playerWorkingInstrument);
+                    clearPendingEffectsEditPrompt();
+                    playerBaselineInstrument = playerWorkingInstrument;
+                    effvol = playerWorkingInstrument.getVol();
+                    effexp = playerWorkingInstrument.getExp();
+                    effrev = playerWorkingInstrument.getRev();
+                    effcho = playerWorkingInstrument.getCho();
+                    effmod = playerWorkingInstrument.getMod();
+                    efftim = playerWorkingInstrument.getTim();
+                    effatk = playerWorkingInstrument.getAtk();
+                    effrel = playerWorkingInstrument.getRel();
+                    effbri = playerWorkingInstrument.getBri();
+                    effpan = playerWorkingInstrument.getPan();
+                    beffectsupdated = true;
+                    tabs.setCurrentTabIndex(PTPlayer, true);
+                    tbroute->setEnabled(false);
+                    updateToRouteButtonDirtyStyle();
+                    return;
+                }
+
                 // Commit route from Effects tab should arm panel Save/Save As.
                 bpendingEffectsEdit = true;
 
@@ -2739,6 +2870,9 @@ public:
 
                 // Populate the Effects Page with last Button Instrument pressed and switch to tab
                 tabs.setCurrentTabIndex(currenttabidx, true);
+
+                if (currenttabidx == PTPlayer)
+                    return;
 
                 // Reset all effects back to original for Cancel
                 cancelEffects(panelbuttonidx);
@@ -2835,6 +2969,26 @@ public:
     }
 
     bool changeEffect(int panelbtnidx, MidiCCType cctype, int val) {
+        if (currenttabidx == PTPlayer && playerRouteActive)
+        {
+            switch (cctype) {
+                case CCVol: playerWorkingInstrument.setVol(val); break;
+                case CCExp: playerWorkingInstrument.setExp(val); break;
+                case CCRev: playerWorkingInstrument.setRev(val); break;
+                case CCCho: playerWorkingInstrument.setCho(val); break;
+                case CCMod: playerWorkingInstrument.setMod(val); break;
+                case CCTim: playerWorkingInstrument.setTim(val); break;
+                case CCAtk: playerWorkingInstrument.setAtk(val); break;
+                case CCRel: playerWorkingInstrument.setRel(val); break;
+                case CCBri: playerWorkingInstrument.setBri(val); break;
+                case CCPan: playerWorkingInstrument.setPan(val); break;
+                default:
+                    break;
+            }
+            tbroute->setEnabled(true);
+            updateToRouteButtonDirtyStyle();
+            return true;
+        }
 
         switch (cctype) {
             case CCVol:
@@ -2985,6 +3139,7 @@ public:
     // Entry into Effects Panel: Show effects parameters for last panel button pressed
     bool setPanelButton(int panelbtnidx, String sgroup, int midiout, int tabindex) {
 
+        playerRouteActive = false;
         currenttabidx = tabindex;
         buttongroupmidiout = midiout;
         panelbuttonidx = panelbtnidx;
@@ -3042,6 +3197,42 @@ public:
 
     bool hasPanelContext() const { return hasPanelContextFlag; }
 
+    bool setPlayerButton(int playerChannel, Instrument instrument, const juce::String& moduleName)
+    {
+        const int midiChannel = juce::jlimit(1, 16, playerChannel);
+        currenttabidx = PTPlayer;
+        panelbuttonidx = -1;
+        buttongroupmidiout = midiChannel;
+
+        group->setColour(GroupComponent::outlineColourId, Colours::slategrey);
+        group->setText(moduleName.isNotEmpty()
+            ? (moduleName + " - Effects for Voice Button")
+            : "Effects for Voice Button");
+        lblsgrouptxt.setText("Midi Channels   [Out:" + juce::String(midiChannel) + "]", {});
+        lblskeyboardtxt.setText("Player", {});
+        lblsvoicetxt.setText(instrument.getVoice(), {});
+        tbroute->setButtonText("To Player");
+        tbroute->setEnabled(false);
+        updateToRouteButtonDirtyStyle();
+        setEffects(instrument);
+        playerRouteActive = true;
+        playerBaselineInstrument = instrument;
+        playerWorkingInstrument = instrument;
+        effvol = instrument.getVol();
+        effexp = instrument.getExp();
+        effrev = instrument.getRev();
+        effcho = instrument.getCho();
+        effmod = instrument.getMod();
+        efftim = instrument.getTim();
+        effatk = instrument.getAtk();
+        effrel = instrument.getRel();
+        effbri = instrument.getBri();
+        effpan = instrument.getPan();
+        ptrvoicebutton = nullptr;
+        hasPanelContextFlag = true;
+        return true;
+    }
+
     void applyCurrentUiProfile()
     {
         currentProfile = resolveUiProfile(getAppState().uiProfileId);
@@ -3079,6 +3270,9 @@ private:
     VoiceButton* ptrvoicebutton;
     int panelbuttonidx = 0;
     bool hasPanelContextFlag = false;
+    bool playerRouteActive = false;
+    Instrument playerBaselineInstrument;
+    Instrument playerWorkingInstrument;
 
     int mchannel = 1;
 
@@ -3141,6 +3335,16 @@ private:
 
     bool effectsValuesDifferFromSnapshot() const
     {
+        if (playerRouteActive)
+        {
+            Instrument w = playerWorkingInstrument;
+            Instrument b = playerBaselineInstrument;
+            return w.getVol() != b.getVol() || w.getExp() != b.getExp() || w.getRev() != b.getRev()
+                || w.getCho() != b.getCho() || w.getMod() != b.getMod() || w.getTim() != b.getTim()
+                || w.getAtk() != b.getAtk() || w.getRel() != b.getRel() || w.getBri() != b.getBri()
+                || w.getPan() != b.getPan();
+        }
+
         if (instrumentpanel == nullptr || panelbuttonidx < 0)
             return false;
 
@@ -7036,6 +7240,300 @@ private:
     }
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(KeyboardPanelPage)
+};
+
+
+//==============================================================================
+// Class: PlayerPage
+//==============================================================================
+static int zinstcntPlayerPage = 0;
+class PlayerPage final : public Component
+{
+public:
+    PlayerPage(TabbedComponent& tabs) :
+        tabsRef(tabs),
+        instrumentmodules(InstrumentModules::getInstance()),
+        mididevices(MidiDevices::getInstance()),
+        appState(getAppState())
+    {
+        juce::Logger::writeToLog("== PlayerPage(): Constructor " + std::to_string(zinstcntPlayerPage++));
+
+        moduleLabel = addToList(new Label("player.module.label", "Sound Module"));
+        moduleLabel->setColour(Label::textColourId, Colours::white);
+        moduleLabel->setJustificationType(Justification::centredRight);
+
+        soundModuleButton = addToList(new TextButton());
+        const int moduleCount = instrumentmodules->getNumModules();
+        playerModuleIdx = juce::jlimit(0, juce::jmax(0, moduleCount - 1), appState.moduleidx);
+        soundModuleButton->setButtonText(instrumentmodules->getDisplayName(playerModuleIdx));
+        soundModuleButton->setClickingTogglesState(false);
+        soundModuleButton->setColour(TextButton::textColourOffId, Colours::white);
+        soundModuleButton->setColour(TextButton::textColourOnId, Colours::white);
+        soundModuleButton->setColour(TextButton::buttonColourId, Colours::black);
+        soundModuleButton->setColour(TextButton::buttonOnColourId, Colours::black);
+        soundModuleButton->setToggleState(true, dontSendNotification);
+        soundModuleButton->onClick = [this]()
+            {
+                PopupMenu menu;
+                const int moduleCount = instrumentmodules->getNumModules();
+                for (int i = 1; i <= moduleCount; ++i)
+                    menu.addItem(i, instrumentmodules->getDisplayName(i - 1), true, true);
+
+                menu.showMenuAsync(PopupMenu::Options{}.withTargetComponent(soundModuleButton),
+                    [this](int result)
+                    {
+                        if (result == 0)
+                            return;
+
+                        playerModuleIdx = result - 1;
+                        soundModuleButton->setButtonText(instrumentmodules->getDisplayName(playerModuleIdx));
+                    });
+            };
+
+        channelsGroup = addToList(new GroupComponent("player.channels", "Midi Channels"));
+        channelsGroup->setColour(GroupComponent::outlineColourId, Colours::slategrey);
+        voiceEditsGroup = addToList(new GroupComponent("player.voiceEdits", "Voice Edits"));
+        voiceEditsGroup->setColour(GroupComponent::outlineColourId, Colours::grey.darker());
+
+        soundsButton = addToList(new TextButton("Sounds"));
+        soundsButton->setClickingTogglesState(false);
+        soundsButton->setColour(TextButton::textColourOffId, Colours::black);
+        soundsButton->setColour(TextButton::textColourOnId, Colours::black);
+        soundsButton->setColour(TextButton::buttonColourId, Colours::lightgrey);
+        soundsButton->setColour(TextButton::buttonOnColourId, Colours::antiquewhite);
+        soundsButton->setConnectedEdges(Button::ConnectedOnRight);
+        soundsButton->setToggleState(false, dontSendNotification);
+        soundsButton->setEnabled(false);
+        soundsButton->onClick = [this]()
+            {
+                if (selectedChannelIdx < 0 || selectedChannelIdx >= playerChannelCount)
+                    return;
+                if (auto* voicesPage = dynamic_cast<VoicesPage*>(tabsRef.getTabContentComponent(PTVoices)))
+                {
+                    const auto instrument = channelInstruments[(size_t) selectedChannelIdx];
+                    const int moduleCount = instrumentmodules->getNumModules();
+                    const int safeModuleIdx = juce::jlimit(0, juce::jmax(0, moduleCount - 1), playerModuleIdx);
+                    voicesPage->setPlayerButton(selectedChannelIdx + 1, instrument, instrumentmodules->getFileName(safeModuleIdx));
+                }
+                tabsRef.setCurrentTabIndex(PTVoices, true);
+            };
+
+        effectsButton = addToList(new TextButton("Effects"));
+        effectsButton->setClickingTogglesState(false);
+        effectsButton->setColour(TextButton::textColourOffId, Colours::black);
+        effectsButton->setColour(TextButton::textColourOnId, Colours::black);
+        effectsButton->setColour(TextButton::buttonColourId, Colours::lightgrey);
+        effectsButton->setColour(TextButton::buttonOnColourId, Colours::antiquewhite);
+        effectsButton->setConnectedEdges(Button::ConnectedOnLeft);
+        effectsButton->setToggleState(false, dontSendNotification);
+        effectsButton->setEnabled(false);
+        effectsButton->onClick = [this]()
+            {
+                if (selectedChannelIdx < 0 || selectedChannelIdx >= playerChannelCount)
+                    return;
+                if (auto* effectsPage = dynamic_cast<EffectsPage*>(tabsRef.getTabContentComponent(PTEffects)))
+                {
+                    const auto instrument = channelInstruments[(size_t) selectedChannelIdx];
+                    const int moduleCount = instrumentmodules->getNumModules();
+                    const int safeModuleIdx = juce::jlimit(0, juce::jmax(0, moduleCount - 1), playerModuleIdx);
+                    effectsPage->setPlayerButton(selectedChannelIdx + 1, instrument, instrumentmodules->getDisplayName(safeModuleIdx));
+                }
+                tabsRef.setCurrentTabIndex(PTEffects, true);
+            };
+
+        const int radioGroupId = 901;
+        for (int i = 0; i < playerChannelCount; ++i)
+        {
+            auto* button = addToList(new VoiceButton("Ch " + String(i + 1)));
+            channelButtons[(size_t) i] = button;
+
+            Instrument instrument;
+            instrument.setVoice("Ch " + String(i + 1));
+            instrument.setChannel(i + 1);
+            instrument.setMSB(0);
+            instrument.setLSB(0);
+            instrument.setFont(0);
+            instrument.setVol(appState.defaultEffectsVol);
+            instrument.setExp(appState.defaultEffectsExp);
+            instrument.setRev(appState.defaultEffectsRev);
+            instrument.setCho(appState.defaultEffectsCho);
+            instrument.setMod(appState.defaultEffectsMod);
+            instrument.setTim(appState.defaultEffectsTim);
+            instrument.setAtk(appState.defaultEffectsAtk);
+            instrument.setRel(appState.defaultEffectsRel);
+            instrument.setBri(appState.defaultEffectsBri);
+            instrument.setPan(appState.defaultEffectsPan);
+            channelInstruments[(size_t) i] = instrument;
+
+            button->setInstrument(instrument);
+            button->setButtonText(instrument.getVoice());
+            button->setButtonId(i);
+            button->setButtonGroupId(radioGroupId);
+            button->setPanelButtonIdx(i);
+            button->setClickingTogglesState(true);
+            button->setRadioGroupId(radioGroupId);
+            button->setColour(TextButton::textColourOffId, Colours::black);
+            button->setColour(TextButton::textColourOnId, Colours::black);
+            button->setColour(TextButton::buttonColourId, Colours::lightgrey);
+            button->setColour(TextButton::buttonOnColourId, Colours::antiquewhite);
+            button->setConnectedEdges(((i > 0) ? Button::ConnectedOnLeft : 0)
+                | ((i < (playerChannelCount - 1)) ? Button::ConnectedOnRight : 0));
+            button->setExplicitUserClickHandler([this](int idx) { registerExplicitVoiceSelection(idx); });
+            button->onClick = [this, button, i]()
+                {
+                    if (!button->getToggleState())
+                        return;
+
+                    selectedChannelIdx = i;
+                    registerExplicitVoiceSelection(i);
+                    enableVoiceEditButtons();
+
+                    auto instrument = channelInstruments[(size_t) i];
+                    instrument.setChannel(i + 1);
+                    channelInstruments[(size_t) i] = instrument;
+                    button->setInstrument(instrument);
+                    button->setButtonText(instrument.getVoice());
+
+                    sendProgramSelect(instrument);
+                    sendEffects(instrument);
+                };
+        }
+
+        gPlayerTabCommitInstrument = [this](int ch, Instrument inst)
+            {
+                juce::MessageManager::callAsync([this, ch, inst]() mutable
+                    {
+                        const int idx = juce::jlimit(1, 16, ch) - 1;
+                        inst.setChannel(idx + 1);
+                        channelInstruments[(size_t) idx] = inst;
+                        if (auto* b = channelButtons[(size_t) idx])
+                        {
+                            b->setInstrument(inst);
+                            b->setButtonText(inst.getVoice());
+                        }
+                        sendProgramSelect(inst);
+                        sendEffects(inst);
+                    });
+            };
+    }
+
+    ~PlayerPage() override
+    {
+        gPlayerTabCommitInstrument = {};
+        DBG("=== PlayerPage(): Destructor " + std::to_string(--zinstcntPlayerPage));
+    }
+
+    void resized() override
+    {
+        const int margin = 10;
+        const int soundModuleY = margin + 6;
+        if (moduleLabel != nullptr)
+            moduleLabel->setBounds(getWidth() - 330, soundModuleY, 110, 30);
+        if (soundModuleButton != nullptr)
+            soundModuleButton->setBounds(getWidth() - 215, soundModuleY, 200, 30);
+
+        const int groupHeight = 120;
+        channelsGroup->setBounds(margin, margin + 40, getWidth() - margin * 2, groupHeight);
+
+        const int channelButtonInsetX = 14;
+        const int channelButtonInsetY = 32;
+        const int buttonGap = 4;
+        const int availableWidth = channelsGroup->getWidth() - channelButtonInsetX * 2 - buttonGap * (playerChannelCount - 1);
+        const int buttonWidth = juce::jmax(48, availableWidth / playerChannelCount);
+        const int buttonHeight = 56;
+
+        for (int i = 0; i < playerChannelCount; ++i)
+        {
+            if (auto* button = channelButtons[(size_t) i])
+                button->setBounds(channelsGroup->getX() + channelButtonInsetX + i * (buttonWidth + buttonGap),
+                                  channelsGroup->getY() + channelButtonInsetY,
+                                  buttonWidth,
+                                  buttonHeight);
+        }
+
+        const int editsWidth = 190;
+        const int editsHeight = 90;
+        const int editsY = channelsGroup->getBottom() + 10;
+        voiceEditsGroup->setBounds(margin, editsY, editsWidth, editsHeight);
+        soundsButton->setBounds(margin + 10, editsY + 30, 85, 42);
+        effectsButton->setBounds(margin + 95, editsY + 30, 85, 42);
+    }
+
+private:
+    void registerExplicitVoiceSelection(int selectedChannel)
+    {
+        selectedChannelIdx = juce::jlimit(0, playerChannelCount - 1, selectedChannel);
+    }
+
+    void enableVoiceEditButtons()
+    {
+        if (soundsButton != nullptr)
+            soundsButton->setEnabled(true);
+        if (effectsButton != nullptr)
+            effectsButton->setEnabled(true);
+    }
+
+    void sendCC(int midiChannel, int controller, int value)
+    {
+        auto message = juce::MidiMessage::controllerEvent(midiChannel, controller, value);
+        message.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
+        mididevices->sendToOutputs(message);
+    }
+
+    void sendProgramSelect(Instrument instrument)
+    {
+        const int midiChannel = instrument.getChannel();
+        sendCC(midiChannel, CCMSB, instrument.getMSB());
+        sendCC(midiChannel, CCLSB, instrument.getLSB());
+
+        auto programChange = juce::MidiMessage::programChange(midiChannel, instrument.getFont());
+        programChange.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
+        mididevices->sendToOutputs(programChange);
+    }
+
+    void sendEffects(Instrument instrument)
+    {
+        const int midiChannel = instrument.getChannel();
+        sendCC(midiChannel, CCVol, instrument.getVol());
+        sendCC(midiChannel, CCExp, instrument.getExp());
+        sendCC(midiChannel, CCRev, instrument.getRev());
+        sendCC(midiChannel, CCCho, instrument.getCho());
+        sendCC(midiChannel, CCMod, instrument.getMod());
+        sendCC(midiChannel, CCTim, instrument.getTim());
+        sendCC(midiChannel, CCAtk, instrument.getAtk());
+        sendCC(midiChannel, CCRel, instrument.getRel());
+        sendCC(midiChannel, CCBri, instrument.getBri());
+        sendCC(midiChannel, CCPan, instrument.getPan());
+    }
+
+    template <typename ComponentType>
+    ComponentType* addToList(ComponentType* newComp)
+    {
+        components.add(newComp);
+        addAndMakeVisible(newComp);
+        return newComp;
+    }
+
+    static constexpr int playerChannelCount = 16;
+
+    OwnedArray<Component> components;
+    Label* moduleLabel = nullptr;
+    TextButton* soundModuleButton = nullptr;
+    GroupComponent* channelsGroup = nullptr;
+    GroupComponent* voiceEditsGroup = nullptr;
+    TextButton* soundsButton = nullptr;
+    TextButton* effectsButton = nullptr;
+    std::array<VoiceButton*, playerChannelCount> channelButtons {};
+    std::array<Instrument, playerChannelCount> channelInstruments {};
+    int selectedChannelIdx = -1;
+    int playerModuleIdx = 0;
+
+    TabbedComponent& tabsRef;
+    InstrumentModules* instrumentmodules = nullptr;
+    MidiDevices* mididevices = nullptr;
+    AppState& appState;
+
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PlayerPage)
 };
 
 
@@ -12178,6 +12676,7 @@ public:
         addTab("Hotkeys",      colour, new HotkeysPage(commandManager, keyPressTarget), true);
         addTab("Monitor",      colour, monitorpage, true);
         addTab("Help",         colour, new HelpPage(), true);
+        addTab("Player",       colour, new PlayerPage(*this), true);
         addTab("Exit",         colour, new Component(), true);
 
         this->setTabBarDepth(30);
