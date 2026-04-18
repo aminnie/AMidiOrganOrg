@@ -7420,7 +7420,8 @@ public:
             auto* chLabel = addToList(new Label("player.ch.label." + String(i + 1), "Ch " + String(i + 1)));
             chLabel->setJustificationType(Justification::centred);
             chLabel->setColour(Label::textColourId, Colours::white);
-            chLabel->setInterceptsMouseClicks(false, false);
+            chLabel->setInterceptsMouseClicks(true, false);
+            chLabel->setTooltip("Ch " + String(i + 1) + ": No Program Change events.");
             channelLabels[(size_t) i] = chLabel;
 
             auto* button = addToList(new VoiceButton("Ch " + String(i + 1)));
@@ -7743,6 +7744,13 @@ private:
         double beatsIntoBarAtStart = 0.0;
     };
 
+    struct ProgramChangeEvent
+    {
+        double timeSec = 0.0;
+        int channel = 1;
+        int program = 0;
+    };
+
     static juce::String formatBpm(double bpm)
     {
         if (bpm <= 0.0)
@@ -7859,6 +7867,159 @@ private:
             : "n/a";
         const auto tempo = metadata.hasTempo ? formatBpm(metadata.bpm) : "n/a";
         return "Time: " + timeSig + "    Key: " + key + "    Tempo: " + tempo;
+    }
+
+    static bool readProgramChangeEvents(const juce::File& file,
+                                        std::vector<ProgramChangeEvent>& outEvents,
+                                        juce::String& error)
+    {
+        outEvents.clear();
+        error.clear();
+
+        juce::FileInputStream stream(file);
+        if (!stream.openedOk())
+        {
+            error = "Failed to open file for PC scan: " + file.getFullPathName();
+            return false;
+        }
+
+        juce::MidiFile midiFile;
+        if (!midiFile.readFrom(stream))
+        {
+            error = "Failed to parse MIDI PC scan: " + file.getFileName();
+            return false;
+        }
+
+        midiFile.convertTimestampTicksToSeconds();
+        for (int track = 0; track < midiFile.getNumTracks(); ++track)
+        {
+            const auto* sequence = midiFile.getTrack(track);
+            if (sequence == nullptr)
+                continue;
+
+            for (int eventIdx = 0; eventIdx < sequence->getNumEvents(); ++eventIdx)
+            {
+                const auto* eventHolder = sequence->getEventPointer(eventIdx);
+                if (eventHolder == nullptr)
+                    continue;
+
+                const auto& msg = eventHolder->message;
+                if (!msg.isProgramChange())
+                    continue;
+
+                outEvents.push_back({
+                    juce::jmax(0.0, msg.getTimeStamp()),
+                    msg.getChannel(),
+                    msg.getProgramChangeNumber()
+                });
+            }
+        }
+
+        std::sort(outEvents.begin(), outEvents.end(), [](const ProgramChangeEvent& a, const ProgramChangeEvent& b)
+            {
+                if (a.timeSec == b.timeSec)
+                    return a.channel < b.channel;
+                return a.timeSec < b.timeSec;
+            });
+        return true;
+    }
+
+    static juce::String buildProgramChangeSummary(const std::vector<ProgramChangeEvent>& events)
+    {
+        if (events.empty())
+            return "PC: none";
+
+        std::array<bool, 17> channelsSeen {};
+        int channelCount = 0;
+        for (const auto& ev : events)
+        {
+            const int ch = juce::jlimit(1, 16, ev.channel);
+            if (!channelsSeen[(size_t) ch])
+            {
+                channelsSeen[(size_t) ch] = true;
+                ++channelCount;
+            }
+        }
+
+        juce::String channelList;
+        for (int ch = 1; ch <= 16; ++ch)
+        {
+            if (!channelsSeen[(size_t) ch])
+                continue;
+            if (channelList.isNotEmpty())
+                channelList << ",";
+            channelList << ch;
+        }
+
+        return "PC: " + juce::String((int) events.size()) + " event(s), Ch " + channelList;
+    }
+
+    static juce::String buildProgramChangeDetails(const std::vector<ProgramChangeEvent>& events)
+    {
+        if (events.empty())
+            return "No Program Change events in loaded file.";
+
+        std::array<juce::String, 17> lines {};
+        for (const auto& ev : events)
+        {
+            const int ch = juce::jlimit(1, 16, ev.channel);
+            if (lines[(size_t) ch].isEmpty())
+                lines[(size_t) ch] = "Ch " + juce::String(ch) + ": ";
+            else
+                lines[(size_t) ch] << ", ";
+
+            lines[(size_t) ch] << juce::String(ev.timeSec, 2) << "s->PC" << juce::String(ev.program);
+        }
+
+        juce::String out;
+        out << "Program Changes (original file):\n";
+        for (int ch = 1; ch <= 16; ++ch)
+        {
+            if (lines[(size_t) ch].isNotEmpty())
+                out << lines[(size_t) ch] << "\n";
+        }
+        return out.trimEnd();
+    }
+
+    void refreshChannelProgramChangeTooltips()
+    {
+        for (int ch = 1; ch <= playerChannelCount; ++ch)
+        {
+            if (auto* lbl = channelLabels[(size_t) (ch - 1)])
+                lbl->setTooltip("Ch " + juce::String(ch) + ": No Program Change events.");
+        }
+
+        if (programChangeEvents.empty())
+            return;
+
+        std::array<juce::String, 17> lines {};
+        for (const auto& ev : programChangeEvents)
+        {
+            const int ch = juce::jlimit(1, playerChannelCount, ev.channel);
+            if (lines[(size_t) ch].isEmpty())
+                lines[(size_t) ch] = "Ch " + juce::String(ch) + " PCs: ";
+            else
+                lines[(size_t) ch] << ", ";
+
+            lines[(size_t) ch] << juce::String(ev.timeSec, 2) << "s->PC" << juce::String(ev.program);
+        }
+
+        for (int ch = 1; ch <= playerChannelCount; ++ch)
+        {
+            if (auto* lbl = channelLabels[(size_t) (ch - 1)])
+            {
+                if (lines[(size_t) ch].isNotEmpty())
+                    lbl->setTooltip(lines[(size_t) ch]);
+            }
+        }
+    }
+
+    juce::String buildTopMetadataLine() const
+    {
+        juce::String line = currentMidiMetadataText;
+        if (currentProgramChangeSummaryText.isNotEmpty())
+            line << "    " << currentProgramChangeSummaryText;
+        return line;
     }
 
     static void sortAndCoalesceTempoEvents(std::vector<TempoEvent>& events)
@@ -8054,7 +8215,10 @@ private:
     void refreshMidiMetadataLabel()
     {
         if (midiMetadataLabel != nullptr)
-            midiMetadataLabel->setText(currentMidiMetadataText, dontSendNotification);
+        {
+            midiMetadataLabel->setText(buildTopMetadataLine(), dontSendNotification);
+            midiMetadataLabel->setTooltip(programChangeDetailText);
+        }
     }
 
     void refreshMidiTransportLabel(double elapsedSec = 0.0)
@@ -8107,7 +8271,11 @@ private:
             loadedMidiFile = {};
             updatePlaybackGroupTitle();
             currentMidiMetadataText = "Time: n/a    Key: n/a    Tempo: n/a";
+            currentProgramChangeSummaryText = "PC: n/a";
+            programChangeDetailText = {};
+            programChangeEvents.clear();
             refreshMidiMetadataLabel();
+            refreshChannelProgramChangeTooltips();
             tempoEvents = { TempoEvent {} };
             timeSignatureEvents = { TimeSignatureEvent {} };
             refreshMidiTransportLabel();
@@ -8129,7 +8297,21 @@ private:
         currentMidiMetadataText = buildMidiMetadataText(metadata);
         if (metadataError.isNotEmpty())
             currentMidiMetadataText = "Time: n/a    Key: n/a    Tempo: n/a";
+
+        juce::String pcError;
+        if (readProgramChangeEvents(file, programChangeEvents, pcError))
+        {
+            currentProgramChangeSummaryText = buildProgramChangeSummary(programChangeEvents);
+            programChangeDetailText = buildProgramChangeDetails(programChangeEvents);
+        }
+        else
+        {
+            currentProgramChangeSummaryText = "PC: n/a";
+            programChangeDetailText = pcError;
+            programChangeEvents.clear();
+        }
         refreshMidiMetadataLabel();
+        refreshChannelProgramChangeTooltips();
 
         juce::String mapError;
         if (!readTempoAndTimeSignatureMaps(file, tempoEvents, timeSignatureEvents, mapError))
@@ -8429,6 +8611,9 @@ private:
     ProgramChangeRemapper programChangeRemapper;
     juce::File loadedMidiFile;
     juce::String currentMidiMetadataText = "Time: n/a    Key: n/a    Tempo: n/a";
+    juce::String currentProgramChangeSummaryText = "PC: n/a";
+    juce::String programChangeDetailText;
+    std::vector<ProgramChangeEvent> programChangeEvents;
     juce::String currentMidiTransportText = "Bar 1  Beat 1  Quarter 0.00";
     std::vector<TempoEvent> tempoEvents { TempoEvent {} };
     std::vector<TimeSignatureEvent> timeSignatureEvents { TimeSignatureEvent {} };
