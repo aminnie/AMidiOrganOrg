@@ -7467,6 +7467,7 @@ public:
                     selectedChannelIdx = i;
                     registerExplicitVoiceSelection(i);
                     enableVoiceEditButtons();
+                    playerChannelConfigured[(size_t) i] = true;
 
                     auto instrument = channelInstruments[(size_t) i];
                     instrument.setChannel(i + 1);
@@ -7486,6 +7487,7 @@ public:
                         const int idx = juce::jlimit(1, 16, ch) - 1;
                         inst.setChannel(idx + 1);
                         channelInstruments[(size_t) idx] = inst;
+                        playerChannelConfigured[(size_t) idx] = true;
                         if (auto* b = channelButtons[(size_t) idx])
                         {
                             b->setInstrument(inst);
@@ -7639,6 +7641,20 @@ private:
         refreshMidiTransportLabel(elapsedSec);
         const auto result = playbackEngine.processUntil(nowMs, [this](const juce::MidiMessage& message)
             {
+                if (message.isProgramChange())
+                {
+                    const int channel = message.getChannel();
+                    if (channel >= 1 && channel <= playerChannelCount
+                        && playerChannelConfigured[(size_t) (channel - 1)])
+                    {
+                        juce::MidiMessage replacements[3];
+                        const auto replacementCount = buildVoiceButtonProgramSelectMessages(channel, replacements, 3);
+                        for (int i = 0; i < replacementCount; ++i)
+                            sendPlaybackMessage(replacements[i]);
+                        return;
+                    }
+                }
+
                 if (midiPlayerSettings.enableProgramChangeRemap)
                 {
                     juce::MidiMessage replacements[3];
@@ -7671,6 +7687,22 @@ private:
             return false;
 
         return midiPlayerSettings.mutedChannels[static_cast<size_t>(channel)];
+    }
+
+    int buildVoiceButtonProgramSelectMessages(int channel, juce::MidiMessage* outMessages, int maxMessages)
+    {
+        if (outMessages == nullptr || maxMessages <= 0 || channel < 1 || channel > playerChannelCount)
+            return 0;
+
+        auto instrument = channelInstruments[(size_t) (channel - 1)];
+        int count = 0;
+        if (count < maxMessages)
+            outMessages[count++] = juce::MidiMessage::controllerEvent(channel, 0, juce::jlimit(0, 127, instrument.getMSB()));
+        if (count < maxMessages)
+            outMessages[count++] = juce::MidiMessage::controllerEvent(channel, 32, juce::jlimit(0, 127, instrument.getLSB()));
+        if (count < maxMessages)
+            outMessages[count++] = juce::MidiMessage::programChange(channel, juce::jlimit(0, 127, instrument.getFont()));
+        return count;
     }
 
     void sendPlaybackMessage(const juce::MidiMessage& message)
@@ -8603,6 +8635,7 @@ private:
     std::array<Label*, playerChannelCount> channelLabels {};
     std::array<VoiceButton*, playerChannelCount> channelButtons {};
     std::array<Instrument, playerChannelCount> channelInstruments {};
+    std::array<bool, playerChannelCount> playerChannelConfigured {};
     int selectedChannelIdx = -1;
     int playerModuleIdx = 0;
     std::unique_ptr<juce::FileChooser> fileChooser;
@@ -10829,6 +10862,16 @@ public:
             };
         setFilterMidiClockEnabled(true);
 
+        addAndMakeVisible(filterMidiProgramChangeToggle);
+        filterMidiProgramChangeToggle.setComponentID("mon.filterPcs");
+        filterMidiProgramChangeToggle.setToggleState(false, juce::dontSendNotification);
+        filterMidiProgramChangeToggle.setTooltip("Show only Program Change rows in both MIDI IN and MIDI OUT monitors.");
+        filterMidiProgramChangeToggle.onClick = [this]()
+            {
+                setFilterMidiProgramChangeEnabled(filterMidiProgramChangeToggle.getToggleState());
+            };
+        setFilterMidiProgramChangeEnabled(false);
+
         addAndMakeVisible(filterMidiNotesToggle);
         filterMidiNotesToggle.setComponentID("mon.filterNotes");
         filterMidiNotesToggle.setToggleState(true, juce::dontSendNotification);
@@ -10945,7 +10988,9 @@ public:
         leftButtons.removeFromLeft(scaleX(8));
         clearButton.setBounds(leftButtons.removeFromLeft(scaleX(90)));
         leftButtons.removeFromLeft(scaleX(8));
-        filterMidiClockToggle.setBounds(leftButtons.removeFromLeft(scaleX(170)));
+        filterMidiProgramChangeToggle.setBounds(leftButtons.removeFromLeft(scaleX(110)));
+        leftButtons.removeFromLeft(scaleX(8));
+        filterMidiClockToggle.setBounds(leftButtons.removeFromLeft(scaleX(150)));
         leftButtons.removeFromLeft(scaleX(8));
         filterMidiNotesToggle.setBounds(leftButtons.removeFromLeft(scaleX(120)));
         leftInner.removeFromTop(scaleY(8));
@@ -10990,6 +11035,7 @@ public:
         applyScale(keyboardGroup, currentProfile.groupTitleFontScale);
         applyScale(enableButton, currentProfile.buttonFontScale);
         applyScale(clearButton, currentProfile.buttonFontScale);
+        applyScale(filterMidiProgramChangeToggle, currentProfile.toggleFontScale);
         applyScale(filterMidiClockToggle, currentProfile.toggleFontScale);
         applyScale(filterMidiNotesToggle, currentProfile.toggleFontScale);
         applyScale(midiInLabel, currentProfile.labelFontScale);
@@ -11087,8 +11133,18 @@ private:
         filterMidiNotesEnabled.store(enabled, std::memory_order_relaxed);
     }
 
+    void setFilterMidiProgramChangeEnabled(bool enabled)
+    {
+        filterMidiProgramChangeToggle.setToggleState(enabled, juce::dontSendNotification);
+        filterMidiProgramChangeEnabled.store(enabled, std::memory_order_relaxed);
+    }
+
     bool shouldFilterOutMessage(const juce::MidiMessage& message) const
     {
+        if (filterMidiProgramChangeEnabled.load(std::memory_order_relaxed)
+            && !message.isProgramChange())
+            return true;
+
         if (filterMidiNotesEnabled.load(std::memory_order_relaxed)
             && (message.isNoteOn() || message.isNoteOff()))
             return true;
@@ -11226,6 +11282,7 @@ private:
     juce::GroupComponent keyboardGroup{ "keyboardGroup", "Virtual Keyboard" };
     juce::TextButton enableButton{ "Enable" };
     juce::TextButton clearButton{ "Clear" };
+    juce::ToggleButton filterMidiProgramChangeToggle{ "Only PCs" };
     juce::ToggleButton filterMidiClockToggle{ "Filter Clock & Sensing" };
     juce::ToggleButton filterMidiNotesToggle{ "Filter Notes" };
     juce::Label midiInLabel{ "midiInLabel", "MIDI IN" };
@@ -11249,6 +11306,7 @@ private:
     int currentVolumeByChannel[17] { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 };
 
     std::atomic<bool> monitorEnabled { false };
+    std::atomic<bool> filterMidiProgramChangeEnabled { false };
     std::atomic<bool> filterMidiClockEnabled { true };
     std::atomic<bool> filterMidiNotesEnabled { true };
     bool isTabActive = false;
