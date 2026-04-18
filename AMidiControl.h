@@ -7410,7 +7410,7 @@ public:
 
         midiTransportLabel = addToList(new Label("player.midi.transport", {}));
         midiTransportLabel->setColour(Label::textColourId, juce::Colours::grey);
-        midiTransportLabel->setJustificationType(Justification::centredLeft);
+        midiTransportLabel->setJustificationType(Justification::centredRight);
         midiTransportLabel->setInterceptsMouseClicks(false, false);
         refreshMidiTransportLabel();
 
@@ -7478,6 +7478,42 @@ public:
                     sendProgramSelect(instrument);
                     sendEffects(instrument);
                 };
+
+            auto* muteToggle = addToList(new ToggleButton("M"));
+            channelMuteToggles[(size_t) i] = muteToggle;
+            muteToggle->setColour(ToggleButton::textColourId, Colours::white);
+            muteToggle->setTooltip("Mute channel during MIDI playback.");
+            muteToggle->onClick = [this, muteToggle, i]()
+                {
+                    midiPlayerSettings.mutedChannels[(size_t) (i + 1)] = muteToggle->getToggleState();
+                    saveMidiPlayerSettings();
+                };
+
+            auto* soloToggle = addToList(new ToggleButton("S"));
+            channelSoloToggles[(size_t) i] = soloToggle;
+            soloToggle->setColour(ToggleButton::textColourId, Colours::white);
+            soloToggle->setTooltip("Solo channel during MIDI playback.");
+            soloToggle->onClick = [this, soloToggle, i]()
+                {
+                    const int soloChannel = i + 1;
+                    if (soloToggle->getToggleState())
+                    {
+                        midiPlayerSettings.soloChannel = soloChannel;
+                        for (int idx = 0; idx < playerChannelCount; ++idx)
+                        {
+                            if (idx == i)
+                                continue;
+                            if (auto* other = channelSoloToggles[(size_t) idx])
+                                other->setToggleState(false, dontSendNotification);
+                        }
+                    }
+                    else if (midiPlayerSettings.soloChannel == soloChannel)
+                    {
+                        midiPlayerSettings.soloChannel = 0;
+                    }
+
+                    saveMidiPlayerSettings();
+                };
         }
 
         gPlayerTabCommitInstrument = [this](int ch, Instrument inst)
@@ -7517,36 +7553,45 @@ public:
     {
         const int margin = 10;
         const int soundModuleY = margin + 1;
+        const int soundModuleControlY = soundModuleY - 5;
         if (moduleLabel != nullptr)
-            moduleLabel->setBounds(getWidth() - 330, soundModuleY, 110, 30);
+            moduleLabel->setBounds(getWidth() - 330, soundModuleControlY, 110, 30);
         if (soundModuleButton != nullptr)
-            soundModuleButton->setBounds(getWidth() - 215, soundModuleY, 200, 30);
+            soundModuleButton->setBounds(getWidth() - 215, soundModuleControlY, 200, 30);
 
         const int metaLabelX = margin + 2;
         const int metaLabelY = soundModuleY + 1;
         const int metaLabelW = juce::jmax(140, getWidth() - 360);
         const int metaLabelH = 20;
+        const int transportLabelGap = 12;
+        const int transportLabelW = juce::jlimit(190, 320, metaLabelW / 3);
+        const int metadataLabelW = juce::jmax(120, metaLabelW - transportLabelW - transportLabelGap);
         if (midiMetadataLabel != nullptr)
-            midiMetadataLabel->setBounds(metaLabelX, metaLabelY, metaLabelW, metaLabelH);
+            midiMetadataLabel->setBounds(metaLabelX, metaLabelY, metadataLabelW, metaLabelH);
         if (midiTransportLabel != nullptr)
-            midiTransportLabel->setBounds(metaLabelX, metaLabelY + metaLabelH, metaLabelW, metaLabelH);
+            midiTransportLabel->setBounds(metaLabelX + metadataLabelW + transportLabelGap, metaLabelY, transportLabelW, metaLabelH);
 
-        const int groupHeight = 128;
-        const int channelsTop = metaLabelY + metaLabelH * 2 + 6;
+        const int groupHeight = 142;
+        const int channelsTop = metaLabelY + metaLabelH + 6 - 5;
         channelsGroup->setBounds(margin, channelsTop, getWidth() - margin * 2, groupHeight);
 
         const int channelButtonInsetX = 14;
-        const int channelLabelInsetY = 26;
+        const int channelLabelInsetY = 16;
         const int channelLabelHeight = 16;
         const int channelLabelToButtonGap = 4;
-        const int channelRowBottomPad = 8;
+        const int channelButtonToToggleGap = 2;
+        const int channelToggleHeight = 18;
+        const int channelRowBottomPad = 0;
         const int buttonGap = 4;
         const int availableWidth = channelsGroup->getWidth() - channelButtonInsetX * 2 - buttonGap * (playerChannelCount - 1);
         const int buttonWidth = juce::jmax(48, availableWidth / playerChannelCount);
         const int labelTop = channelsGroup->getY() + channelLabelInsetY;
         const int buttonTop = labelTop + channelLabelHeight + channelLabelToButtonGap;
-        const int buttonHeight = juce::jlimit(40, 56,
-            channelsGroup->getBottom() - channelRowBottomPad - buttonTop);
+        const int buttonHeight = juce::jlimit(28, 56,
+            channelsGroup->getBottom() - channelRowBottomPad - channelToggleHeight - channelButtonToToggleGap - buttonTop);
+        const int toggleTop = buttonTop + buttonHeight + channelButtonToToggleGap;
+        const int channelToggleGap = 4;
+        const int toggleWidth = juce::jmax(20, (buttonWidth - channelToggleGap) / 2);
 
         for (int i = 0; i < playerChannelCount; ++i)
         {
@@ -7555,6 +7600,10 @@ public:
                 lbl->setBounds(colX, labelTop, buttonWidth, channelLabelHeight);
             if (auto* button = channelButtons[(size_t) i])
                 button->setBounds(colX, buttonTop, buttonWidth, buttonHeight);
+            if (auto* muteToggle = channelMuteToggles[(size_t) i])
+                muteToggle->setBounds(colX, toggleTop, toggleWidth, channelToggleHeight);
+            if (auto* soloToggle = channelSoloToggles[(size_t) i])
+                soloToggle->setBounds(colX + buttonWidth - toggleWidth, toggleTop, toggleWidth, channelToggleHeight);
         }
 
         static constexpr int kPlayerVoiceEditBtnW = 85;
@@ -7562,34 +7611,35 @@ public:
 
         const int editsWidth = 190;
         const int editsHeight = 90;
-        const int editsY = channelsGroup->getBottom();
-        const int voiceEditButtonY = editsY + 30;
+        const int voiceEditsY = channelsGroup->getBottom();
+        const int voiceEditButtonY = voiceEditsY + 30;
+        const int playbackY = channelsGroup->getBottom();
+        const int playbackButtonY = playbackY + 30;
 
-        voiceEditsGroup->setBounds(margin, editsY, editsWidth, editsHeight);
+        voiceEditsGroup->setBounds(margin, voiceEditsY, editsWidth, editsHeight);
         soundsButton->setBounds(margin + 10, voiceEditButtonY, kPlayerVoiceEditBtnW, kPlayerVoiceEditBtnH);
         effectsButton->setBounds(margin + 95, voiceEditButtonY, kPlayerVoiceEditBtnW, kPlayerVoiceEditBtnH);
 
         const int playbackX = voiceEditsGroup->getRight() + 10;
-        const int playbackY = editsY;
         const int playbackHeight = editsHeight;
         const int playbackWidth = juce::jmax(260, getWidth() - playbackX - margin);
         playbackGroup->setBounds(playbackX, playbackY, playbackWidth, playbackHeight);
 
         auto playbackArea = playbackGroup->getBounds().reduced(10, 24);
-        const int alignPlaybackRowSkip = juce::jmax(0, voiceEditButtonY - playbackArea.getY());
+        const int alignPlaybackRowSkip = juce::jmax(0, playbackButtonY - playbackArea.getY());
         playbackArea.removeFromTop(alignPlaybackRowSkip);
 
         auto controlRow = playbackArea.removeFromTop(kPlayerVoiceEditBtnH).reduced(2, 0);
         const int gap = 4;
 
         int midiBtnX = controlRow.getX();
-        loadMidiButton->setBounds(midiBtnX, voiceEditButtonY, kPlayerVoiceEditBtnW, kPlayerVoiceEditBtnH);
+        loadMidiButton->setBounds(midiBtnX, playbackButtonY, kPlayerVoiceEditBtnW, kPlayerVoiceEditBtnH);
         midiBtnX += kPlayerVoiceEditBtnW + gap;
-        startMidiButton->setBounds(midiBtnX, voiceEditButtonY, kPlayerVoiceEditBtnW, kPlayerVoiceEditBtnH);
+        startMidiButton->setBounds(midiBtnX, playbackButtonY, kPlayerVoiceEditBtnW, kPlayerVoiceEditBtnH);
         midiBtnX += kPlayerVoiceEditBtnW + gap;
-        stopMidiButton->setBounds(midiBtnX, voiceEditButtonY, kPlayerVoiceEditBtnW, kPlayerVoiceEditBtnH);
+        stopMidiButton->setBounds(midiBtnX, playbackButtonY, kPlayerVoiceEditBtnW, kPlayerVoiceEditBtnH);
         midiBtnX += kPlayerVoiceEditBtnW + gap;
-        importMidiButton->setBounds(midiBtnX, voiceEditButtonY, kPlayerVoiceEditBtnW, kPlayerVoiceEditBtnH);
+        importMidiButton->setBounds(midiBtnX, playbackButtonY, kPlayerVoiceEditBtnW, kPlayerVoiceEditBtnH);
         midiBtnX += kPlayerVoiceEditBtnW + gap;
 
         {
@@ -7603,17 +7653,17 @@ public:
                 statusW = juce::jmax(60, w - statusGap - minForToggles);
 
             auto statusRect = r.removeFromRight(statusW);
-            playbackStatusLabel->setBounds(statusRect.getX(), voiceEditButtonY, statusRect.getWidth(), kPlayerVoiceEditBtnH);
+            playbackStatusLabel->setBounds(statusRect.getX(), playbackButtonY, statusRect.getWidth(), kPlayerVoiceEditBtnH);
             r.removeFromRight(statusGap);
 
             const int toggleGap = 6;
             const int tRem = juce::jmax(0, r.getWidth() - toggleGap);
             const int toggleW = tRem / 2;
             auto t0 = r.removeFromLeft(toggleW);
-            autoLoadLastMidiToggle->setBounds(t0.getX(), voiceEditButtonY, t0.getWidth(), kPlayerVoiceEditBtnH);
+            autoLoadLastMidiToggle->setBounds(t0.getX(), playbackButtonY, t0.getWidth(), kPlayerVoiceEditBtnH);
             r.removeFromLeft(toggleGap);
             auto t1 = r;
-            remapProgramChangeToggle->setBounds(t1.getX(), voiceEditButtonY, t1.getWidth(), kPlayerVoiceEditBtnH);
+            remapProgramChangeToggle->setBounds(t1.getX(), playbackButtonY, t1.getWidth(), kPlayerVoiceEditBtnH);
         }
     }
 
@@ -7683,8 +7733,12 @@ private:
     bool isPlaybackMutedForMessage(const juce::MidiMessage& message) const
     {
         const int channel = message.getChannel();
-        if (channel < 1 || channel > 16)
+        if (channel < 1 || channel > playerChannelCount)
             return false;
+
+        const int soloChannel = juce::jlimit(0, playerChannelCount, midiPlayerSettings.soloChannel);
+        if (soloChannel > 0 && channel != soloChannel)
+            return true;
 
         return midiPlayerSettings.mutedChannels[static_cast<size_t>(channel)];
     }
@@ -8416,6 +8470,7 @@ private:
 
         autoLoadLastMidiToggle->setToggleState(midiPlayerSettings.autoLoadLastMidiOnStartup, dontSendNotification);
         remapProgramChangeToggle->setToggleState(midiPlayerSettings.enableProgramChangeRemap, dontSendNotification);
+        syncMuteSoloTogglesFromSettings();
     }
 
     void saveMidiPlayerSettings()
@@ -8423,6 +8478,18 @@ private:
         juce::String error;
         if (!midiPlayerSettings.save(error) && error.isNotEmpty())
             playbackStatusLabel->setText(error, dontSendNotification);
+    }
+
+    void syncMuteSoloTogglesFromSettings()
+    {
+        const int soloChannel = juce::jlimit(0, playerChannelCount, midiPlayerSettings.soloChannel);
+        for (int i = 0; i < playerChannelCount; ++i)
+        {
+            if (auto* muteToggle = channelMuteToggles[(size_t) i])
+                muteToggle->setToggleState(midiPlayerSettings.mutedChannels[(size_t) (i + 1)], dontSendNotification);
+            if (auto* soloToggle = channelSoloToggles[(size_t) i])
+                soloToggle->setToggleState(soloChannel == (i + 1), dontSendNotification);
+        }
     }
 
     void maybeAutoLoadLastMidi()
@@ -8634,6 +8701,8 @@ private:
     Label* midiTransportLabel = nullptr;
     std::array<Label*, playerChannelCount> channelLabels {};
     std::array<VoiceButton*, playerChannelCount> channelButtons {};
+    std::array<ToggleButton*, playerChannelCount> channelMuteToggles {};
+    std::array<ToggleButton*, playerChannelCount> channelSoloToggles {};
     std::array<Instrument, playerChannelCount> channelInstruments {};
     std::array<bool, playerChannelCount> playerChannelConfigured {};
     int selectedChannelIdx = -1;

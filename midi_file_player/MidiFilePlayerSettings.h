@@ -9,6 +9,7 @@ struct MidiFilePlayerSettings
     bool autoLoadLastMidiOnStartup = true;
     bool enableProgramChangeRemap = true;
     std::array<bool, 17> mutedChannels {};
+    int soloChannel = 0;
     juce::String selectedOutputIdentifier;
     juce::String selectedInputIdentifier;
 
@@ -43,6 +44,7 @@ struct MidiFilePlayerSettings
         autoLoadLastMidiOnStartup = true;
         enableProgramChangeRemap = true;
         mutedChannels.fill(false);
+        soloChannel = 0;
 
         const auto settingsFile = getSettingsJsonFile();
         if (!settingsFile.existsAsFile())
@@ -79,6 +81,10 @@ struct MidiFilePlayerSettings
             }
         }
 
+        const auto soloChannelVar = object->getProperty("soloChannel");
+        if (soloChannelVar.isInt() || soloChannelVar.isInt64() || soloChannelVar.isDouble())
+            soloChannel = juce::jlimit(0, 16, static_cast<int>(soloChannelVar));
+
         loadPersistedDeviceSelection();
         return true;
     }
@@ -101,6 +107,7 @@ struct MidiFilePlayerSettings
         for (int channel = 1; channel <= 16; ++channel)
             mutedArray.add(mutedChannels[static_cast<size_t>(channel)]);
         settingsObject->setProperty("mutedChannels", mutedArray);
+        settingsObject->setProperty("soloChannel", juce::jlimit(0, 16, soloChannel));
 
         const auto settingsFile = getSettingsJsonFile();
         settingsFile.getParentDirectory().createDirectory();
@@ -188,5 +195,9 @@ private:
                     mutedChannels[static_cast<size_t>(i + 1)] = static_cast<bool>(entry);
             }
         }
+
+        const auto soloChannelVar = object->getProperty("soloChannel");
+        if (soloChannelVar.isInt() || soloChannelVar.isInt64() || soloChannelVar.isDouble())
+            soloChannel = juce::jlimit(0, 16, static_cast<int>(soloChannelVar));
     }
 };
