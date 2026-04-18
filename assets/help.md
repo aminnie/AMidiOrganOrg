@@ -129,6 +129,13 @@ Contact the developer for additional module support.
   - Uses `merged = clamp(round(fileValue * stripValue / 127.0))`.
   - Merges `CC1`, `CC7`, `CC11`, `CC71`, `CC72`, `CC73`, `CC74`, `CC91`, `CC93`.
   - Keeps `CC10` (`Pan`) passthrough (not scaled).
+- Player profile workflow:
+  - `Profile` dropdown lists saved profiles for the loaded MIDI file.
+  - `Save Profile` updates active profile values.
+  - `Save Profile As` creates a new profile.
+  - `Revert Profile` reloads the active profile.
+  - Dirty profile switches prompt to save/discard/cancel.
+- Profiles are saved as sidecar files under `Documents/AMidiOrgan/configs/player_profiles/` and do not rewrite the source `.mid` file.
 
 ### Help
 

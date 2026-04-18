@@ -387,7 +387,8 @@ How to use:
 2. Select one or more channel strips (`Ch 1..16`) and configure voice/effects for those channels.
 3. Optional: enable `Enable Program Change remap` if lookup remapping is desired.
 4. Optional: enable `Scale file CCs with Player strip` to blend file CC automation with strip trims.
-5. Start playback.
+5. Optional: choose an existing profile in `Profile` or create one with `Save Profile As`.
+6. Start playback.
 
 Behavior:
 
@@ -398,6 +399,12 @@ Behavior:
   - `merged = clamp(round(fileValue * stripValue / 127.0))`
 - Merged CC list: `CC1`, `CC7`, `CC11`, `CC71`, `CC72`, `CC73`, `CC74`, `CC91`, `CC93`.
 - `CC10` (`Pan`) remains passthrough (not scaled) to avoid incorrect pan-center behavior.
+- Profile workflow:
+  - `Save Profile` updates the active profile.
+  - `Save Profile As` creates a new profile entry.
+  - `Revert Profile` reloads the active profile from disk.
+  - Profile switch while dirty prompts `Save`, `Discard`, or `Cancel`.
+- Profiles are sidecar files (your source `.mid` is unchanged during normal playback).
 
 Expected result:
 

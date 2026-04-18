@@ -90,6 +90,8 @@ Primary implementation files:
   - Program/Bank replacement on configured channels (`MSB`, `LSB`, `PC`)
   - Optional Program Change lookup remap (`ProgramChangeRemapper`)
   - Optional CC merge against Player strip trims (`PlayerStripCcMerge`)
+  - ValueTree-backed song profiles (sidecar JSON) for per-MIDI/per-module Player state
+  - Profile index + last-used mapping for auto-load on MIDI open
   - Mute/Solo gating reused from playback routing path
 - **Monitor**
   - Outgoing MIDI monitor with enable/disable capture
@@ -115,6 +117,11 @@ Primary implementation files:
   - optional Player-strip CC merge second (selected controllers only)
   - optional generic Program Change remap lookup third
   - default passthrough last
+- Player profile auto-load order:
+  - build MIDI identity key on file load
+  - query profile index for matching entries
+  - apply last-used profile when available
+  - preserve current state when no profile exists
 - Output monitoring hook captures final routed messages
 - When startup-monitor config is enabled, the outgoing monitor hook is armed during startup before Start-tab initialization completes
 
@@ -250,6 +257,8 @@ User data root: `Documents/AMidiOrgan`
 - `configs/midi_sticky_devices.json`: Last MIDI in/out selections
 - `configs/last_session.json`: Last loaded panel/config
 - `configs/midi_file_settings.json`: Player tab MIDI-file settings (autoload, remap, mute/solo, Player-strip CC merge toggle)
+- `configs/player_profiles/`: Per-profile sidecar files (`<profileId>.playerprofile.json`)
+- `configs/player_profiles_index.json`: Profile metadata index + `lastUsedByMidiKey`
 - `configs/ui_profiles.json`: UI profile catalog and optional `keyboardRectOverrides`
 - `configs/instrument_modules.json`: Managed module catalog (module index and metadata)
 - `instruments/*.json`: Sound module catalogs
@@ -263,6 +272,8 @@ Config persistence notes:
 - Config root also persists `presetMidiPcInputChannel` and `presetMidiPcValue` for external Program Change preset-next triggering.
 - Config root also persists `uiProfileId` for fixed-size profile selection.
 - MIDI-file settings persist `enablePlayerStripCcScaling` (default `false` when missing for backward compatibility).
+- Player profile schema root: `playerSongProfile` with `midiRef`, `moduleRef`, `playerFlags`, `channels`, and optional `uiState`.
+- Player profile schema version starts at `1`; missing/new properties follow defensive defaults for backward compatibility.
 - Each `group` child also persists SysEx-through settings:
   - `sysexThrough` (bool, default `false`)
   - `sysexInputIdentifier` (MIDI input device identifier, default empty)

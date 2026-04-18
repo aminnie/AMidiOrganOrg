@@ -212,6 +212,12 @@ On startup, the app also attempts to auto-restore the last used panel and config
 - The following file CCs are scaled: `CC1`, `CC7`, `CC11`, `CC71`, `CC72`, `CC73`, `CC74`, `CC91`, `CC93`.
 - `CC10` (`Pan`) is intentionally passed through unchanged during this merge mode to avoid incorrect left/right behavior from naive 0..127 scaling around pan center.
 - Non-controller MIDI events continue through the normal playback path unchanged.
+- Player now supports per-song profile workflows:
+  - `Profile` selector + `Save Profile`, `Save Profile As`, `Revert Profile`.
+  - Profiles are sidecar data (the `.mid` file is not rewritten during normal playback).
+  - Profiles capture per-channel voice/effect strips, configured-channel flags, module selection, mute/solo state, and Player remap/merge toggles.
+  - Profile files are stored under `Documents/AMidiOrgan/configs/player_profiles/`.
+  - Profile index and last-used mapping are stored in `Documents/AMidiOrgan/configs/player_profiles_index.json`.
 
 #### Help
 

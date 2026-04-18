@@ -6,6 +6,9 @@ using namespace juce;
 #include "../AMidiDevices.h"
 #include "../AMidiInstruments.h"
 #include "../AMidiControl.h"
+#include "../midi_file_player/PlayerMidiIdentity.h"
+#include "../midi_file_player/PlayerSongProfile.h"
+#include "../midi_file_player/PlayerSongProfileStore.h"
 #include "../midi_file_player/PlayerStripCcMerge.h"
 
 #include <iostream>
@@ -39,6 +42,16 @@ namespace
         if (actual != expected)
         {
             details = label + " expected '" + expected.toStdString() + "' but got '" + actual.toStdString() + "'";
+            return false;
+        }
+        return true;
+    }
+
+    bool expectTrue(bool value, const std::string& label, std::string& details)
+    {
+        if (!value)
+        {
+            details = label + " expected true but was false";
             return false;
         }
         return true;
@@ -411,6 +424,86 @@ namespace
         }
 
         return true;
+    }
+
+    bool runPlayerSongProfileCodecRoundtrip(std::string& details)
+    {
+        PlayerSongProfile profile;
+        profile.profileId = "profile-1";
+        profile.displayName = "Song A - Integra";
+        profile.createdUtc = "2026-04-18T10:00:00Z";
+        profile.updatedUtc = "2026-04-18T10:10:00Z";
+        profile.midiIdentity.midiKey = "songA|123|456";
+        profile.midiIdentity.fileName = "songA.mid";
+        profile.midiIdentity.originalPath = "C:/temp/songA.mid";
+        profile.moduleIdx = 2;
+        profile.moduleDisplayName = "Integra-7";
+        profile.enableProgramChangeRemap = true;
+        profile.enablePlayerStripCcScaling = true;
+        profile.soloChannel = 3;
+        profile.mutedChannels[(size_t) 5] = true;
+        profile.channels[0].midiChannel = 1;
+        profile.channels[0].configured = true;
+        profile.channels[0].voice = "Organ 1";
+        profile.channels[0].program = 42;
+        profile.channels[0].vol = 96;
+        profile.selectedChannelIdx = 0;
+
+        const auto json = PlayerSongProfileCodec::toJsonString(profile);
+        PlayerSongProfile decoded;
+        juce::String error;
+        if (!PlayerSongProfileCodec::fromJsonString(json, decoded, error))
+        {
+            details = "fromJsonString failed: " + error.toStdString();
+            return false;
+        }
+
+        if (!expectEqualStr(decoded.profileId, profile.profileId, "profileId roundtrip", details)
+            || !expectEqualStr(decoded.displayName, profile.displayName, "displayName roundtrip", details)
+            || !expectEqual(decoded.moduleIdx, profile.moduleIdx, "moduleIdx roundtrip", details)
+            || !expectEqual(decoded.soloChannel, profile.soloChannel, "soloChannel roundtrip", details)
+            || !expectEqual(decoded.channels[0].program, profile.channels[0].program, "program roundtrip", details)
+            || !expectEqual(decoded.channels[0].vol, profile.channels[0].vol, "vol roundtrip", details))
+        {
+            return false;
+        }
+
+        if (!expectTrue(decoded.mutedChannels[(size_t) 5], "muted channel 5 roundtrip", details))
+            return false;
+
+        return true;
+    }
+
+    bool runPlayerSongProfilesIndexRoundtrip(std::string& details)
+    {
+        PlayerSongProfilesIndex index;
+        index.schemaVersion = 1;
+        PlayerSongProfileIndexEntry entry;
+        entry.profileId = "p1";
+        entry.displayName = "Song A - Deebach";
+        entry.midiKey = "songA|1|2";
+        entry.moduleDisplayName = "Deebach";
+        entry.profileFile = "p1.playerprofile.json";
+        entry.updatedUtc = "2026-04-18T11:00:00Z";
+        index.entries.push_back(entry);
+        index.lastUsedByMidiKey[entry.midiKey] = entry.profileId;
+
+        const auto encoded = PlayerSongProfileStore::toVar(index);
+        const auto decoded = PlayerSongProfileStore::fromVar(encoded);
+        if (!expectEqual((int) decoded.entries.size(), 1, "decoded index entries size", details))
+            return false;
+        if (!expectEqualStr(decoded.entries[0].profileId, "p1", "decoded entry profileId", details))
+            return false;
+        if (!expectEqualStr(PlayerSongProfileStore::getLastUsedProfileIdForMidiKey(decoded, entry.midiKey),
+                            "p1",
+                            "lastUsedByMidiKey lookup",
+                            details))
+        {
+            return false;
+        }
+
+        const auto filtered = PlayerSongProfileStore::getProfilesForMidiKey(decoded, entry.midiKey);
+        return expectEqual((int) filtered.size(), 1, "filtered profiles for midi key", details);
     }
 
     bool runModuleIdxBaselineDiffers(std::string& details)
@@ -2559,6 +2652,16 @@ int main()
     {
         std::string details;
         results.push_back({ "Player strip CC merge helper math and whitelist behavior", runPlayerStripCcMergeHelpers(details), details });
+    }
+
+    {
+        std::string details;
+        results.push_back({ "Player song profile codec roundtrip preserves key fields", runPlayerSongProfileCodecRoundtrip(details), details });
+    }
+
+    {
+        std::string details;
+        results.push_back({ "Player profiles index roundtrip and midi-key lookup", runPlayerSongProfilesIndexRoundtrip(details), details });
     }
 
     {

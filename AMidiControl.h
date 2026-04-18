@@ -15,6 +15,9 @@
 #include "AMidiRotors.h"
 #include "midi_file_player/MidiFilePlaybackEngine.h"
 #include "midi_file_player/MidiFilePlayerSettings.h"
+#include "midi_file_player/PlayerMidiIdentity.h"
+#include "midi_file_player/PlayerSongProfile.h"
+#include "midi_file_player/PlayerSongProfileStore.h"
 #include "midi_file_player/PlayerStripCcMerge.h"
 #include "midi_file_player/ProgramChangeRemapper.h"
 
@@ -7294,8 +7297,38 @@ public:
 
                         playerModuleIdx = result - 1;
                         soundModuleButton->setButtonText(instrumentmodules->getDisplayName(playerModuleIdx));
+                        markPlayerProfileDirty();
                     });
             };
+
+        profileLabel = addToList(new Label("player.profile.label", "Profile"));
+        profileLabel->setColour(Label::textColourId, Colours::white);
+        profileLabel->setJustificationType(Justification::centredRight);
+
+        profileComboBox = addToList(new ComboBox("player.profile.combo"));
+        profileComboBox->setTooltip("Select a saved Player profile for the loaded MIDI file.");
+        profileComboBox->onChange = [this]() { onProfileSelectionChangedFromUi(); };
+
+        saveProfileButton = addToList(new TextButton("Save Profile"));
+        saveProfileButton->setColour(TextButton::textColourOffId, Colours::black);
+        saveProfileButton->setColour(TextButton::textColourOnId, Colours::black);
+        saveProfileButton->setColour(TextButton::buttonColourId, juce::Colours::lightgrey);
+        saveProfileButton->setColour(TextButton::buttonOnColourId, juce::Colours::lightgrey);
+        saveProfileButton->onClick = [this]() { saveCurrentProfile(false); };
+
+        saveProfileAsButton = addToList(new TextButton("Save Profile As"));
+        saveProfileAsButton->setColour(TextButton::textColourOffId, Colours::black);
+        saveProfileAsButton->setColour(TextButton::textColourOnId, Colours::black);
+        saveProfileAsButton->setColour(TextButton::buttonColourId, juce::Colours::lightgrey);
+        saveProfileAsButton->setColour(TextButton::buttonOnColourId, juce::Colours::lightgrey);
+        saveProfileAsButton->onClick = [this]() { saveCurrentProfile(true); };
+
+        revertProfileButton = addToList(new TextButton("Revert Profile"));
+        revertProfileButton->setColour(TextButton::textColourOffId, Colours::black);
+        revertProfileButton->setColour(TextButton::textColourOnId, Colours::black);
+        revertProfileButton->setColour(TextButton::buttonColourId, juce::Colours::lightgrey);
+        revertProfileButton->setColour(TextButton::buttonOnColourId, juce::Colours::lightgrey);
+        revertProfileButton->onClick = [this]() { revertCurrentProfile(); };
 
         channelsGroup = addToList(new GroupComponent("player.channels", "Midi Channels"));
         channelsGroup->setColour(GroupComponent::outlineColourId, Colours::slategrey);
@@ -7389,6 +7422,7 @@ public:
             {
                 midiPlayerSettings.autoLoadLastMidiOnStartup = autoLoadLastMidiToggle->getToggleState();
                 saveMidiPlayerSettings();
+                markPlayerProfileDirty();
             };
 
         remapProgramChangeToggle = addToList(new ToggleButton("Enable Program Change remap"));
@@ -7397,6 +7431,7 @@ public:
             {
                 midiPlayerSettings.enableProgramChangeRemap = remapProgramChangeToggle->getToggleState();
                 saveMidiPlayerSettings();
+                markPlayerProfileDirty();
             };
 
         playerStripCcScalingToggle = addToList(new ToggleButton("Scale file CCs with Player strip"));
@@ -7405,6 +7440,7 @@ public:
             {
                 midiPlayerSettings.enablePlayerStripCcScaling = playerStripCcScalingToggle->getToggleState();
                 saveMidiPlayerSettings();
+                markPlayerProfileDirty();
             };
 
         playbackStatusLabel = addToList(new Label("player.playback.status", "Ready."));
@@ -7486,6 +7522,7 @@ public:
 
                     sendProgramSelect(instrument);
                     sendEffects(instrument);
+                    markPlayerProfileDirty();
                 };
 
             auto* muteToggle = addToList(new ToggleButton("M"));
@@ -7496,6 +7533,7 @@ public:
                 {
                     midiPlayerSettings.mutedChannels[(size_t) (i + 1)] = muteToggle->getToggleState();
                     saveMidiPlayerSettings();
+                    markPlayerProfileDirty();
                 };
 
             auto* soloToggle = addToList(new ToggleButton("S"));
@@ -7522,6 +7560,7 @@ public:
                     }
 
                     saveMidiPlayerSettings();
+                    markPlayerProfileDirty();
                 };
         }
 
@@ -7540,13 +7579,17 @@ public:
                         }
                         sendProgramSelect(inst);
                         sendEffects(inst);
+                        markPlayerProfileDirty();
                     });
             };
 
         loadProgramChangeRemapper();
         loadMidiPlayerSettings();
+        loadPlayerProfilesIndex();
         seedMidiLibraryFromDocsIfMissing();
         maybeAutoLoadLastMidi();
+        refreshProfileCombo();
+        updateProfileButtonsState();
         updatePlaybackGroupTitle();
         updateTransportButtons();
     }
@@ -7563,14 +7606,47 @@ public:
         const int margin = 10;
         const int soundModuleY = margin + 1;
         const int soundModuleControlY = soundModuleY - 5;
+        const int topControlH = 26;
+        const int topGap = 6;
+        const int profileButtonW = 98;
+        const int revertButtonW = 92;
+        const int profileLabelW = 54;
+        const int moduleLabelW = 98;
+        const int moduleButtonW = 170;
+
+        auto topRow = juce::Rectangle<int>(margin, soundModuleControlY, juce::jmax(100, getWidth() - margin * 2), topControlH);
+        auto moduleButtonRect = topRow.removeFromRight(moduleButtonW);
+        topRow.removeFromRight(topGap);
+        auto moduleLabelRect = topRow.removeFromRight(moduleLabelW);
+        topRow.removeFromRight(topGap);
+        auto revertRect = topRow.removeFromRight(revertButtonW);
+        topRow.removeFromRight(topGap);
+        auto saveAsRect = topRow.removeFromRight(profileButtonW);
+        topRow.removeFromRight(topGap);
+        auto saveRect = topRow.removeFromRight(profileButtonW);
+        topRow.removeFromRight(topGap);
+        auto profileComboRect = topRow;
+        auto profileLabelRect = profileComboRect.removeFromLeft(profileLabelW);
+        profileComboRect.removeFromLeft(topGap);
+
+        if (profileLabel != nullptr)
+            profileLabel->setBounds(profileLabelRect);
+        if (profileComboBox != nullptr)
+            profileComboBox->setBounds(profileComboRect);
+        if (saveProfileButton != nullptr)
+            saveProfileButton->setBounds(saveRect);
+        if (saveProfileAsButton != nullptr)
+            saveProfileAsButton->setBounds(saveAsRect);
+        if (revertProfileButton != nullptr)
+            revertProfileButton->setBounds(revertRect);
         if (moduleLabel != nullptr)
-            moduleLabel->setBounds(getWidth() - 330, soundModuleControlY, 110, 30);
+            moduleLabel->setBounds(moduleLabelRect);
         if (soundModuleButton != nullptr)
-            soundModuleButton->setBounds(getWidth() - 215, soundModuleControlY, 200, 30);
+            soundModuleButton->setBounds(moduleButtonRect);
 
         const int metaLabelX = margin + 2;
-        const int metaLabelY = soundModuleY + 1;
-        const int metaLabelW = juce::jmax(140, getWidth() - 360);
+        const int metaLabelY = soundModuleControlY + topControlH + 2;
+        const int metaLabelW = juce::jmax(140, getWidth() - margin * 2);
         const int metaLabelH = 20;
         const int transportLabelGap = 12;
         const int transportLabelW = juce::jlimit(190, 320, metaLabelW / 3);
@@ -7691,6 +7767,338 @@ private:
             soundsButton->setEnabled(true);
         if (effectsButton != nullptr)
             effectsButton->setEnabled(true);
+    }
+
+    juce::String makeDefaultProfileDisplayName() const
+    {
+        const auto midiName = loadedMidiFile.existsAsFile()
+            ? loadedMidiFile.getFileNameWithoutExtension()
+            : juce::String("Player");
+        const auto moduleName = instrumentmodules->getDisplayName(playerModuleIdx).trim();
+        return moduleName.isNotEmpty() ? (midiName + " - " + moduleName) : midiName;
+    }
+
+    void loadPlayerProfilesIndex()
+    {
+        juce::String error;
+        if (!PlayerSongProfileStore::loadIndex(playerProfilesIndex, error) && error.isNotEmpty())
+            playbackStatusLabel->setText("Player profile index load failed: " + error, dontSendNotification);
+    }
+
+    bool savePlayerProfilesIndex()
+    {
+        juce::String error;
+        if (!PlayerSongProfileStore::saveIndex(playerProfilesIndex, error))
+        {
+            if (error.isNotEmpty())
+                playbackStatusLabel->setText("Player profile index save failed: " + error, dontSendNotification);
+            return false;
+        }
+        return true;
+    }
+
+    PlayerSongProfile captureProfileFromCurrentState(const juce::String& profileId,
+                                                     const juce::String& displayName,
+                                                     const juce::String& createdUtc)
+    {
+        PlayerSongProfile profile;
+        profile.schemaVersion = PlayerSongProfile::schemaVersionCurrent;
+        profile.profileId = profileId;
+        profile.displayName = displayName;
+        profile.createdUtc = createdUtc;
+        profile.updatedUtc = PlayerSongProfileCodec::utcNowIso8601();
+        profile.midiIdentity = currentMidiIdentity;
+        profile.moduleIdx = playerModuleIdx;
+        profile.moduleDisplayName = instrumentmodules->getDisplayName(playerModuleIdx);
+        profile.enableProgramChangeRemap = midiPlayerSettings.enableProgramChangeRemap;
+        profile.enablePlayerStripCcScaling = midiPlayerSettings.enablePlayerStripCcScaling;
+        profile.soloChannel = midiPlayerSettings.soloChannel;
+        profile.mutedChannels = midiPlayerSettings.mutedChannels;
+        profile.selectedChannelIdx = selectedChannelIdx;
+
+        for (int idx = 0; idx < playerChannelCount; ++idx)
+        {
+            auto source = channelInstruments[(size_t) idx];
+            auto& target = profile.channels[(size_t) idx];
+            target.midiChannel = idx + 1;
+            target.configured = playerChannelConfigured[(size_t) idx];
+            target.voice = source.getVoice();
+            target.category = source.getCategory();
+            target.msb = source.getMSB();
+            target.lsb = source.getLSB();
+            target.program = source.getFont();
+            target.vol = source.getVol();
+            target.exp = source.getExp();
+            target.rev = source.getRev();
+            target.cho = source.getCho();
+            target.mod = source.getMod();
+            target.tim = source.getTim();
+            target.atk = source.getAtk();
+            target.rel = source.getRel();
+            target.bri = source.getBri();
+            target.pan = source.getPan();
+        }
+        return profile;
+    }
+
+    void applyProfileToCurrentState(const PlayerSongProfile& profile)
+    {
+        applyingPlayerProfileState = true;
+
+        playerModuleIdx = juce::jlimit(0, juce::jmax(0, instrumentmodules->getNumModules() - 1), profile.moduleIdx);
+        soundModuleButton->setButtonText(instrumentmodules->getDisplayName(playerModuleIdx));
+
+        midiPlayerSettings.enableProgramChangeRemap = profile.enableProgramChangeRemap;
+        midiPlayerSettings.enablePlayerStripCcScaling = profile.enablePlayerStripCcScaling;
+        midiPlayerSettings.soloChannel = juce::jlimit(0, 16, profile.soloChannel);
+        midiPlayerSettings.mutedChannels = profile.mutedChannels;
+        remapProgramChangeToggle->setToggleState(midiPlayerSettings.enableProgramChangeRemap, dontSendNotification);
+        playerStripCcScalingToggle->setToggleState(midiPlayerSettings.enablePlayerStripCcScaling, dontSendNotification);
+        syncMuteSoloTogglesFromSettings();
+
+        for (int idx = 0; idx < playerChannelCount; ++idx)
+        {
+            const auto& source = profile.channels[(size_t) idx];
+            Instrument instrument;
+            instrument.setVoice(source.voice.isNotEmpty() ? source.voice : ("Ch " + juce::String(idx + 1)));
+            instrument.setCategory(source.category);
+            instrument.setChannel(idx + 1);
+            instrument.setMSB(source.msb);
+            instrument.setLSB(source.lsb);
+            instrument.setFont(source.program);
+            instrument.setVol(source.vol);
+            instrument.setExp(source.exp);
+            instrument.setRev(source.rev);
+            instrument.setCho(source.cho);
+            instrument.setMod(source.mod);
+            instrument.setTim(source.tim);
+            instrument.setAtk(source.atk);
+            instrument.setRel(source.rel);
+            instrument.setBri(source.bri);
+            instrument.setPan(source.pan);
+
+            channelInstruments[(size_t) idx] = instrument;
+            playerChannelConfigured[(size_t) idx] = source.configured;
+            if (auto* button = channelButtons[(size_t) idx])
+            {
+                button->setInstrument(instrument);
+                button->setButtonText(instrument.getVoice());
+                button->setToggleState(selectedChannelIdx == idx, dontSendNotification);
+            }
+        }
+
+        selectedChannelIdx = juce::jlimit(-1, playerChannelCount - 1, profile.selectedChannelIdx);
+        if (selectedChannelIdx >= 0)
+            enableVoiceEditButtons();
+
+        if (selectedChannelIdx >= 0 && selectedChannelIdx < playerChannelCount)
+        {
+            auto instrument = channelInstruments[(size_t) selectedChannelIdx];
+            instrument.setChannel(selectedChannelIdx + 1);
+            sendProgramSelect(instrument);
+            sendEffects(instrument);
+        }
+
+        applyingPlayerProfileState = false;
+        markPlayerProfileDirty(false);
+        updateProfileButtonsState();
+    }
+
+    bool loadProfileByIdAndApply(const juce::String& profileId)
+    {
+        PlayerSongProfile profile;
+        juce::String error;
+        if (!PlayerSongProfileStore::loadProfileById(profileId, profile, error))
+        {
+            if (error.isNotEmpty())
+                playbackStatusLabel->setText("Profile load failed: " + error, dontSendNotification);
+            return false;
+        }
+
+        applyProfileToCurrentState(profile);
+        activeProfileId = profile.profileId;
+        activeProfileDisplayName = profile.displayName;
+        activeProfileCreatedUtc = profile.createdUtc;
+        PlayerSongProfileStore::setLastUsedProfileIdForMidiKey(playerProfilesIndex, currentMidiKey, activeProfileId);
+        savePlayerProfilesIndex();
+        refreshProfileCombo();
+        return true;
+    }
+
+    void refreshProfileCombo()
+    {
+        visibleProfilesForCurrentMidi = PlayerSongProfileStore::getProfilesForMidiKey(playerProfilesIndex, currentMidiKey);
+        suppressProfileComboCallback = true;
+        profileComboBox->clear(dontSendNotification);
+        profileComboBox->addItem("(No profile)", 1);
+        int itemId = 2;
+        for (const auto& entry : visibleProfilesForCurrentMidi)
+        {
+            auto label = entry.displayName;
+            if (entry.moduleDisplayName.isNotEmpty())
+                label << " [" << entry.moduleDisplayName << "]";
+            profileComboBox->addItem(label, itemId++);
+        }
+
+        int selectedId = 1;
+        if (activeProfileId.isNotEmpty())
+        {
+            for (int i = 0; i < (int) visibleProfilesForCurrentMidi.size(); ++i)
+            {
+                if (visibleProfilesForCurrentMidi[(size_t) i].profileId == activeProfileId)
+                {
+                    selectedId = i + 2;
+                    break;
+                }
+            }
+        }
+        profileComboBox->setSelectedId(selectedId, dontSendNotification);
+        suppressProfileComboCallback = false;
+        updateProfileButtonsState();
+    }
+
+    void updateProfileButtonsState()
+    {
+        const bool canUseProfiles = hasLoadedPlayableMidi && loadedMidiFile.existsAsFile();
+        profileComboBox->setEnabled(canUseProfiles);
+        saveProfileButton->setEnabled(canUseProfiles);
+        saveProfileAsButton->setEnabled(canUseProfiles);
+        revertProfileButton->setEnabled(canUseProfiles && activeProfileId.isNotEmpty());
+    }
+
+    void markPlayerProfileDirty(bool dirty = true)
+    {
+        if (applyingPlayerProfileState)
+            return;
+        playerProfileDirty = dirty;
+    }
+
+    int promptToResolveDirtyProfile()
+    {
+        if (!playerProfileDirty)
+            return 2;
+
+        return juce::AlertWindow::showYesNoCancelBox(
+            juce::AlertWindow::WarningIcon,
+            "Unsaved Player Profile",
+            "Save Player profile changes before switching?",
+            "Save",
+            "Discard",
+            "Cancel",
+            this,
+            nullptr);
+    }
+
+    bool saveCurrentProfile(bool forceSaveAs)
+    {
+        if (!hasLoadedPlayableMidi || !loadedMidiFile.existsAsFile())
+        {
+            playbackStatusLabel->setText("Load a MIDI file before saving a profile.", dontSendNotification);
+            return false;
+        }
+
+        juce::String profileId = activeProfileId;
+        juce::String profileName = activeProfileDisplayName;
+        juce::String createdUtc = activeProfileCreatedUtc;
+        if (forceSaveAs || profileId.isEmpty())
+        {
+            profileName = makeDefaultProfileDisplayName() + " (" + juce::Time::getCurrentTime().formatted("%Y-%m-%d %H%M%S") + ")";
+            profileId = juce::Uuid().toString();
+            createdUtc = PlayerSongProfileCodec::utcNowIso8601();
+        }
+        else if (createdUtc.isEmpty())
+        {
+            createdUtc = PlayerSongProfileCodec::utcNowIso8601();
+        }
+
+        auto profile = captureProfileFromCurrentState(profileId, profileName, createdUtc);
+        juce::String error;
+        if (!PlayerSongProfileStore::saveProfile(profile, error))
+        {
+            playbackStatusLabel->setText("Profile save failed: " + error, dontSendNotification);
+            return false;
+        }
+
+        PlayerSongProfileStore::upsertIndexEntry(playerProfilesIndex, profile);
+        PlayerSongProfileStore::setLastUsedProfileIdForMidiKey(playerProfilesIndex, currentMidiKey, profile.profileId);
+        if (!savePlayerProfilesIndex())
+            return false;
+
+        activeProfileId = profile.profileId;
+        activeProfileDisplayName = profile.displayName;
+        activeProfileCreatedUtc = profile.createdUtc;
+        markPlayerProfileDirty(false);
+        refreshProfileCombo();
+        playbackStatusLabel->setText("Profile saved: " + profile.displayName, dontSendNotification);
+        return true;
+    }
+
+    bool revertCurrentProfile()
+    {
+        if (activeProfileId.isEmpty())
+            return false;
+        return loadProfileByIdAndApply(activeProfileId);
+    }
+
+    void onProfileSelectionChangedFromUi()
+    {
+        if (suppressProfileComboCallback)
+            return;
+
+        const int selectedId = profileComboBox->getSelectedId();
+        juce::String targetProfileId;
+        if (selectedId >= 2)
+        {
+            const int idx = selectedId - 2;
+            if (idx >= 0 && idx < (int) visibleProfilesForCurrentMidi.size())
+                targetProfileId = visibleProfilesForCurrentMidi[(size_t) idx].profileId;
+        }
+
+        if (targetProfileId == activeProfileId)
+            return;
+
+        const int decision = promptToResolveDirtyProfile();
+        if (decision == 0)
+        {
+            refreshProfileCombo();
+            return;
+        }
+
+        if (decision == 1 && !saveCurrentProfile(false))
+        {
+            refreshProfileCombo();
+            return;
+        }
+
+        if (targetProfileId.isEmpty())
+        {
+            activeProfileId.clear();
+            activeProfileDisplayName.clear();
+            activeProfileCreatedUtc.clear();
+            markPlayerProfileDirty(false);
+            refreshProfileCombo();
+            return;
+        }
+
+        loadProfileByIdAndApply(targetProfileId);
+    }
+
+    void tryAutoLoadProfileForCurrentMidi()
+    {
+        refreshProfileCombo();
+        const auto preferredProfileId = PlayerSongProfileStore::getLastUsedProfileIdForMidiKey(
+            playerProfilesIndex, currentMidiKey);
+        if (preferredProfileId.isNotEmpty())
+        {
+            if (loadProfileByIdAndApply(preferredProfileId))
+                return;
+        }
+
+        activeProfileId.clear();
+        activeProfileDisplayName.clear();
+        activeProfileCreatedUtc.clear();
+        markPlayerProfileDirty(false);
+        refreshProfileCombo();
     }
 
     void timerCallback() override
@@ -7817,6 +8225,7 @@ private:
     {
         startMidiButton->setEnabled(hasLoadedPlayableMidi && !isPlayingFilePlayback);
         stopMidiButton->setEnabled(isPlayingFilePlayback);
+        updateProfileButtonsState();
     }
 
     void updatePlaybackGroupTitle()
@@ -8378,6 +8787,17 @@ private:
 
     bool loadMidiFile(const juce::File& file)
     {
+        if (loadedMidiFile.existsAsFile()
+            && loadedMidiFile.getFullPathName() != file.getFullPathName()
+            && playerProfileDirty)
+        {
+            const int decision = promptToResolveDirtyProfile();
+            if (decision == 0)
+                return false;
+            if (decision == 1 && !saveCurrentProfile(false))
+                return false;
+        }
+
         stopPlayback();
 
         juce::String loadError;
@@ -8385,6 +8805,13 @@ private:
         {
             hasLoadedPlayableMidi = false;
             loadedMidiFile = juce::File();
+            currentMidiIdentity = {};
+            currentMidiKey.clear();
+            activeProfileId.clear();
+            activeProfileDisplayName.clear();
+            activeProfileCreatedUtc.clear();
+            markPlayerProfileDirty(false);
+            refreshProfileCombo();
             updatePlaybackGroupTitle();
             currentMidiMetadataText = "Time: n/a    Key: n/a    Tempo: n/a";
             currentProgramChangeSummaryText = "PC: n/a";
@@ -8404,6 +8831,8 @@ private:
         }
 
         loadedMidiFile = file;
+        currentMidiIdentity = PlayerMidiIdentityUtil::buildIdentity(file);
+        currentMidiKey = currentMidiIdentity.midiKey;
         updatePlaybackGroupTitle();
         hasLoadedPlayableMidi = true;
         midiPlayerSettings.saveLastMidiPath(file);
@@ -8440,6 +8869,7 @@ private:
         playbackStatusLabel->setText("Loaded: " + file.getFileName()
                 + " (" + juce::String(playbackEngine.getEventCount()) + " events)",
             dontSendNotification);
+        tryAutoLoadProfileForCurrentMidi();
         updateTransportButtons();
         return true;
     }
@@ -8716,6 +9146,11 @@ private:
     OwnedArray<Component> components;
     Label* moduleLabel = nullptr;
     TextButton* soundModuleButton = nullptr;
+    Label* profileLabel = nullptr;
+    ComboBox* profileComboBox = nullptr;
+    TextButton* saveProfileButton = nullptr;
+    TextButton* saveProfileAsButton = nullptr;
+    TextButton* revertProfileButton = nullptr;
     GroupComponent* channelsGroup = nullptr;
     GroupComponent* voiceEditsGroup = nullptr;
     GroupComponent* playbackGroup = nullptr;
@@ -8742,8 +9177,15 @@ private:
     std::unique_ptr<juce::FileChooser> fileChooser;
     MidiFilePlaybackEngine playbackEngine;
     MidiFilePlayerSettings midiPlayerSettings;
+    PlayerSongProfilesIndex playerProfilesIndex;
+    std::vector<PlayerSongProfileIndexEntry> visibleProfilesForCurrentMidi;
     ProgramChangeRemapper programChangeRemapper;
     juce::File loadedMidiFile;
+    PlayerMidiIdentity currentMidiIdentity;
+    juce::String currentMidiKey;
+    juce::String activeProfileId;
+    juce::String activeProfileDisplayName;
+    juce::String activeProfileCreatedUtc;
     juce::String currentMidiMetadataText = "Time: n/a    Key: n/a    Tempo: n/a";
     juce::String currentProgramChangeSummaryText = "PC: n/a";
     juce::String programChangeDetailText;
@@ -8755,6 +9197,9 @@ private:
     bool isPlayingFilePlayback = false;
     bool hasLoadedPlayableMidi = false;
     bool hasSeededMidiLibraryFromDocs = false;
+    bool playerProfileDirty = false;
+    bool suppressProfileComboCallback = false;
+    bool applyingPlayerProfileState = false;
 
     TabbedComponent& tabsRef;
     InstrumentModules* instrumentmodules = nullptr;
