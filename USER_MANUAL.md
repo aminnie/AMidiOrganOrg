@@ -403,8 +403,10 @@ Behavior:
   - `Save Profile` updates the active profile.
   - `Save Profile As` creates a new profile entry.
   - `Revert Profile` reloads the active profile from disk.
+  - `Load MIDI from Profile` loads the MIDI file referenced by the selected profile and applies that profile state.
   - Profile switch while dirty prompts `Save`, `Discard`, or `Cancel`.
 - Profiles are sidecar files (your source `.mid` is unchanged during normal playback).
+- If a profile references a missing MIDI file, Player shows an error in status and keeps the current session unchanged.
 
 Expected result:
 

@@ -7330,6 +7330,13 @@ public:
         revertProfileButton->setColour(TextButton::buttonOnColourId, juce::Colours::lightgrey);
         revertProfileButton->onClick = [this]() { revertCurrentProfile(); };
 
+        loadMidiFromProfileButton = addToList(new TextButton("Load MIDI from Profile"));
+        loadMidiFromProfileButton->setColour(TextButton::textColourOffId, Colours::black);
+        loadMidiFromProfileButton->setColour(TextButton::textColourOnId, Colours::black);
+        loadMidiFromProfileButton->setColour(TextButton::buttonColourId, juce::Colours::lightgrey);
+        loadMidiFromProfileButton->setColour(TextButton::buttonOnColourId, juce::Colours::lightgrey);
+        loadMidiFromProfileButton->onClick = [this]() { showLoadMidiFromProfileMenu(); };
+
         channelsGroup = addToList(new GroupComponent("player.channels", "Midi Channels"));
         channelsGroup->setColour(GroupComponent::outlineColourId, Colours::slategrey);
         voiceEditsGroup = addToList(new GroupComponent("player.voiceEdits", "Voice Edits"));
@@ -7608,16 +7615,19 @@ public:
         const int soundModuleControlY = soundModuleY - 5;
         const int topControlH = 26;
         const int topGap = 6;
+        const int loadFromProfileButtonW = 136;
         const int profileButtonW = 98;
         const int revertButtonW = 92;
         const int profileLabelW = 54;
-        const int moduleLabelW = 98;
-        const int moduleButtonW = 170;
+        const int moduleLabelW = 84;
+        const int moduleButtonW = 146;
 
         auto topRow = juce::Rectangle<int>(margin, soundModuleControlY, juce::jmax(100, getWidth() - margin * 2), topControlH);
         auto moduleButtonRect = topRow.removeFromRight(moduleButtonW);
         topRow.removeFromRight(topGap);
         auto moduleLabelRect = topRow.removeFromRight(moduleLabelW);
+        topRow.removeFromRight(topGap);
+        auto loadFromProfileRect = topRow.removeFromRight(loadFromProfileButtonW);
         topRow.removeFromRight(topGap);
         auto revertRect = topRow.removeFromRight(revertButtonW);
         topRow.removeFromRight(topGap);
@@ -7639,6 +7649,8 @@ public:
             saveProfileAsButton->setBounds(saveAsRect);
         if (revertProfileButton != nullptr)
             revertProfileButton->setBounds(revertRect);
+        if (loadMidiFromProfileButton != nullptr)
+            loadMidiFromProfileButton->setBounds(loadFromProfileRect);
         if (moduleLabel != nullptr)
             moduleLabel->setBounds(moduleLabelRect);
         if (soundModuleButton != nullptr)
@@ -7656,7 +7668,7 @@ public:
         if (midiTransportLabel != nullptr)
             midiTransportLabel->setBounds(metaLabelX + metadataLabelW + transportLabelGap, metaLabelY, transportLabelW, metaLabelH);
 
-        const int groupHeight = 142;
+        const int groupHeight = 132;
         const int channelsTop = metaLabelY + metaLabelH + 6 - 5;
         channelsGroup->setBounds(margin, channelsTop, getWidth() - margin * 2, groupHeight);
 
@@ -7964,6 +7976,7 @@ private:
         saveProfileButton->setEnabled(canUseProfiles);
         saveProfileAsButton->setEnabled(canUseProfiles);
         revertProfileButton->setEnabled(canUseProfiles && activeProfileId.isNotEmpty());
+        loadMidiFromProfileButton->setEnabled(!playerProfilesIndex.entries.empty());
     }
 
     void markPlayerProfileDirty(bool dirty = true)
@@ -8081,6 +8094,89 @@ private:
         }
 
         loadProfileByIdAndApply(targetProfileId);
+    }
+
+    bool loadMidiFromProfileId(const juce::String& profileId)
+    {
+        PlayerSongProfile profile;
+        juce::String error;
+        if (!PlayerSongProfileStore::loadProfileById(profileId, profile, error))
+        {
+            if (error.isNotEmpty())
+                playbackStatusLabel->setText("Profile load failed: " + error, dontSendNotification);
+            return false;
+        }
+
+        const auto midiPath = profile.midiIdentity.originalPath.trim();
+        if (midiPath.isEmpty())
+        {
+            playbackStatusLabel->setText("Profile has no associated MIDI path.", dontSendNotification);
+            return false;
+        }
+
+        const juce::File midiFile(midiPath);
+        if (!midiFile.existsAsFile())
+        {
+            playbackStatusLabel->setText("Profile MIDI not found: " + midiPath, dontSendNotification);
+            return false;
+        }
+
+        const int decision = promptToResolveDirtyProfile();
+        if (decision == 0)
+            return false;
+        if (decision == 1)
+        {
+            if (!saveCurrentProfile(false))
+                return false;
+        }
+        else
+        {
+            markPlayerProfileDirty(false);
+        }
+
+        if (!loadedMidiFile.existsAsFile()
+            || loadedMidiFile.getFullPathName() != midiFile.getFullPathName())
+        {
+            if (!loadMidiFile(midiFile))
+                return false;
+        }
+
+        const bool applied = loadProfileByIdAndApply(profile.profileId);
+        if (applied)
+        {
+            playbackStatusLabel->setText("Loaded from profile: " + profile.displayName
+                + " -> " + midiFile.getFileName(), dontSendNotification);
+        }
+        return applied;
+    }
+
+    void showLoadMidiFromProfileMenu()
+    {
+        if (playerProfilesIndex.entries.empty())
+        {
+            playbackStatusLabel->setText("No saved Player profiles found.", dontSendNotification);
+            return;
+        }
+
+        PopupMenu menu;
+        int itemId = 1;
+        for (const auto& entry : playerProfilesIndex.entries)
+        {
+            auto label = entry.displayName;
+            if (entry.moduleDisplayName.isNotEmpty())
+                label << " [" << entry.moduleDisplayName << "]";
+            menu.addItem(itemId++, label, true, entry.profileId == activeProfileId);
+        }
+
+        menu.showMenuAsync(PopupMenu::Options{}.withTargetComponent(loadMidiFromProfileButton),
+            [this](int result)
+            {
+                if (result <= 0 || result > (int) playerProfilesIndex.entries.size())
+                    return;
+
+                const auto profileId = playerProfilesIndex.entries[(size_t) (result - 1)].profileId;
+                loadMidiFromProfileId(profileId);
+            });
     }
 
     void tryAutoLoadProfileForCurrentMidi()
@@ -9151,6 +9247,7 @@ private:
     TextButton* saveProfileButton = nullptr;
     TextButton* saveProfileAsButton = nullptr;
     TextButton* revertProfileButton = nullptr;
+    TextButton* loadMidiFromProfileButton = nullptr;
     GroupComponent* channelsGroup = nullptr;
     GroupComponent* voiceEditsGroup = nullptr;
     GroupComponent* playbackGroup = nullptr;

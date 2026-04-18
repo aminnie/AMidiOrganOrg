@@ -91,6 +91,7 @@ Primary implementation files:
   - Optional Program Change lookup remap (`ProgramChangeRemapper`)
   - Optional CC merge against Player strip trims (`PlayerStripCcMerge`)
   - ValueTree-backed song profiles (sidecar JSON) for per-MIDI/per-module Player state
+  - Explicit `Load MIDI from Profile` action for profile-first recall (load referenced MIDI path, then apply profile)
   - Profile index + last-used mapping for auto-load on MIDI open
   - Mute/Solo gating reused from playback routing path
 - **Monitor**
@@ -122,6 +123,11 @@ Primary implementation files:
   - query profile index for matching entries
   - apply last-used profile when available
   - preserve current state when no profile exists
+- Player profile-first load order (`Load MIDI from Profile` button):
+  - read selected profile from index/storage
+  - resolve `midiRef.originalPath` and validate file existence
+  - load MIDI file through normal `loadMidiFile(...)` path
+  - apply selected profile state explicitly
 - Output monitoring hook captures final routed messages
 - When startup-monitor config is enabled, the outgoing monitor hook is armed during startup before Start-tab initialization completes
 
