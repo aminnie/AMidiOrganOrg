@@ -13,6 +13,9 @@
 #include "AMidiInstruments.h"
 #include "AMidiButtons.h"
 #include "AMidiRotors.h"
+#include "midi_file_player/MidiFilePlaybackEngine.h"
+#include "midi_file_player/MidiFilePlayerSettings.h"
+#include "midi_file_player/ProgramChangeRemapper.h"
 
 #include <functional>
 #include <atomic>
@@ -7247,7 +7250,8 @@ private:
 // Class: PlayerPage
 //==============================================================================
 static int zinstcntPlayerPage = 0;
-class PlayerPage final : public Component
+class PlayerPage final : public Component,
+    private juce::Timer
 {
 public:
     PlayerPage(TabbedComponent& tabs) :
@@ -7341,6 +7345,61 @@ public:
                 tabsRef.setCurrentTabIndex(PTEffects, true);
             };
 
+        playbackGroup = addToList(new GroupComponent("player.playback", "MIDI File Playback"));
+        playbackGroup->setColour(GroupComponent::outlineColourId, Colours::grey.darker());
+
+        loadMidiButton = addToList(new TextButton("Load MIDI"));
+        loadMidiButton->setColour(TextButton::textColourOffId, Colours::black);
+        loadMidiButton->setColour(TextButton::textColourOnId, Colours::black);
+        loadMidiButton->setColour(TextButton::buttonColourId, juce::Colours::lightgrey);
+        loadMidiButton->setColour(TextButton::buttonOnColourId, juce::Colours::lightgrey);
+        loadMidiButton->setToggleState(true, dontSendNotification);
+        loadMidiButton->onClick = [this]() { loadMidiFromChooser(); };
+
+        startMidiButton = addToList(new TextButton("Start"));
+        startMidiButton->setColour(TextButton::textColourOffId, Colours::black);
+        startMidiButton->setColour(TextButton::textColourOnId, Colours::black);
+        startMidiButton->setColour(TextButton::buttonColourId, juce::Colours::lightgrey);
+        startMidiButton->setColour(TextButton::buttonOnColourId, juce::Colours::lightgrey);
+        startMidiButton->setToggleState(true, dontSendNotification);
+        startMidiButton->onClick = [this]() { startPlayback(); };
+
+        stopMidiButton = addToList(new TextButton("Stop"));
+        stopMidiButton->setColour(TextButton::textColourOffId, Colours::black);
+        stopMidiButton->setColour(TextButton::textColourOnId, Colours::black);
+        stopMidiButton->setColour(TextButton::buttonColourId, juce::Colours::lightgrey);
+        stopMidiButton->setColour(TextButton::buttonOnColourId, juce::Colours::lightgrey);
+        stopMidiButton->setToggleState(true, dontSendNotification);
+        stopMidiButton->onClick = [this]() { stopPlayback(); };
+
+        importMidiButton = addToList(new TextButton("Import MIDI"));
+        importMidiButton->setColour(TextButton::textColourOffId, Colours::black);
+        importMidiButton->setColour(TextButton::textColourOnId, Colours::black);
+        importMidiButton->setColour(TextButton::buttonColourId, juce::Colours::lightgrey);
+        importMidiButton->setColour(TextButton::buttonOnColourId, juce::Colours::lightgrey);
+        importMidiButton->setToggleState(true, dontSendNotification);
+        importMidiButton->onClick = [this]() { importLoadedMidiToLibrary(); };
+
+        autoLoadLastMidiToggle = addToList(new ToggleButton("Auto-load last MIDI"));
+        autoLoadLastMidiToggle->setColour(ToggleButton::textColourId, Colours::white);
+        autoLoadLastMidiToggle->onClick = [this]()
+            {
+                midiPlayerSettings.autoLoadLastMidiOnStartup = autoLoadLastMidiToggle->getToggleState();
+                saveMidiPlayerSettings();
+            };
+
+        remapProgramChangeToggle = addToList(new ToggleButton("Enable Program Change remap"));
+        remapProgramChangeToggle->setColour(ToggleButton::textColourId, Colours::white);
+        remapProgramChangeToggle->onClick = [this]()
+            {
+                midiPlayerSettings.enableProgramChangeRemap = remapProgramChangeToggle->getToggleState();
+                saveMidiPlayerSettings();
+            };
+
+        playbackStatusLabel = addToList(new Label("player.playback.status", "Ready."));
+        playbackStatusLabel->setColour(Label::textColourId, juce::Colours::grey);
+        playbackStatusLabel->setJustificationType(Justification::centredLeft);
+
         const int radioGroupId = 901;
         for (int i = 0; i < playerChannelCount; ++i)
         {
@@ -7421,10 +7480,18 @@ public:
                         sendEffects(inst);
                     });
             };
+
+        loadProgramChangeRemapper();
+        loadMidiPlayerSettings();
+        seedMidiLibraryFromDocsIfMissing();
+        maybeAutoLoadLastMidi();
+        updatePlaybackGroupTitle();
+        updateTransportButtons();
     }
 
     ~PlayerPage() override
     {
+        stopPlayback();
         gPlayerTabCommitInstrument = {};
         DBG("=== PlayerPage(): Destructor " + std::to_string(--zinstcntPlayerPage));
     }
@@ -7432,14 +7499,14 @@ public:
     void resized() override
     {
         const int margin = 10;
-        const int soundModuleY = margin + 6;
+        const int soundModuleY = margin + 1;
         if (moduleLabel != nullptr)
             moduleLabel->setBounds(getWidth() - 330, soundModuleY, 110, 30);
         if (soundModuleButton != nullptr)
             soundModuleButton->setBounds(getWidth() - 215, soundModuleY, 200, 30);
 
         const int groupHeight = 128;
-        channelsGroup->setBounds(margin, margin + 40, getWidth() - margin * 2, groupHeight);
+        channelsGroup->setBounds(margin, margin + 30, getWidth() - margin * 2, groupHeight);
 
         const int channelButtonInsetX = 14;
         const int channelLabelInsetY = 26;
@@ -7463,12 +7530,64 @@ public:
                 button->setBounds(colX, buttonTop, buttonWidth, buttonHeight);
         }
 
+        static constexpr int kPlayerVoiceEditBtnW = 85;
+        static constexpr int kPlayerVoiceEditBtnH = 42;
+
         const int editsWidth = 190;
         const int editsHeight = 90;
-        const int editsY = channelsGroup->getBottom() + 10;
+        const int editsY = channelsGroup->getBottom();
+        const int voiceEditButtonY = editsY + 30;
+
         voiceEditsGroup->setBounds(margin, editsY, editsWidth, editsHeight);
-        soundsButton->setBounds(margin + 10, editsY + 30, 85, 42);
-        effectsButton->setBounds(margin + 95, editsY + 30, 85, 42);
+        soundsButton->setBounds(margin + 10, voiceEditButtonY, kPlayerVoiceEditBtnW, kPlayerVoiceEditBtnH);
+        effectsButton->setBounds(margin + 95, voiceEditButtonY, kPlayerVoiceEditBtnW, kPlayerVoiceEditBtnH);
+
+        const int playbackX = voiceEditsGroup->getRight() + 10;
+        const int playbackY = editsY;
+        const int playbackHeight = editsHeight;
+        const int playbackWidth = juce::jmax(260, getWidth() - playbackX - margin);
+        playbackGroup->setBounds(playbackX, playbackY, playbackWidth, playbackHeight);
+
+        auto playbackArea = playbackGroup->getBounds().reduced(10, 24);
+        const int alignPlaybackRowSkip = juce::jmax(0, voiceEditButtonY - playbackArea.getY());
+        playbackArea.removeFromTop(alignPlaybackRowSkip);
+
+        auto controlRow = playbackArea.removeFromTop(kPlayerVoiceEditBtnH).reduced(2, 0);
+        const int gap = 4;
+
+        int midiBtnX = controlRow.getX();
+        loadMidiButton->setBounds(midiBtnX, voiceEditButtonY, kPlayerVoiceEditBtnW, kPlayerVoiceEditBtnH);
+        midiBtnX += kPlayerVoiceEditBtnW + gap;
+        startMidiButton->setBounds(midiBtnX, voiceEditButtonY, kPlayerVoiceEditBtnW, kPlayerVoiceEditBtnH);
+        midiBtnX += kPlayerVoiceEditBtnW + gap;
+        stopMidiButton->setBounds(midiBtnX, voiceEditButtonY, kPlayerVoiceEditBtnW, kPlayerVoiceEditBtnH);
+        midiBtnX += kPlayerVoiceEditBtnW + gap;
+        importMidiButton->setBounds(midiBtnX, voiceEditButtonY, kPlayerVoiceEditBtnW, kPlayerVoiceEditBtnH);
+        midiBtnX += kPlayerVoiceEditBtnW + gap;
+
+        {
+            auto r = controlRow.withX(midiBtnX).withWidth(juce::jmax(0, controlRow.getRight() - midiBtnX));
+            const int statusGap = 6;
+            const int w = r.getWidth();
+            int statusW = juce::jlimit(100, 380, juce::jmax(80, w / 3));
+            const int minToggleEach = 72;
+            const int minForToggles = minToggleEach * 2 + 6;
+            if (w < statusW + statusGap + minForToggles)
+                statusW = juce::jmax(60, w - statusGap - minForToggles);
+
+            auto statusRect = r.removeFromRight(statusW);
+            playbackStatusLabel->setBounds(statusRect.getX(), voiceEditButtonY, statusRect.getWidth(), kPlayerVoiceEditBtnH);
+            r.removeFromRight(statusGap);
+
+            const int toggleGap = 6;
+            const int tRem = juce::jmax(0, r.getWidth() - toggleGap);
+            const int toggleW = tRem / 2;
+            auto t0 = r.removeFromLeft(toggleW);
+            autoLoadLastMidiToggle->setBounds(t0.getX(), voiceEditButtonY, t0.getWidth(), kPlayerVoiceEditBtnH);
+            r.removeFromLeft(toggleGap);
+            auto t1 = r;
+            remapProgramChangeToggle->setBounds(t1.getX(), voiceEditButtonY, t1.getWidth(), kPlayerVoiceEditBtnH);
+        }
     }
 
 private:
@@ -7483,6 +7602,359 @@ private:
             soundsButton->setEnabled(true);
         if (effectsButton != nullptr)
             effectsButton->setEnabled(true);
+    }
+
+    void timerCallback() override
+    {
+        if (!isPlayingFilePlayback)
+            return;
+
+        const auto nowMs = juce::Time::getMillisecondCounterHiRes();
+        const auto result = playbackEngine.processUntil(nowMs, [this](const juce::MidiMessage& message)
+            {
+                if (midiPlayerSettings.enableProgramChangeRemap)
+                {
+                    juce::MidiMessage replacements[3];
+                    const auto replacementCount = programChangeRemapper.buildReplacementMessages(message, replacements, 3);
+                    if (replacementCount > 0)
+                    {
+                        for (int i = 0; i < replacementCount; ++i)
+                            sendPlaybackMessage(replacements[i]);
+                        return;
+                    }
+                }
+
+                sendPlaybackMessage(message);
+            });
+
+        if (result.reachedEndOfStream)
+        {
+            stopPlayback();
+            if (loadedMidiFile.existsAsFile())
+                playbackStatusLabel->setText("Playback finished: " + loadedMidiFile.getFileName(), dontSendNotification);
+            else
+                playbackStatusLabel->setText("Playback finished.", dontSendNotification);
+        }
+    }
+
+    bool isPlaybackMutedForMessage(const juce::MidiMessage& message) const
+    {
+        const int channel = message.getChannel();
+        if (channel < 1 || channel > 16)
+            return false;
+
+        return midiPlayerSettings.mutedChannels[static_cast<size_t>(channel)];
+    }
+
+    void sendPlaybackMessage(const juce::MidiMessage& message)
+    {
+        if (isPlaybackMutedForMessage(message))
+            return;
+
+        auto routedMessage = message;
+        routedMessage.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
+        mididevices->sendToOutputs(routedMessage);
+    }
+
+    void sendAllNotesOff()
+    {
+        for (int channel = 1; channel <= 16; ++channel)
+        {
+            auto notesOff = juce::MidiMessage::allNotesOff(channel);
+            notesOff.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
+            mididevices->sendToOutputs(notesOff);
+
+            auto soundOff = juce::MidiMessage::allSoundOff(channel);
+            soundOff.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
+            mididevices->sendToOutputs(soundOff);
+        }
+    }
+
+    void updateTransportButtons()
+    {
+        startMidiButton->setEnabled(hasLoadedPlayableMidi && !isPlayingFilePlayback);
+        stopMidiButton->setEnabled(isPlayingFilePlayback);
+    }
+
+    void updatePlaybackGroupTitle()
+    {
+        const juce::String baseTitle = "MIDI File Playback";
+        if (playbackGroup == nullptr)
+            return;
+
+        if (loadedMidiFile.existsAsFile())
+            playbackGroup->setText(baseTitle + " - " + loadedMidiFile.getFileName());
+        else
+            playbackGroup->setText(baseTitle);
+    }
+
+    void loadMidiFromChooser()
+    {
+        fileChooser.reset(new FileChooser(
+            "Select MIDI file to load",
+            getOrganMidiLibraryDirectory(),
+            "*.mid;*.midi",
+            false,
+            false,
+            nullptr));
+
+        const auto chooserOptions = juce::FileBrowserComponent::openMode
+            | juce::FileBrowserComponent::canSelectFiles
+            | juce::FileBrowserComponent::filenameBoxIsReadOnly;
+
+        fileChooser->launchAsync(chooserOptions, [this](const juce::FileChooser& chooser)
+            {
+                juce::File selected;
+                auto results = chooser.getURLResults();
+                for (auto result : results)
+                {
+                    if (result.isLocalFile())
+                        selected = result.getLocalFile();
+                }
+
+                fileChooser.reset();
+                if (!selected.existsAsFile())
+                    return;
+
+                loadMidiFile(selected);
+            });
+    }
+
+    bool loadMidiFile(const juce::File& file)
+    {
+        stopPlayback();
+
+        juce::String loadError;
+        if (!playbackEngine.loadFromFile(file, loadError))
+        {
+            hasLoadedPlayableMidi = false;
+            loadedMidiFile = {};
+            updatePlaybackGroupTitle();
+            playbackStatusLabel->setText(loadError.isNotEmpty()
+                    ? loadError
+                    : ("No playable MIDI events found in: " + file.getFileName()),
+                dontSendNotification);
+            updateTransportButtons();
+            return false;
+        }
+
+        loadedMidiFile = file;
+        updatePlaybackGroupTitle();
+        hasLoadedPlayableMidi = true;
+        midiPlayerSettings.saveLastMidiPath(file);
+        playbackStatusLabel->setText("Loaded: " + file.getFileName()
+                + " (" + juce::String(playbackEngine.getEventCount()) + " events)",
+            dontSendNotification);
+        updateTransportButtons();
+        return true;
+    }
+
+    void startPlayback()
+    {
+        if (!hasLoadedPlayableMidi || !loadedMidiFile.existsAsFile())
+        {
+            playbackStatusLabel->setText("Load a MIDI file before starting.", dontSendNotification);
+            return;
+        }
+
+        sendAllNotesOff();
+        playbackEngine.start(juce::Time::getMillisecondCounterHiRes());
+        isPlayingFilePlayback = true;
+        startTimer(1);
+        updateTransportButtons();
+        playbackStatusLabel->setText("Playing: " + loadedMidiFile.getFileName(), dontSendNotification);
+    }
+
+    void stopPlayback()
+    {
+        if (!isPlayingFilePlayback && !playbackEngine.getIsPlaying())
+            return;
+
+        stopTimer();
+        playbackEngine.stop();
+        isPlayingFilePlayback = false;
+        sendAllNotesOff();
+        updateTransportButtons();
+        if (loadedMidiFile.existsAsFile())
+            playbackStatusLabel->setText("Stopped: " + loadedMidiFile.getFileName(), dontSendNotification);
+        else
+            playbackStatusLabel->setText("Playback stopped.", dontSendNotification);
+    }
+
+    void loadProgramChangeRemapper()
+    {
+        juce::String error;
+        const auto lookupFile = MidiFilePlayerSettings::getConfigDirectory().getChildFile("program_change_lookup.json");
+        if (!lookupFile.existsAsFile())
+            return;
+
+        if (!programChangeRemapper.loadFromJsonFile(lookupFile, error))
+            playbackStatusLabel->setText("Program remap load failed: " + error, dontSendNotification);
+    }
+
+    void loadMidiPlayerSettings()
+    {
+        juce::String error;
+        midiPlayerSettings.load(error);
+        if (error.isNotEmpty())
+            playbackStatusLabel->setText(error, dontSendNotification);
+
+        autoLoadLastMidiToggle->setToggleState(midiPlayerSettings.autoLoadLastMidiOnStartup, dontSendNotification);
+        remapProgramChangeToggle->setToggleState(midiPlayerSettings.enableProgramChangeRemap, dontSendNotification);
+    }
+
+    void saveMidiPlayerSettings()
+    {
+        juce::String error;
+        if (!midiPlayerSettings.save(error) && error.isNotEmpty())
+            playbackStatusLabel->setText(error, dontSendNotification);
+    }
+
+    void maybeAutoLoadLastMidi()
+    {
+        if (!midiPlayerSettings.autoLoadLastMidiOnStartup)
+            return;
+
+        const auto path = midiPlayerSettings.loadLastMidiPath();
+        if (path.isEmpty())
+            return;
+
+        const juce::File file(path);
+        if (!file.existsAsFile())
+        {
+            midiPlayerSettings.clearLastMidiPath();
+            return;
+        }
+
+        loadMidiFile(file);
+    }
+
+    static bool hasMidiExtension(const juce::File& file)
+    {
+        const auto ext = file.getFileExtension().toLowerCase();
+        return ext == ".mid" || ext == ".midi";
+    }
+
+    static juce::File findDocsSeedDirectoryForPlayer()
+    {
+        auto docsIn = [](const juce::File& base)
+            {
+                return base.getChildFile("docs");
+            };
+        auto docsInBundleResources = [](const juce::File& base)
+            {
+                return base.getChildFile("Resources").getChildFile("docs");
+            };
+
+        auto docsDir = docsIn(juce::File::getCurrentWorkingDirectory());
+        if (docsDir.exists() && docsDir.isDirectory())
+            return docsDir;
+
+        auto probe = juce::File::getSpecialLocation(juce::File::currentExecutableFile).getParentDirectory();
+        for (int depth = 0; depth < 6 && probe.exists(); ++depth)
+        {
+            docsDir = docsIn(probe);
+            if (docsDir.exists() && docsDir.isDirectory())
+                return docsDir;
+
+            docsDir = docsInBundleResources(probe);
+            if (docsDir.exists() && docsDir.isDirectory())
+                return docsDir;
+
+            auto parent = probe.getParentDirectory();
+            if (parent == probe)
+                break;
+            probe = parent;
+        }
+
+        return {};
+    }
+
+    void seedMidiLibraryFromDocsIfMissing()
+    {
+        if (hasSeededMidiLibraryFromDocs)
+            return;
+        hasSeededMidiLibraryFromDocs = true;
+
+        const auto docsDir = findDocsSeedDirectoryForPlayer();
+        if (!docsDir.exists() || !docsDir.isDirectory())
+            return;
+
+        const auto sourceMidiDir = docsDir.getChildFile("midi");
+        if (!sourceMidiDir.exists() || !sourceMidiDir.isDirectory())
+            return;
+
+        const auto targetMidiDir = getOrganMidiLibraryDirectory();
+        int copiedCount = 0;
+        for (const auto& entry : juce::RangedDirectoryIterator(sourceMidiDir, false, "*", juce::File::findFiles))
+        {
+            const auto sourceFile = entry.getFile();
+            if (!hasMidiExtension(sourceFile))
+                continue;
+
+            const auto targetFile = targetMidiDir.getChildFile(sourceFile.getFileName());
+            if (targetFile.existsAsFile())
+                continue;
+
+            if (sourceFile.copyFileTo(targetFile))
+                ++copiedCount;
+        }
+
+        if (copiedCount > 0 && playbackStatusLabel != nullptr)
+            playbackStatusLabel->setText("Seeded MIDI folder with " + juce::String(copiedCount) + " file(s).",
+                dontSendNotification);
+    }
+
+    juce::File getCollisionSafeMidiLibraryTarget(const juce::File& sourceFile) const
+    {
+        const auto midiDir = getOrganMidiLibraryDirectory();
+        juce::String baseName = sourceFile.getFileNameWithoutExtension().trim();
+        if (baseName.isEmpty())
+            baseName = "midi_file";
+        const auto extension = sourceFile.getFileExtension();
+
+        juce::File candidate = midiDir.getChildFile(baseName + extension);
+        int suffix = 1;
+        while (candidate.existsAsFile())
+        {
+            candidate = midiDir.getChildFile(baseName + "-" + juce::String(suffix++) + extension);
+        }
+        return candidate;
+    }
+
+    void importLoadedMidiToLibrary()
+    {
+        if (!loadedMidiFile.existsAsFile())
+        {
+            playbackStatusLabel->setText("Load a MIDI file before importing.", dontSendNotification);
+            return;
+        }
+
+        if (!hasMidiExtension(loadedMidiFile))
+        {
+            playbackStatusLabel->setText("Loaded file is not a MIDI file.", dontSendNotification);
+            return;
+        }
+
+        const auto midiDir = getOrganMidiLibraryDirectory();
+        if (loadedMidiFile.getParentDirectory() == midiDir || loadedMidiFile.isAChildOf(midiDir))
+        {
+            playbackStatusLabel->setText("Already in MIDI folder: " + loadedMidiFile.getFileName(), dontSendNotification);
+            return;
+        }
+
+        const auto targetFile = getCollisionSafeMidiLibraryTarget(loadedMidiFile);
+        if (!loadedMidiFile.copyFileTo(targetFile))
+        {
+            playbackStatusLabel->setText("Failed to import MIDI file to: " + targetFile.getFullPathName(),
+                dontSendNotification);
+            return;
+        }
+
+        loadedMidiFile = targetFile;
+        updatePlaybackGroupTitle();
+        midiPlayerSettings.saveLastMidiPath(loadedMidiFile);
+        playbackStatusLabel->setText("Imported to MIDI folder: " + loadedMidiFile.getFileName(), dontSendNotification);
     }
 
     void sendCC(int midiChannel, int controller, int value)
@@ -7533,13 +8005,29 @@ private:
     TextButton* soundModuleButton = nullptr;
     GroupComponent* channelsGroup = nullptr;
     GroupComponent* voiceEditsGroup = nullptr;
+    GroupComponent* playbackGroup = nullptr;
     TextButton* soundsButton = nullptr;
     TextButton* effectsButton = nullptr;
+    TextButton* loadMidiButton = nullptr;
+    TextButton* startMidiButton = nullptr;
+    TextButton* stopMidiButton = nullptr;
+    TextButton* importMidiButton = nullptr;
+    ToggleButton* autoLoadLastMidiToggle = nullptr;
+    ToggleButton* remapProgramChangeToggle = nullptr;
+    Label* playbackStatusLabel = nullptr;
     std::array<Label*, playerChannelCount> channelLabels {};
     std::array<VoiceButton*, playerChannelCount> channelButtons {};
     std::array<Instrument, playerChannelCount> channelInstruments {};
     int selectedChannelIdx = -1;
     int playerModuleIdx = 0;
+    std::unique_ptr<juce::FileChooser> fileChooser;
+    MidiFilePlaybackEngine playbackEngine;
+    MidiFilePlayerSettings midiPlayerSettings;
+    ProgramChangeRemapper programChangeRemapper;
+    juce::File loadedMidiFile;
+    bool isPlayingFilePlayback = false;
+    bool hasLoadedPlayableMidi = false;
+    bool hasSeededMidiLibraryFromDocs = false;
 
     TabbedComponent& tabsRef;
     InstrumentModules* instrumentmodules = nullptr;

@@ -104,6 +104,18 @@ endif()
 
 juce_generate_juce_header(AMidiOrgan)
 
+add_library(amidi_file_player_core INTERFACE)
+target_sources(amidi_file_player_core
+    INTERFACE
+        midi_file_player/MidiFilePlaybackEngine.h
+        midi_file_player/MidiFilePlayerSettings.h
+        midi_file_player/ProgramChangeRemapper.h
+)
+target_include_directories(amidi_file_player_core
+    INTERFACE
+        "${CMAKE_CURRENT_SOURCE_DIR}/midi_file_player"
+)
+
 juce_add_binary_data(AMidiOrganBinaryData
     SOURCES
         assets/keyboard.png
@@ -156,6 +168,7 @@ target_compile_definitions(AMidiOrgan
 target_link_libraries(AMidiOrgan
     PRIVATE
         AMidiOrganBinaryData
+        amidi_file_player_core
         juce::juce_audio_basics
         juce::juce_audio_devices
         juce::juce_audio_utils

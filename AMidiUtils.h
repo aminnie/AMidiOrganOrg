@@ -264,6 +264,15 @@ inline juce::File getDefaultPanelsDirectory()
     return dir;
 }
 
+/** Canonical folder for user MIDI files (`Documents/AMidiOrgan/midi`). */
+inline juce::File getOrganMidiLibraryDirectory()
+{
+    juce::File dir = getOrganUserDocumentsRoot().getChildFile("midi");
+    if (!dir.isDirectory())
+        dir.createDirectory();
+    return dir;
+}
+
 /** Last Start-tab MIDI In/Out selections (`configs/midi_sticky_devices.json`, JUCE device identifiers). */
 inline juce::File getMidiStickyDevicesFile()
 {
