@@ -8354,7 +8354,7 @@ private:
         if (!playbackEngine.loadFromFile(file, loadError))
         {
             hasLoadedPlayableMidi = false;
-            loadedMidiFile = {};
+            loadedMidiFile = juce::File();
             updatePlaybackGroupTitle();
             currentMidiMetadataText = "Time: n/a    Key: n/a    Tempo: n/a";
             currentProgramChangeSummaryText = "PC: n/a";
