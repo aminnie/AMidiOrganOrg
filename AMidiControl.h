@@ -7344,6 +7344,12 @@ public:
         const int radioGroupId = 901;
         for (int i = 0; i < playerChannelCount; ++i)
         {
+            auto* chLabel = addToList(new Label("player.ch.label." + String(i + 1), "Ch " + String(i + 1)));
+            chLabel->setJustificationType(Justification::centred);
+            chLabel->setColour(Label::textColourId, Colours::white);
+            chLabel->setInterceptsMouseClicks(false, false);
+            channelLabels[(size_t) i] = chLabel;
+
             auto* button = addToList(new VoiceButton("Ch " + String(i + 1)));
             channelButtons[(size_t) i] = button;
 
@@ -7432,23 +7438,29 @@ public:
         if (soundModuleButton != nullptr)
             soundModuleButton->setBounds(getWidth() - 215, soundModuleY, 200, 30);
 
-        const int groupHeight = 120;
+        const int groupHeight = 128;
         channelsGroup->setBounds(margin, margin + 40, getWidth() - margin * 2, groupHeight);
 
         const int channelButtonInsetX = 14;
-        const int channelButtonInsetY = 32;
+        const int channelLabelInsetY = 26;
+        const int channelLabelHeight = 16;
+        const int channelLabelToButtonGap = 4;
+        const int channelRowBottomPad = 8;
         const int buttonGap = 4;
         const int availableWidth = channelsGroup->getWidth() - channelButtonInsetX * 2 - buttonGap * (playerChannelCount - 1);
         const int buttonWidth = juce::jmax(48, availableWidth / playerChannelCount);
-        const int buttonHeight = 56;
+        const int labelTop = channelsGroup->getY() + channelLabelInsetY;
+        const int buttonTop = labelTop + channelLabelHeight + channelLabelToButtonGap;
+        const int buttonHeight = juce::jlimit(40, 56,
+            channelsGroup->getBottom() - channelRowBottomPad - buttonTop);
 
         for (int i = 0; i < playerChannelCount; ++i)
         {
+            const int colX = channelsGroup->getX() + channelButtonInsetX + i * (buttonWidth + buttonGap);
+            if (auto* lbl = channelLabels[(size_t) i])
+                lbl->setBounds(colX, labelTop, buttonWidth, channelLabelHeight);
             if (auto* button = channelButtons[(size_t) i])
-                button->setBounds(channelsGroup->getX() + channelButtonInsetX + i * (buttonWidth + buttonGap),
-                                  channelsGroup->getY() + channelButtonInsetY,
-                                  buttonWidth,
-                                  buttonHeight);
+                button->setBounds(colX, buttonTop, buttonWidth, buttonHeight);
         }
 
         const int editsWidth = 190;
@@ -7523,6 +7535,7 @@ private:
     GroupComponent* voiceEditsGroup = nullptr;
     TextButton* soundsButton = nullptr;
     TextButton* effectsButton = nullptr;
+    std::array<Label*, playerChannelCount> channelLabels {};
     std::array<VoiceButton*, playerChannelCount> channelButtons {};
     std::array<Instrument, playerChannelCount> channelInstruments {};
     int selectedChannelIdx = -1;
