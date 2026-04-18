@@ -84,6 +84,13 @@ Primary implementation files:
   - Duplicate key conflict prevention
   - Includes Monitor tab hotkey command
   - Preset hotkeys currently cover `Manual`, `Preset 1..6`, and `Next` (no dedicated `Preset 7..12` hotkeys yet)
+- **Player**
+  - MIDI-file playback (`MidiFilePlaybackEngine`) with timed event dispatch from file timestamps
+  - Per-channel (`1..16`) Player strips backed by `channelInstruments`
+  - Program/Bank replacement on configured channels (`MSB`, `LSB`, `PC`)
+  - Optional Program Change lookup remap (`ProgramChangeRemapper`)
+  - Optional CC merge against Player strip trims (`PlayerStripCcMerge`)
+  - Mute/Solo gating reused from playback routing path
 - **Monitor**
   - Outgoing MIDI monitor with enable/disable capture
   - Optional startup auto-enable without tab navigation
@@ -103,6 +110,11 @@ Primary implementation files:
 - Inbound channel-16 **CC** has a dedicated global-through fan-out path gated per button group (`globalCcThrough`)
 - Incoming Program Change can trigger preset-next when it matches global config (`Preset MIDI PC`), using message-thread handoff to the hotkey-equivalent preset-next path
 - Matched Program Change trigger events are consumed and not forwarded
+- Player MIDI-file playback message order in `PlayerPage::timerCallback(...)`:
+  - configured-channel Program Change replacement first
+  - optional Player-strip CC merge second (selected controllers only)
+  - optional generic Program Change remap lookup third
+  - default passthrough last
 - Output monitoring hook captures final routed messages
 - When startup-monitor config is enabled, the outgoing monitor hook is armed during startup before Start-tab initialization completes
 
@@ -183,6 +195,29 @@ flowchart TD
 2. Child pages initialize from restored app-state values.
 3. On successful panel/config loads, session state is saved back to disk.
 
+### 4.7 Player MIDI-File Playback Rewrite Flow
+
+```mermaid
+flowchart LR
+  event[MidiFileEvent] --> isPc{ProgramChange?}
+  isPc -->|Yes_And_PlayerConfigured| replacePc[SendMSB_LSB_PCFromChannelInstrument]
+  isPc -->|No| ccMergeGate{CcMergeEnabled_And_Controller_And_PlayerConfigured}
+  replacePc --> endFlow[Return]
+  ccMergeGate -->|Yes_And_WhitelistedCC| mergeCc[ScaleFileCcByStripTrim]
+  ccMergeGate -->|No| remapGate{ProgramChangeRemapEnabled}
+  mergeCc --> endFlow
+  remapGate -->|Mapped| sendMappedPc[SendMappedProgramMessages]
+  remapGate -->|NoMappingOrDisabled| passthrough[SendOriginalMessage]
+  sendMappedPc --> endFlow
+  passthrough --> endFlow
+```
+
+Notes:
+
+- CC merge applies only to: `CC1`, `CC7`, `CC11`, `CC71`, `CC72`, `CC73`, `CC74`, `CC91`, `CC93`.
+- CC merge formula is `merged = clamp(round(fileValue * stripValue / 127.0))`.
+- `CC10` (`Pan`) intentionally bypasses merge logic and remains passthrough.
+
 ## 5. Domain Model Summary
 
 ### Key Concepts
@@ -214,6 +249,7 @@ User data root: `Documents/AMidiOrgan`
 - `configs/hotkeys.json`: Shortcut mappings
 - `configs/midi_sticky_devices.json`: Last MIDI in/out selections
 - `configs/last_session.json`: Last loaded panel/config
+- `configs/midi_file_settings.json`: Player tab MIDI-file settings (autoload, remap, mute/solo, Player-strip CC merge toggle)
 - `configs/ui_profiles.json`: UI profile catalog and optional `keyboardRectOverrides`
 - `configs/instrument_modules.json`: Managed module catalog (module index and metadata)
 - `instruments/*.json`: Sound module catalogs
@@ -226,6 +262,7 @@ Config persistence notes:
 - Non-managed user catalogs (for example `custom.json`) are preserved.
 - Config root also persists `presetMidiPcInputChannel` and `presetMidiPcValue` for external Program Change preset-next triggering.
 - Config root also persists `uiProfileId` for fixed-size profile selection.
+- MIDI-file settings persist `enablePlayerStripCcScaling` (default `false` when missing for backward compatibility).
 - Each `group` child also persists SysEx-through settings:
   - `sysexThrough` (bool, default `false`)
   - `sysexInputIdentifier` (MIDI input device identifier, default empty)

@@ -202,6 +202,17 @@ On startup, the app also attempts to auto-restore the last used panel and config
 - The Monitor tab includes a virtual MIDI keyboard and an `Octave` control for range positioning.
 - Monitor note names and keyboard labels now follow the same `C4 = 60` convention used by Solo split values in Config.
 
+#### Player
+
+- `Scale file CCs with Player strip` is an optional playback-time merge in the `Player` tab.
+- Merge is active only for channels that are explicitly configured from `Player` (`Ch 1..16` voice button selected at least once).
+- Merge runs during MIDI-file playback after Player channel Program/Bank substitution and before the generic Program Change remap lookup path.
+- When enabled, file CC values are scaled by the channel strip value using:
+  - `merged = clamp(round(fileValue * stripValue / 127.0))`
+- The following file CCs are scaled: `CC1`, `CC7`, `CC11`, `CC71`, `CC72`, `CC73`, `CC74`, `CC91`, `CC93`.
+- `CC10` (`Pan`) is intentionally passed through unchanged during this merge mode to avoid incorrect left/right behavior from naive 0..127 scaling around pan center.
+- Non-controller MIDI events continue through the normal playback path unchanged.
+
 #### Help
 
 - Shows the embedded user guide.

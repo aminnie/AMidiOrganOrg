@@ -117,6 +117,19 @@ Contact the developer for additional module support.
 - `Cancel` restores the last applied shortcut map.
 - Duplicate non-empty shortcuts are blocked.
 
+### Player
+
+- Plays `.mid` files through the app's MIDI output routing path.
+- Channel strips (`Ch 1..16`) hold per-channel Program/Bank and effect values.
+- Selecting a channel strip sends Program/Bank and Effects immediately on that channel.
+- During playback, Program Change on configured Player channels is replaced by strip `MSB/LSB/PC`.
+- `Enable Program Change remap` applies lookup remapping to remaining Program Change traffic.
+- `Scale file CCs with Player strip` is optional (default OFF):
+  - Applies only to channels configured from Player tab.
+  - Uses `merged = clamp(round(fileValue * stripValue / 127.0))`.
+  - Merges `CC1`, `CC7`, `CC11`, `CC71`, `CC72`, `CC73`, `CC74`, `CC91`, `CC93`.
+  - Keeps `CC10` (`Pan`) passthrough (not scaled).
+
 ### Help
 
 - Shows this guide.

@@ -8,6 +8,7 @@ struct MidiFilePlayerSettings
 {
     bool autoLoadLastMidiOnStartup = true;
     bool enableProgramChangeRemap = true;
+    bool enablePlayerStripCcScaling = false;
     std::array<bool, 17> mutedChannels {};
     int soloChannel = 0;
     juce::String selectedOutputIdentifier;
@@ -43,6 +44,7 @@ struct MidiFilePlayerSettings
         error.clear();
         autoLoadLastMidiOnStartup = true;
         enableProgramChangeRemap = true;
+        enablePlayerStripCcScaling = false;
         mutedChannels.fill(false);
         soloChannel = 0;
 
@@ -69,6 +71,10 @@ struct MidiFilePlayerSettings
         const auto remapValue = object->getProperty("enableProgramChangeRemap");
         if (remapValue.isBool())
             enableProgramChangeRemap = static_cast<bool>(remapValue);
+
+        const auto playerCcScalingValue = object->getProperty("enablePlayerStripCcScaling");
+        if (playerCcScalingValue.isBool())
+            enablePlayerStripCcScaling = static_cast<bool>(playerCcScalingValue);
 
         const auto mutedChannelsVar = object->getProperty("mutedChannels");
         if (auto* mutedArray = mutedChannelsVar.getArray())
@@ -102,6 +108,7 @@ struct MidiFilePlayerSettings
 
         settingsObject->setProperty("autoLoadLastMidiOnStartup", autoLoadLastMidiOnStartup);
         settingsObject->setProperty("enableProgramChangeRemap", enableProgramChangeRemap);
+        settingsObject->setProperty("enablePlayerStripCcScaling", enablePlayerStripCcScaling);
 
         juce::Array<juce::var> mutedArray;
         for (int channel = 1; channel <= 16; ++channel)
@@ -184,6 +191,10 @@ private:
         const auto remapValue = object->getProperty("enableProgramChangeRemap");
         if (remapValue.isBool())
             enableProgramChangeRemap = static_cast<bool>(remapValue);
+
+        const auto playerCcScalingValue = object->getProperty("enablePlayerStripCcScaling");
+        if (playerCcScalingValue.isBool())
+            enablePlayerStripCcScaling = static_cast<bool>(playerCcScalingValue);
 
         const auto mutedChannelsVar = object->getProperty("mutedChannels");
         if (auto* mutedArray = mutedChannelsVar.getArray())

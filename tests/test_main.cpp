@@ -6,6 +6,7 @@ using namespace juce;
 #include "../AMidiDevices.h"
 #include "../AMidiInstruments.h"
 #include "../AMidiControl.h"
+#include "../midi_file_player/PlayerStripCcMerge.h"
 
 #include <iostream>
 #include <string>
@@ -362,6 +363,54 @@ namespace
 
         return expectEqual(computeEffectiveVolumeCc7(100, 100, 0), 127,
                            "computeEffectiveVolumeCc7 guards default denominator", details);
+    }
+
+    bool runPlayerStripCcMergeHelpers(std::string& details)
+    {
+        if (!expectEqual(PlayerStripCcMerge::mergeUnipolarCc7Bit(100, 127), 100,
+                         "mergeUnipolarCc7Bit keeps file value when strip is 127", details)
+            || !expectEqual(PlayerStripCcMerge::mergeUnipolarCc7Bit(100, 64), 50,
+                            "mergeUnipolarCc7Bit scales by strip trim", details)
+            || !expectEqual(PlayerStripCcMerge::mergeUnipolarCc7Bit(127, 127), 127,
+                            "mergeUnipolarCc7Bit clamps at upper bound", details)
+            || !expectEqual(PlayerStripCcMerge::mergeUnipolarCc7Bit(-3, 90), 0,
+                            "mergeUnipolarCc7Bit clamps negative source values", details))
+        {
+            return false;
+        }
+
+        if (PlayerStripCcMerge::shouldMergeControllerNumber(CCPan))
+        {
+            details = "CCPan should be passthrough and not whitelisted for scaling";
+            return false;
+        }
+
+        Instrument strip;
+        strip.setVol(64);
+        juce::MidiMessage mergedMessage;
+        const auto merged = PlayerStripCcMerge::mergeControllerWithStripIfApplicable(
+            juce::MidiMessage::controllerEvent(1, CCVol, 100), strip, mergedMessage);
+        if (!merged)
+        {
+            details = "Expected CCVol merge to apply for whitelisted controller";
+            return false;
+        }
+
+        if (!expectEqual(mergedMessage.getControllerValue(), 50,
+                         "Merged CCVol value should be scaled by strip volume", details))
+        {
+            return false;
+        }
+
+        const auto panMerged = PlayerStripCcMerge::mergeControllerWithStripIfApplicable(
+            juce::MidiMessage::controllerEvent(1, CCPan, 80), strip, mergedMessage);
+        if (panMerged)
+        {
+            details = "CCPan should not be transformed by player-strip CC merge";
+            return false;
+        }
+
+        return true;
     }
 
     bool runModuleIdxBaselineDiffers(std::string& details)
@@ -2505,6 +2554,11 @@ int main()
     {
         std::string details;
         results.push_back({ "Volume helper math and clamping", runVolumeMathHelpers(details), details });
+    }
+
+    {
+        std::string details;
+        results.push_back({ "Player strip CC merge helper math and whitelist behavior", runPlayerStripCcMergeHelpers(details), details });
     }
 
     {

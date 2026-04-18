@@ -372,7 +372,38 @@ Expected result:
 
 - Saved shortcuts continue working after app restart.
 
-## 6.7 Monitor Tab
+## 6.7 Player Tab
+
+Primary use: route MIDI-file playback through per-channel Player voice/effects strips.
+
+Quick read (look here first):
+
+- Focus first on channel strip selection (`Ch 1..16`) to define which channels are Player-configured.
+- Then use playback toggles to choose Program Change remap behavior and optional file-CC scaling.
+
+How to use:
+
+1. Load a MIDI file in `Player`.
+2. Select one or more channel strips (`Ch 1..16`) and configure voice/effects for those channels.
+3. Optional: enable `Enable Program Change remap` if lookup remapping is desired.
+4. Optional: enable `Scale file CCs with Player strip` to blend file CC automation with strip trims.
+5. Start playback.
+
+Behavior:
+
+- On configured channels, file Program Change is replaced by the strip Program/Bank (`MSB`, `LSB`, `PC`).
+- `Enable Program Change remap` still applies to non-replaced Program Change events via the lookup mapping path.
+- `Scale file CCs with Player strip` is OFF by default and applies only on configured channels.
+- CC merge formula:
+  - `merged = clamp(round(fileValue * stripValue / 127.0))`
+- Merged CC list: `CC1`, `CC7`, `CC11`, `CC71`, `CC72`, `CC73`, `CC74`, `CC91`, `CC93`.
+- `CC10` (`Pan`) remains passthrough (not scaled) to avoid incorrect pan-center behavior.
+
+Expected result:
+
+- Playback follows Player channel sound selection while preserving relative file CC movement for merged controllers.
+
+## 6.8 Monitor Tab
 
 Primary use: troubleshoot outgoing MIDI.
 
@@ -409,7 +440,7 @@ Expected result:
 
 - You can see outgoing MIDI lines while enabled and retain history until cleared.
 
-## 6.8 Help Tab
+## 6.9 Help Tab
 
 Reference image:
 
@@ -423,7 +454,7 @@ Quick read (look here first):
 - Displays in-app user guidance.
 - Use it for quick reference during setup/performance.
 
-## 6.9 Exit
+## 6.10 Exit
 
 - Closes application.
 - If panel changes are pending, app may prompt to save first.

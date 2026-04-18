@@ -15,6 +15,7 @@
 #include "AMidiRotors.h"
 #include "midi_file_player/MidiFilePlaybackEngine.h"
 #include "midi_file_player/MidiFilePlayerSettings.h"
+#include "midi_file_player/PlayerStripCcMerge.h"
 #include "midi_file_player/ProgramChangeRemapper.h"
 
 #include <functional>
@@ -7398,6 +7399,14 @@ public:
                 saveMidiPlayerSettings();
             };
 
+        playerStripCcScalingToggle = addToList(new ToggleButton("Scale file CCs with Player strip"));
+        playerStripCcScalingToggle->setColour(ToggleButton::textColourId, Colours::white);
+        playerStripCcScalingToggle->onClick = [this]()
+            {
+                midiPlayerSettings.enablePlayerStripCcScaling = playerStripCcScalingToggle->getToggleState();
+                saveMidiPlayerSettings();
+            };
+
         playbackStatusLabel = addToList(new Label("player.playback.status", "Ready."));
         playbackStatusLabel->setColour(Label::textColourId, juce::Colours::grey);
         playbackStatusLabel->setJustificationType(Justification::centredLeft);
@@ -7648,7 +7657,8 @@ public:
             const int w = r.getWidth();
             int statusW = juce::jlimit(100, 380, juce::jmax(80, w / 3));
             const int minToggleEach = 72;
-            const int minForToggles = minToggleEach * 2 + 6;
+            const int toggleGap = 6;
+            const int minForToggles = minToggleEach * 3 + toggleGap * 2;
             if (w < statusW + statusGap + minForToggles)
                 statusW = juce::jmax(60, w - statusGap - minForToggles);
 
@@ -7656,14 +7666,16 @@ public:
             playbackStatusLabel->setBounds(statusRect.getX(), playbackButtonY, statusRect.getWidth(), kPlayerVoiceEditBtnH);
             r.removeFromRight(statusGap);
 
-            const int toggleGap = 6;
-            const int tRem = juce::jmax(0, r.getWidth() - toggleGap);
-            const int toggleW = tRem / 2;
+            const int tRem = juce::jmax(0, r.getWidth() - (toggleGap * 2));
+            const int toggleW = tRem / 3;
             auto t0 = r.removeFromLeft(toggleW);
             autoLoadLastMidiToggle->setBounds(t0.getX(), playbackButtonY, t0.getWidth(), kPlayerVoiceEditBtnH);
             r.removeFromLeft(toggleGap);
-            auto t1 = r;
+            auto t1 = r.removeFromLeft(toggleW);
             remapProgramChangeToggle->setBounds(t1.getX(), playbackButtonY, t1.getWidth(), kPlayerVoiceEditBtnH);
+            r.removeFromLeft(toggleGap);
+            auto t2 = r;
+            playerStripCcScalingToggle->setBounds(t2.getX(), playbackButtonY, t2.getWidth(), kPlayerVoiceEditBtnH);
         }
     }
 
@@ -7702,6 +7714,24 @@ private:
                         for (int i = 0; i < replacementCount; ++i)
                             sendPlaybackMessage(replacements[i]);
                         return;
+                    }
+                }
+
+                if (midiPlayerSettings.enablePlayerStripCcScaling && message.isController())
+                {
+                    const int channel = message.getChannel();
+                    if (channel >= 1 && channel <= playerChannelCount
+                        && playerChannelConfigured[(size_t) (channel - 1)])
+                    {
+                        juce::MidiMessage mergedMessage;
+                        if (PlayerStripCcMerge::mergeControllerWithStripIfApplicable(
+                                message,
+                                channelInstruments[(size_t) (channel - 1)],
+                                mergedMessage))
+                        {
+                            sendPlaybackMessage(mergedMessage);
+                            return;
+                        }
                     }
                 }
 
@@ -8470,6 +8500,7 @@ private:
 
         autoLoadLastMidiToggle->setToggleState(midiPlayerSettings.autoLoadLastMidiOnStartup, dontSendNotification);
         remapProgramChangeToggle->setToggleState(midiPlayerSettings.enableProgramChangeRemap, dontSendNotification);
+        playerStripCcScalingToggle->setToggleState(midiPlayerSettings.enablePlayerStripCcScaling, dontSendNotification);
         syncMuteSoloTogglesFromSettings();
     }
 
@@ -8696,6 +8727,7 @@ private:
     TextButton* importMidiButton = nullptr;
     ToggleButton* autoLoadLastMidiToggle = nullptr;
     ToggleButton* remapProgramChangeToggle = nullptr;
+    ToggleButton* playerStripCcScalingToggle = nullptr;
     Label* playbackStatusLabel = nullptr;
     Label* midiMetadataLabel = nullptr;
     Label* midiTransportLabel = nullptr;
