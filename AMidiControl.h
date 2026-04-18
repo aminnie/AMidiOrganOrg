@@ -24,6 +24,8 @@
 #include <unordered_map>
 #include <vector>
 #include <array>
+#include <cmath>
+#include <limits>
 #include<iostream>
 #include<fstream>
 
@@ -7400,6 +7402,18 @@ public:
         playbackStatusLabel->setColour(Label::textColourId, juce::Colours::grey);
         playbackStatusLabel->setJustificationType(Justification::centredLeft);
 
+        midiMetadataLabel = addToList(new Label("player.midi.meta", {}));
+        midiMetadataLabel->setColour(Label::textColourId, juce::Colours::grey);
+        midiMetadataLabel->setJustificationType(Justification::centredLeft);
+        midiMetadataLabel->setInterceptsMouseClicks(false, false);
+        refreshMidiMetadataLabel();
+
+        midiTransportLabel = addToList(new Label("player.midi.transport", {}));
+        midiTransportLabel->setColour(Label::textColourId, juce::Colours::grey);
+        midiTransportLabel->setJustificationType(Justification::centredLeft);
+        midiTransportLabel->setInterceptsMouseClicks(false, false);
+        refreshMidiTransportLabel();
+
         const int radioGroupId = 901;
         for (int i = 0; i < playerChannelCount; ++i)
         {
@@ -7505,8 +7519,18 @@ public:
         if (soundModuleButton != nullptr)
             soundModuleButton->setBounds(getWidth() - 215, soundModuleY, 200, 30);
 
+        const int metaLabelX = margin + 2;
+        const int metaLabelY = soundModuleY + 1;
+        const int metaLabelW = juce::jmax(140, getWidth() - 360);
+        const int metaLabelH = 20;
+        if (midiMetadataLabel != nullptr)
+            midiMetadataLabel->setBounds(metaLabelX, metaLabelY, metaLabelW, metaLabelH);
+        if (midiTransportLabel != nullptr)
+            midiTransportLabel->setBounds(metaLabelX, metaLabelY + metaLabelH, metaLabelW, metaLabelH);
+
         const int groupHeight = 128;
-        channelsGroup->setBounds(margin, margin + 30, getWidth() - margin * 2, groupHeight);
+        const int channelsTop = metaLabelY + metaLabelH * 2 + 6;
+        channelsGroup->setBounds(margin, channelsTop, getWidth() - margin * 2, groupHeight);
 
         const int channelButtonInsetX = 14;
         const int channelLabelInsetY = 26;
@@ -7610,6 +7634,8 @@ private:
             return;
 
         const auto nowMs = juce::Time::getMillisecondCounterHiRes();
+        const auto elapsedSec = juce::jmax(0.0, (nowMs - playbackStartMs) / 1000.0);
+        refreshMidiTransportLabel(elapsedSec);
         const auto result = playbackEngine.processUntil(nowMs, [this](const juce::MidiMessage& message)
             {
                 if (midiPlayerSettings.enableProgramChangeRemap)
@@ -7688,6 +7714,356 @@ private:
             playbackGroup->setText(baseTitle);
     }
 
+    struct MidiFileMetadata
+    {
+        bool hasTimeSignature = false;
+        int numerator = 0;
+        int denominator = 0;
+        bool hasTempo = false;
+        double bpm = 0.0;
+        bool hasKey = false;
+        int sharpsOrFlats = 0;
+        bool isMajorKey = true;
+    };
+
+    struct TempoEvent
+    {
+        double timeSec = 0.0;
+        double bpm = 120.0;
+        double quarterAtTime = 0.0;
+    };
+
+    struct TimeSignatureEvent
+    {
+        double timeSec = 0.0;
+        int numerator = 4;
+        int denominator = 4;
+        double quarterAtTime = 0.0;
+        int barAtStart = 1;
+        double beatsIntoBarAtStart = 0.0;
+    };
+
+    static juce::String formatBpm(double bpm)
+    {
+        if (bpm <= 0.0)
+            return "n/a";
+
+        const int rounded = static_cast<int>(std::round(bpm));
+        if (std::abs(static_cast<double>(rounded) - bpm) < 0.05)
+            return juce::String(rounded) + " BPM";
+
+        return juce::String(bpm, 1) + " BPM";
+    }
+
+    static juce::String formatKeySignature(int sharpsOrFlats, bool isMajorKey)
+    {
+        static constexpr const char* majorKeys[15] =
+            { "Cb", "Gb", "Db", "Ab", "Eb", "Bb", "F", "C", "G", "D", "A", "E", "B", "F#", "C#" };
+        static constexpr const char* minorKeys[15] =
+            { "Abm", "Ebm", "Bbm", "Fm", "Cm", "Gm", "Dm", "Am", "Em", "Bm", "F#m", "C#m", "G#m", "D#m", "A#m" };
+
+        const int idx = sharpsOrFlats + 7;
+        if (idx >= 0 && idx < 15)
+            return juce::String(isMajorKey ? majorKeys[idx] : minorKeys[idx]);
+
+        if (sharpsOrFlats > 0)
+            return juce::String(sharpsOrFlats) + " sharps";
+        if (sharpsOrFlats < 0)
+            return juce::String(std::abs(sharpsOrFlats)) + " flats";
+        return "C";
+    }
+
+    static MidiFileMetadata readMidiMetadata(const juce::File& file, juce::String& error)
+    {
+        MidiFileMetadata metadata;
+        error.clear();
+
+        juce::FileInputStream stream(file);
+        if (!stream.openedOk())
+        {
+            error = "Failed to open file for metadata: " + file.getFullPathName();
+            return metadata;
+        }
+
+        juce::MidiFile midiFile;
+        if (!midiFile.readFrom(stream))
+        {
+            error = "Failed to parse MIDI metadata: " + file.getFileName();
+            return metadata;
+        }
+
+        midiFile.convertTimestampTicksToSeconds();
+
+        double earliestTempoTs = std::numeric_limits<double>::max();
+        double earliestTimeSigTs = std::numeric_limits<double>::max();
+        double earliestKeyTs = std::numeric_limits<double>::max();
+
+        for (int track = 0; track < midiFile.getNumTracks(); ++track)
+        {
+            const auto* sequence = midiFile.getTrack(track);
+            if (sequence == nullptr)
+                continue;
+
+            for (int eventIdx = 0; eventIdx < sequence->getNumEvents(); ++eventIdx)
+            {
+                const auto* eventHolder = sequence->getEventPointer(eventIdx);
+                if (eventHolder == nullptr)
+                    continue;
+
+                const auto& msg = eventHolder->message;
+                const auto ts = msg.getTimeStamp();
+
+                if (msg.isTempoMetaEvent() && ts < earliestTempoTs)
+                {
+                    const auto secondsPerQuarter = msg.getTempoSecondsPerQuarterNote();
+                    if (secondsPerQuarter > 0.0)
+                    {
+                        earliestTempoTs = ts;
+                        metadata.hasTempo = true;
+                        metadata.bpm = 60.0 / secondsPerQuarter;
+                    }
+                }
+                else if (msg.isTimeSignatureMetaEvent() && ts < earliestTimeSigTs)
+                {
+                    int num = 0;
+                    int den = 0;
+                    msg.getTimeSignatureInfo(num, den);
+                    if (num > 0 && den > 0)
+                    {
+                        earliestTimeSigTs = ts;
+                        metadata.hasTimeSignature = true;
+                        metadata.numerator = num;
+                        metadata.denominator = den;
+                    }
+                }
+                else if (msg.isKeySignatureMetaEvent() && ts < earliestKeyTs)
+                {
+                    earliestKeyTs = ts;
+                    metadata.hasKey = true;
+                    metadata.sharpsOrFlats = msg.getKeySignatureNumberOfSharpsOrFlats();
+                    metadata.isMajorKey = msg.isKeySignatureMajorKey();
+                }
+            }
+        }
+
+        return metadata;
+    }
+
+    static juce::String buildMidiMetadataText(const MidiFileMetadata& metadata)
+    {
+        const auto timeSig = metadata.hasTimeSignature
+            ? (juce::String(metadata.numerator) + "/" + juce::String(metadata.denominator))
+            : "n/a";
+        const auto key = metadata.hasKey
+            ? formatKeySignature(metadata.sharpsOrFlats, metadata.isMajorKey)
+            : "n/a";
+        const auto tempo = metadata.hasTempo ? formatBpm(metadata.bpm) : "n/a";
+        return "Time: " + timeSig + "    Key: " + key + "    Tempo: " + tempo;
+    }
+
+    static void sortAndCoalesceTempoEvents(std::vector<TempoEvent>& events)
+    {
+        std::sort(events.begin(), events.end(), [](const TempoEvent& a, const TempoEvent& b)
+            {
+                return a.timeSec < b.timeSec;
+            });
+
+        std::vector<TempoEvent> merged;
+        merged.reserve(events.size());
+        for (const auto& ev : events)
+        {
+            if (!merged.empty() && std::abs(merged.back().timeSec - ev.timeSec) < 1.0e-9)
+                merged.back().bpm = ev.bpm;
+            else
+                merged.push_back(ev);
+        }
+        events.swap(merged);
+    }
+
+    static void sortAndCoalesceTimeSignatureEvents(std::vector<TimeSignatureEvent>& events)
+    {
+        std::sort(events.begin(), events.end(), [](const TimeSignatureEvent& a, const TimeSignatureEvent& b)
+            {
+                return a.timeSec < b.timeSec;
+            });
+
+        std::vector<TimeSignatureEvent> merged;
+        merged.reserve(events.size());
+        for (const auto& ev : events)
+        {
+            if (!merged.empty() && std::abs(merged.back().timeSec - ev.timeSec) < 1.0e-9)
+            {
+                merged.back().numerator = ev.numerator;
+                merged.back().denominator = ev.denominator;
+            }
+            else
+            {
+                merged.push_back(ev);
+            }
+        }
+        events.swap(merged);
+    }
+
+    static double getQuarterAtTime(const std::vector<TempoEvent>& tempoEvents, double elapsedSec)
+    {
+        if (tempoEvents.empty())
+            return 0.0;
+
+        const double t = juce::jmax(0.0, elapsedSec);
+        int idx = 0;
+        while (idx + 1 < static_cast<int>(tempoEvents.size()) && tempoEvents[(size_t) (idx + 1)].timeSec <= t)
+            ++idx;
+
+        const auto& ev = tempoEvents[(size_t) idx];
+        return ev.quarterAtTime + (t - ev.timeSec) * ev.bpm / 60.0;
+    }
+
+    static void finalizeTempoAndTimeSignatureMaps(std::vector<TempoEvent>& tempoEvents,
+                                                  std::vector<TimeSignatureEvent>& timeSigEvents)
+    {
+        if (tempoEvents.empty() || tempoEvents.front().timeSec > 0.0)
+            tempoEvents.insert(tempoEvents.begin(), TempoEvent {});
+        sortAndCoalesceTempoEvents(tempoEvents);
+
+        tempoEvents[0].timeSec = 0.0;
+        tempoEvents[0].quarterAtTime = 0.0;
+        for (size_t i = 1; i < tempoEvents.size(); ++i)
+        {
+            const auto& prev = tempoEvents[i - 1];
+            auto& cur = tempoEvents[i];
+            const double deltaSec = juce::jmax(0.0, cur.timeSec - prev.timeSec);
+            cur.quarterAtTime = prev.quarterAtTime + deltaSec * prev.bpm / 60.0;
+        }
+
+        if (timeSigEvents.empty() || timeSigEvents.front().timeSec > 0.0)
+            timeSigEvents.insert(timeSigEvents.begin(), TimeSignatureEvent {});
+        sortAndCoalesceTimeSignatureEvents(timeSigEvents);
+
+        timeSigEvents[0].timeSec = 0.0;
+        timeSigEvents[0].quarterAtTime = 0.0;
+        timeSigEvents[0].barAtStart = 1;
+        timeSigEvents[0].beatsIntoBarAtStart = 0.0;
+
+        for (size_t i = 1; i < timeSigEvents.size(); ++i)
+        {
+            auto& cur = timeSigEvents[i];
+            const auto& prev = timeSigEvents[i - 1];
+
+            cur.quarterAtTime = getQuarterAtTime(tempoEvents, cur.timeSec);
+            const double deltaQuarters = juce::jmax(0.0, cur.quarterAtTime - prev.quarterAtTime);
+            const double deltaBeats = deltaQuarters * static_cast<double>(prev.denominator) / 4.0;
+            const double beatsPerBar = static_cast<double>(prev.numerator) * 4.0 / static_cast<double>(prev.denominator);
+            const double totalBeats = prev.beatsIntoBarAtStart + deltaBeats;
+            const int barsAdvanced = static_cast<int>(std::floor((totalBeats + 1.0e-9) / beatsPerBar));
+
+            cur.barAtStart = prev.barAtStart + barsAdvanced;
+            cur.beatsIntoBarAtStart = totalBeats - static_cast<double>(barsAdvanced) * beatsPerBar;
+        }
+    }
+
+    static bool readTempoAndTimeSignatureMaps(const juce::File& file,
+                                              std::vector<TempoEvent>& outTempoEvents,
+                                              std::vector<TimeSignatureEvent>& outTimeSigEvents,
+                                              juce::String& error)
+    {
+        outTempoEvents.clear();
+        outTimeSigEvents.clear();
+        error.clear();
+
+        juce::FileInputStream stream(file);
+        if (!stream.openedOk())
+        {
+            error = "Failed to open file for transport map: " + file.getFullPathName();
+            return false;
+        }
+
+        juce::MidiFile midiFile;
+        if (!midiFile.readFrom(stream))
+        {
+            error = "Failed to parse MIDI transport map: " + file.getFileName();
+            return false;
+        }
+
+        midiFile.convertTimestampTicksToSeconds();
+        for (int track = 0; track < midiFile.getNumTracks(); ++track)
+        {
+            const auto* sequence = midiFile.getTrack(track);
+            if (sequence == nullptr)
+                continue;
+
+            for (int eventIdx = 0; eventIdx < sequence->getNumEvents(); ++eventIdx)
+            {
+                const auto* eventHolder = sequence->getEventPointer(eventIdx);
+                if (eventHolder == nullptr)
+                    continue;
+
+                const auto& msg = eventHolder->message;
+                const double timeSec = juce::jmax(0.0, msg.getTimeStamp());
+
+                if (msg.isTempoMetaEvent())
+                {
+                    const auto secondsPerQuarter = msg.getTempoSecondsPerQuarterNote();
+                    if (secondsPerQuarter > 0.0)
+                        outTempoEvents.push_back({ timeSec, 60.0 / secondsPerQuarter, 0.0 });
+                }
+                else if (msg.isTimeSignatureMetaEvent())
+                {
+                    int num = 0;
+                    int den = 0;
+                    msg.getTimeSignatureInfo(num, den);
+                    if (num > 0 && den > 0)
+                        outTimeSigEvents.push_back({ timeSec, num, den, 0.0, 1, 0.0 });
+                }
+            }
+        }
+
+        finalizeTempoAndTimeSignatureMaps(outTempoEvents, outTimeSigEvents);
+        return true;
+    }
+
+    static juce::String buildTransportText(const std::vector<TempoEvent>& tempoEvents,
+                                           const std::vector<TimeSignatureEvent>& timeSigEvents,
+                                           double elapsedSec)
+    {
+        if (tempoEvents.empty() || timeSigEvents.empty())
+            return "Bar 1  Beat 1  Quarter 0.00";
+
+        const double quarterPos = getQuarterAtTime(tempoEvents, elapsedSec);
+        int sigIdx = 0;
+        while (sigIdx + 1 < static_cast<int>(timeSigEvents.size())
+               && timeSigEvents[(size_t) (sigIdx + 1)].timeSec <= elapsedSec)
+        {
+            ++sigIdx;
+        }
+
+        const auto& sig = timeSigEvents[(size_t) sigIdx];
+        const double beatsPerBar = static_cast<double>(sig.numerator) * 4.0 / static_cast<double>(sig.denominator);
+        const double deltaQuarters = juce::jmax(0.0, quarterPos - sig.quarterAtTime);
+        const double deltaBeats = deltaQuarters * static_cast<double>(sig.denominator) / 4.0;
+        const double totalBeats = sig.beatsIntoBarAtStart + deltaBeats;
+        const int barsAdvanced = static_cast<int>(std::floor((totalBeats + 1.0e-9) / beatsPerBar));
+        const double beatInBarZero = totalBeats - static_cast<double>(barsAdvanced) * beatsPerBar;
+
+        const int barNumber = juce::jmax(1, sig.barAtStart + barsAdvanced);
+        const int beatInBar = juce::jlimit(1, juce::jmax(1, sig.numerator), static_cast<int>(std::floor(beatInBarZero + 1.0e-9)) + 1);
+        return "Bar " + juce::String(barNumber)
+            + "  Beat " + juce::String(beatInBar)
+            + "  Quarter " + juce::String(quarterPos, 2);
+    }
+
+    void refreshMidiMetadataLabel()
+    {
+        if (midiMetadataLabel != nullptr)
+            midiMetadataLabel->setText(currentMidiMetadataText, dontSendNotification);
+    }
+
+    void refreshMidiTransportLabel(double elapsedSec = 0.0)
+    {
+        currentMidiTransportText = buildTransportText(tempoEvents, timeSignatureEvents, elapsedSec);
+        if (midiTransportLabel != nullptr)
+            midiTransportLabel->setText(currentMidiTransportText, dontSendNotification);
+    }
+
     void loadMidiFromChooser()
     {
         fileChooser.reset(new FileChooser(
@@ -7730,6 +8106,11 @@ private:
             hasLoadedPlayableMidi = false;
             loadedMidiFile = {};
             updatePlaybackGroupTitle();
+            currentMidiMetadataText = "Time: n/a    Key: n/a    Tempo: n/a";
+            refreshMidiMetadataLabel();
+            tempoEvents = { TempoEvent {} };
+            timeSignatureEvents = { TimeSignatureEvent {} };
+            refreshMidiTransportLabel();
             playbackStatusLabel->setText(loadError.isNotEmpty()
                     ? loadError
                     : ("No playable MIDI events found in: " + file.getFileName()),
@@ -7742,6 +8123,22 @@ private:
         updatePlaybackGroupTitle();
         hasLoadedPlayableMidi = true;
         midiPlayerSettings.saveLastMidiPath(file);
+
+        juce::String metadataError;
+        const auto metadata = readMidiMetadata(file, metadataError);
+        currentMidiMetadataText = buildMidiMetadataText(metadata);
+        if (metadataError.isNotEmpty())
+            currentMidiMetadataText = "Time: n/a    Key: n/a    Tempo: n/a";
+        refreshMidiMetadataLabel();
+
+        juce::String mapError;
+        if (!readTempoAndTimeSignatureMaps(file, tempoEvents, timeSignatureEvents, mapError))
+        {
+            tempoEvents = { TempoEvent {} };
+            timeSignatureEvents = { TimeSignatureEvent {} };
+        }
+        refreshMidiTransportLabel();
+
         playbackStatusLabel->setText("Loaded: " + file.getFileName()
                 + " (" + juce::String(playbackEngine.getEventCount()) + " events)",
             dontSendNotification);
@@ -7758,9 +8155,11 @@ private:
         }
 
         sendAllNotesOff();
-        playbackEngine.start(juce::Time::getMillisecondCounterHiRes());
+        playbackStartMs = juce::Time::getMillisecondCounterHiRes();
+        playbackEngine.start(playbackStartMs);
         isPlayingFilePlayback = true;
         startTimer(1);
+        refreshMidiTransportLabel(0.0);
         updateTransportButtons();
         playbackStatusLabel->setText("Playing: " + loadedMidiFile.getFileName(), dontSendNotification);
     }
@@ -7773,7 +8172,9 @@ private:
         stopTimer();
         playbackEngine.stop();
         isPlayingFilePlayback = false;
+        playbackStartMs = 0.0;
         sendAllNotesOff();
+        refreshMidiTransportLabel(0.0);
         updateTransportButtons();
         if (loadedMidiFile.existsAsFile())
             playbackStatusLabel->setText("Stopped: " + loadedMidiFile.getFileName(), dontSendNotification);
@@ -8015,6 +8416,8 @@ private:
     ToggleButton* autoLoadLastMidiToggle = nullptr;
     ToggleButton* remapProgramChangeToggle = nullptr;
     Label* playbackStatusLabel = nullptr;
+    Label* midiMetadataLabel = nullptr;
+    Label* midiTransportLabel = nullptr;
     std::array<Label*, playerChannelCount> channelLabels {};
     std::array<VoiceButton*, playerChannelCount> channelButtons {};
     std::array<Instrument, playerChannelCount> channelInstruments {};
@@ -8025,6 +8428,11 @@ private:
     MidiFilePlayerSettings midiPlayerSettings;
     ProgramChangeRemapper programChangeRemapper;
     juce::File loadedMidiFile;
+    juce::String currentMidiMetadataText = "Time: n/a    Key: n/a    Tempo: n/a";
+    juce::String currentMidiTransportText = "Bar 1  Beat 1  Quarter 0.00";
+    std::vector<TempoEvent> tempoEvents { TempoEvent {} };
+    std::vector<TimeSignatureEvent> timeSignatureEvents { TimeSignatureEvent {} };
+    double playbackStartMs = 0.0;
     bool isPlayingFilePlayback = false;
     bool hasLoadedPlayableMidi = false;
     bool hasSeededMidiLibraryFromDocs = false;
