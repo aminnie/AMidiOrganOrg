@@ -7399,21 +7399,25 @@ public:
         loadMidiButton->setToggleState(true, dontSendNotification);
         loadMidiButton->onClick = [this]() { loadMidiFromChooser(); };
 
-        startMidiButton = addToList(new TextButton("Start"));
-        startMidiButton->setColour(TextButton::textColourOffId, Colours::black);
-        startMidiButton->setColour(TextButton::textColourOnId, Colours::black);
-        startMidiButton->setColour(TextButton::buttonColourId, juce::Colours::lightgrey);
-        startMidiButton->setColour(TextButton::buttonOnColourId, juce::Colours::lightgrey);
-        startMidiButton->setToggleState(true, dontSendNotification);
-        startMidiButton->onClick = [this]() { startPlayback(); };
+        startStopMidiButton = addToList(new TextButton("Start"));
+        startStopMidiButton->setColour(TextButton::textColourOffId, Colours::black);
+        startStopMidiButton->setColour(TextButton::textColourOnId, Colours::black);
+        startStopMidiButton->setToggleState(true, dontSendNotification);
+        startStopMidiButton->onClick = [this]()
+            {
+                if (isPlayingFilePlayback)
+                    pausePlayback();
+                else
+                    startPlayback();
+            };
 
-        stopMidiButton = addToList(new TextButton("Stop"));
-        stopMidiButton->setColour(TextButton::textColourOffId, Colours::black);
-        stopMidiButton->setColour(TextButton::textColourOnId, Colours::black);
-        stopMidiButton->setColour(TextButton::buttonColourId, juce::Colours::lightgrey);
-        stopMidiButton->setColour(TextButton::buttonOnColourId, juce::Colours::lightgrey);
-        stopMidiButton->setToggleState(true, dontSendNotification);
-        stopMidiButton->onClick = [this]() { stopPlayback(); };
+        continueMidiButton = addToList(new TextButton("Continue"));
+        continueMidiButton->setColour(TextButton::textColourOffId, Colours::black);
+        continueMidiButton->setColour(TextButton::textColourOnId, Colours::black);
+        continueMidiButton->setColour(TextButton::buttonColourId, juce::Colours::lightgrey);
+        continueMidiButton->setColour(TextButton::buttonOnColourId, juce::Colours::lightgrey);
+        continueMidiButton->setToggleState(true, dontSendNotification);
+        continueMidiButton->onClick = [this]() { continuePlayback(); };
 
         importMidiButton = addToList(new TextButton("Import MIDI"));
         importMidiButton->setColour(TextButton::textColourOffId, Colours::black);
@@ -7452,7 +7456,7 @@ public:
         refreshMidiMetadataLabel();
 
         midiTransportLabel = addToList(new Label("player.midi.transport", {}));
-        midiTransportLabel->setColour(Label::textColourId, juce::Colours::darkred);
+        midiTransportLabel->setColour(Label::textColourId, juce::Colours::white);
         midiTransportLabel->setFont(midiTransportLabel->getFont().boldened());
         midiTransportLabel->setJustificationType(Justification::centredLeft);
         midiTransportLabel->setInterceptsMouseClicks(false, false);
@@ -7635,10 +7639,6 @@ public:
         if (profileLabelRect.getWidth() < profileLabelW)
             profileLabelRect.setWidth(profileLabelW);
 
-        if (profileLabel != nullptr)
-            profileLabel->setBounds(profileLabelRect);
-        if (profileComboBox != nullptr)
-            profileComboBox->setBounds(profileComboRect);
         if (saveProfileButton != nullptr)
             saveProfileButton->setBounds(saveRect);
         if (saveProfileAsButton != nullptr)
@@ -7673,6 +7673,23 @@ public:
         const int toggleTop = buttonTop + buttonHeight + channelButtonToToggleGap;
         const int channelToggleGap = 4;
         const int toggleWidth = juce::jmax(20, (buttonWidth - channelToggleGap) / 2);
+        const int ch2X = channelsGroup->getX() + channelButtonInsetX + (buttonWidth + buttonGap);
+
+        const int profileComboLeft = ch2X;
+        const int profileComboRight = loadFromProfileRect.getX() - topGap;
+        const int profileComboAlignedWidth = juce::jmax(120, profileComboRight - profileComboLeft);
+        profileComboRect.setX(profileComboLeft);
+        profileComboRect.setWidth(profileComboAlignedWidth);
+        profileLabelRect = juce::Rectangle<int>(
+            juce::jmax(margin, profileComboRect.getX() - topGap - profileLabelW),
+            profileRegionRect.getY(),
+            profileLabelW,
+            profileRegionRect.getHeight());
+
+        if (profileLabel != nullptr)
+            profileLabel->setBounds(profileLabelRect);
+        if (profileComboBox != nullptr)
+            profileComboBox->setBounds(profileComboRect);
 
         for (int i = 0; i < playerChannelCount; ++i)
         {
@@ -7716,9 +7733,9 @@ public:
         int midiBtnX = controlRow.getX();
         loadMidiButton->setBounds(midiBtnX, playbackButtonY, kPlayerVoiceEditBtnW, kPlayerVoiceEditBtnH);
         midiBtnX += kPlayerVoiceEditBtnW + gap;
-        startMidiButton->setBounds(midiBtnX, playbackButtonY, kPlayerVoiceEditBtnW, kPlayerVoiceEditBtnH);
+        startStopMidiButton->setBounds(midiBtnX, playbackButtonY, kPlayerVoiceEditBtnW, kPlayerVoiceEditBtnH);
         midiBtnX += kPlayerVoiceEditBtnW + gap;
-        stopMidiButton->setBounds(midiBtnX, playbackButtonY, kPlayerVoiceEditBtnW, kPlayerVoiceEditBtnH);
+        continueMidiButton->setBounds(midiBtnX, playbackButtonY, kPlayerVoiceEditBtnW, kPlayerVoiceEditBtnH);
         midiBtnX += kPlayerVoiceEditBtnW + gap;
         importMidiButton->setBounds(midiBtnX, playbackButtonY, kPlayerVoiceEditBtnW, kPlayerVoiceEditBtnH);
         midiBtnX += kPlayerVoiceEditBtnW + gap;
@@ -8206,7 +8223,7 @@ private:
             return;
 
         const auto nowMs = juce::Time::getMillisecondCounterHiRes();
-        const auto elapsedSec = juce::jmax(0.0, (nowMs - playbackStartMs) / 1000.0);
+        const auto elapsedSec = playbackElapsedBeforeResumeSec + juce::jmax(0.0, (nowMs - playbackStartMs) / 1000.0);
         refreshMidiTransportLabel(elapsedSec);
         const auto result = playbackEngine.processUntil(nowMs, [this](const juce::MidiMessage& message)
             {
@@ -8322,8 +8339,26 @@ private:
 
     void updateTransportButtons()
     {
-        startMidiButton->setEnabled(hasLoadedPlayableMidi && !isPlayingFilePlayback);
-        stopMidiButton->setEnabled(isPlayingFilePlayback);
+        if (startStopMidiButton != nullptr)
+        {
+            startStopMidiButton->setEnabled(hasLoadedPlayableMidi);
+            startStopMidiButton->setButtonText(isPlayingFilePlayback ? "Stop" : "Start");
+
+            const auto startOff = juce::Colours::darkgreen;
+            const auto startOn = juce::Colours::darkgreen.brighter();
+            const auto stopOff = juce::Colours::darkred;
+            const auto stopOn = juce::Colours::darkred.brighter();
+            const auto disabled = juce::Colours::lightgrey;
+
+            startStopMidiButton->setColour(TextButton::buttonColourId,
+                hasLoadedPlayableMidi ? (isPlayingFilePlayback ? stopOff : startOff) : disabled);
+            startStopMidiButton->setColour(TextButton::buttonOnColourId,
+                hasLoadedPlayableMidi ? (isPlayingFilePlayback ? stopOn : startOn) : disabled);
+        }
+
+        if (continueMidiButton != nullptr)
+            continueMidiButton->setEnabled(hasLoadedPlayableMidi && !isPlayingFilePlayback && canContinuePlayback);
+
         updateProfileButtonsState();
     }
 
@@ -9143,6 +9178,8 @@ private:
         sendAllNotesOff();
         playbackStartMs = juce::Time::getMillisecondCounterHiRes();
         playbackEngine.start(playbackStartMs);
+        playbackElapsedBeforeResumeSec = 0.0;
+        canContinuePlayback = false;
         isPlayingFilePlayback = true;
         startTimer(1);
         refreshMidiTransportLabel(0.0);
@@ -9150,15 +9187,60 @@ private:
         playbackStatusLabel->setText("Playing: " + loadedMidiFile.getFileName(), dontSendNotification);
     }
 
+    void pausePlayback()
+    {
+        if (!isPlayingFilePlayback)
+            return;
+
+        const double nowMs = juce::Time::getMillisecondCounterHiRes();
+        playbackElapsedBeforeResumeSec += juce::jmax(0.0, (nowMs - playbackStartMs) / 1000.0);
+        stopTimer();
+        playbackEngine.pause(nowMs);
+        isPlayingFilePlayback = false;
+        playbackStartMs = 0.0;
+        canContinuePlayback = playbackEngine.hasPendingEvents();
+        sendAllNotesOff();
+        refreshMidiTransportLabel(playbackElapsedBeforeResumeSec);
+        updateTransportButtons();
+        if (loadedMidiFile.existsAsFile())
+            playbackStatusLabel->setText("Stopped: " + loadedMidiFile.getFileName() + " (Continue to resume)", dontSendNotification);
+        else
+            playbackStatusLabel->setText("Playback stopped.", dontSendNotification);
+    }
+
+    void continuePlayback()
+    {
+        if (!hasLoadedPlayableMidi || !loadedMidiFile.existsAsFile() || isPlayingFilePlayback || !canContinuePlayback)
+            return;
+
+        const double nowMs = juce::Time::getMillisecondCounterHiRes();
+        if (!playbackEngine.resume(nowMs))
+        {
+            canContinuePlayback = false;
+            updateTransportButtons();
+            return;
+        }
+
+        sendAllNotesOff();
+        playbackStartMs = nowMs;
+        isPlayingFilePlayback = true;
+        startTimer(1);
+        refreshMidiTransportLabel(playbackElapsedBeforeResumeSec);
+        updateTransportButtons();
+        playbackStatusLabel->setText("Continuing: " + loadedMidiFile.getFileName(), dontSendNotification);
+    }
+
     void stopPlayback()
     {
-        if (!isPlayingFilePlayback && !playbackEngine.getIsPlaying())
+        if (!isPlayingFilePlayback && !playbackEngine.getIsPlaying() && !canContinuePlayback)
             return;
 
         stopTimer();
         playbackEngine.stop();
         isPlayingFilePlayback = false;
         playbackStartMs = 0.0;
+        playbackElapsedBeforeResumeSec = 0.0;
+        canContinuePlayback = false;
         sendAllNotesOff();
         refreshMidiTransportLabel(0.0);
         updateTransportButtons();
@@ -9396,8 +9478,8 @@ private:
     TextButton* soundsButton = nullptr;
     TextButton* effectsButton = nullptr;
     TextButton* loadMidiButton = nullptr;
-    TextButton* startMidiButton = nullptr;
-    TextButton* stopMidiButton = nullptr;
+    TextButton* startStopMidiButton = nullptr;
+    TextButton* continueMidiButton = nullptr;
     TextButton* importMidiButton = nullptr;
     ToggleButton* remapProgramChangeToggle = nullptr;
     ToggleButton* playerStripCcScalingToggle = nullptr;
@@ -9432,7 +9514,9 @@ private:
     std::vector<TempoEvent> tempoEvents { TempoEvent {} };
     std::vector<TimeSignatureEvent> timeSignatureEvents { TimeSignatureEvent {} };
     double playbackStartMs = 0.0;
+    double playbackElapsedBeforeResumeSec = 0.0;
     bool isPlayingFilePlayback = false;
+    bool canContinuePlayback = false;
     bool hasLoadedPlayableMidi = false;
     bool hasSeededMidiLibraryFromDocs = false;
     bool playerProfileDirty = false;

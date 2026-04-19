@@ -87,7 +87,29 @@ public:
 
         isPlaying = true;
         nextEventIndex = 0;
+        playbackOffsetSeconds = 0.0;
         playbackStartMs = nowMs;
+    }
+
+    void pause(double nowMs)
+    {
+        if (!isPlaying)
+            return;
+
+        const auto elapsedSinceStart = juce::jmax(0.0, (nowMs - playbackStartMs) / 1000.0);
+        playbackOffsetSeconds += elapsedSinceStart;
+        isPlaying = false;
+        playbackStartMs = 0.0;
+    }
+
+    bool resume(double nowMs)
+    {
+        if (events.empty() || nextEventIndex >= static_cast<int>(events.size()))
+            return false;
+
+        isPlaying = true;
+        playbackStartMs = nowMs;
+        return true;
     }
 
     void stop()
@@ -95,6 +117,7 @@ public:
         isPlaying = false;
         nextEventIndex = 0;
         playbackStartMs = 0.0;
+        playbackOffsetSeconds = 0.0;
     }
 
     ProcessResult processUntil(double nowMs, const std::function<void(const juce::MidiMessage&)>& sink)
@@ -103,7 +126,7 @@ public:
         if (!isPlaying || sink == nullptr)
             return result;
 
-        const auto elapsedSeconds = (nowMs - playbackStartMs) / 1000.0;
+        const auto elapsedSeconds = playbackOffsetSeconds + (nowMs - playbackStartMs) / 1000.0;
         while (nextEventIndex < static_cast<int>(events.size())
                && events[static_cast<size_t>(nextEventIndex)].timeSeconds <= elapsedSeconds)
         {
@@ -123,6 +146,7 @@ public:
 
     bool hasEvents() const { return !events.empty(); }
     bool getIsPlaying() const { return isPlaying; }
+    bool hasPendingEvents() const { return nextEventIndex < static_cast<int>(events.size()); }
     int getEventCount() const { return static_cast<int>(events.size()); }
     const std::vector<ScheduledEvent>& getEvents() const { return events; }
 
@@ -131,4 +155,5 @@ private:
     bool isPlaying = false;
     int nextEventIndex = 0;
     double playbackStartMs = 0.0;
+    double playbackOffsetSeconds = 0.0;
 };
