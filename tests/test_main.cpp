@@ -2541,6 +2541,130 @@ namespace
         return true;
     }
 
+    bool runType0MidiLoadAndPlaybackRegression(std::string& details)
+    {
+        auto* devices = MidiDevices::getInstance();
+        if (devices == nullptr)
+        {
+            details = "MidiDevices::getInstance() returned nullptr";
+            return false;
+        }
+
+        devices->clearMidiIOMap();
+
+        const auto tempRoot = File::getSpecialLocation(File::tempDirectory)
+            .getChildFile("AMidiOrganTests");
+        if (!tempRoot.exists() && !tempRoot.createDirectory())
+        {
+            details = "Failed to create temporary directory: " + tempRoot.getFullPathName().toStdString();
+            return false;
+        }
+
+        const auto midiFilePath = tempRoot.getNonexistentChildFile("type0-regression", ".mid");
+
+        MidiFile type0Write;
+        type0Write.setTicksPerQuarterNote(480);
+        MidiMessageSequence track;
+        track.addEvent(MidiMessage::programChange(1, 10), 0.0);
+        track.addEvent(MidiMessage::noteOn(1, 60, (uint8) 100), 0.0);
+        track.addEvent(MidiMessage::noteOff(1, 60), 480.0);
+        type0Write.addTrack(track);
+
+        {
+            FileOutputStream out(midiFilePath);
+            if (!out.openedOk())
+            {
+                details = "Failed to open Type 0 MIDI output file: " + midiFilePath.getFullPathName().toStdString();
+                return false;
+            }
+
+            if (!type0Write.writeTo(out, 0))
+            {
+                details = "Failed to write Type 0 MIDI file: " + midiFilePath.getFullPathName().toStdString();
+                return false;
+            }
+        }
+
+        {
+            FileInputStream in(midiFilePath);
+            if (!in.openedOk())
+            {
+                details = "Failed to reopen generated Type 0 MIDI file: " + midiFilePath.getFullPathName().toStdString();
+                return false;
+            }
+
+            MidiFile parsed;
+            int midiType = -1;
+            if (!parsed.readFrom(in, true, &midiType))
+            {
+                details = "JUCE failed to parse generated Type 0 MIDI file";
+                return false;
+            }
+
+            if (!expectEqual(midiType, 0, "generated MIDI file type", details))
+                return false;
+            if (!expectEqual(parsed.getNumTracks(), 1, "generated Type 0 track count", details))
+                return false;
+        }
+
+        MidiFilePlaybackEngine engine;
+        juce::String loadError;
+        if (!engine.loadFromFile(midiFilePath, loadError))
+        {
+            details = "MidiFilePlaybackEngine failed to load Type 0 MIDI: " + loadError.toStdString();
+            return false;
+        }
+
+        int programChanges = 0;
+        int noteOns = 0;
+        int noteOffs = 0;
+        int firstProgram = -1;
+        int firstNote = -1;
+
+        devices->setOutgoingMidiMonitor([&](const MidiMessage& msg, const juce::String&)
+            {
+                if (msg.getChannel() != 1)
+                    return;
+
+                if (msg.isProgramChange())
+                {
+                    ++programChanges;
+                    if (firstProgram < 0)
+                        firstProgram = msg.getProgramChangeNumber();
+                }
+                else if (msg.isNoteOn())
+                {
+                    ++noteOns;
+                    if (firstNote < 0)
+                        firstNote = msg.getNoteNumber();
+                }
+                else if (msg.isNoteOff())
+                {
+                    ++noteOffs;
+                }
+            });
+
+        engine.start(0.0);
+        engine.processUntil(1.0e9, [&](const MidiMessage& msg)
+            {
+                devices->sendToOutputs(msg);
+            });
+        devices->setOutgoingMidiMonitor({});
+
+        if (!expectEqual(programChanges, 1, "Type 0 program change count", details))
+            return false;
+        if (!expectEqual(firstProgram, 10, "Type 0 first program value", details))
+            return false;
+        if (!expectEqual(noteOns, 1, "Type 0 note-on count", details))
+            return false;
+        if (!expectEqual(noteOffs, 1, "Type 0 note-off count", details))
+            return false;
+        if (!expectEqual(firstNote, 60, "Type 0 first note number", details))
+            return false;
+
+        return true;
+    }
+
     bool runShortcutFocusDeferralGuard(std::string& details)
     {
         TextEditor editor;
@@ -2955,6 +3079,11 @@ int main()
     {
         std::string details;
         results.push_back({ "amtest.mid playback emits all channels and expected note pattern", runAmtestPlaybackEmitsAllChannelsAndNotes(details), details });
+    }
+
+    {
+        std::string details;
+        results.push_back({ "Type 0 MIDI regression: parse + playback emits expected channel events", runType0MidiLoadAndPlaybackRegression(details), details });
     }
 
     {
