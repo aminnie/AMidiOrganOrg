@@ -9040,8 +9040,16 @@ private:
             const int decision = promptToResolveDirtyProfile();
             if (decision == 0)
                 return false;
-            if (decision == 1 && !saveCurrentProfile(false))
-                return false;
+            if (decision == 1)
+            {
+                if (!saveCurrentProfile(false))
+                    return false;
+            }
+            else
+            {
+                // Discard means continue with the new MIDI file and clear current dirty prompt state.
+                markPlayerProfileDirty(false);
+            }
         }
 
         stopPlayback();
