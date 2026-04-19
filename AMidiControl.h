@@ -7558,6 +7558,7 @@ public:
                         midiPlayerSettings.soloChannel = 0;
                     }
 
+                    sendAllNotesOff();
                     saveMidiPlayerSettings();
                     markPlayerProfileDirty();
                 };
