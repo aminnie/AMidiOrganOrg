@@ -440,8 +440,23 @@ From the repository root:
 # Build the test executable
 cmake --build build --config Debug --target AMidiOrganTests
 
+# (Optional) Regenerate deterministic multi-channel fixture
+python tools/generate_amtest_midi.py
+
 # Run tests
 ctest --test-dir build -C Debug --output-on-failure
+```
+
+The test suite now includes `amtest.mid` playback coverage:
+
+- Fixture file: `docs/midi/amtest.mid`
+- Generator script: `tools/generate_amtest_midi.py`
+- Test name in output: `amtest.mid playback emits all channels and expected note pattern`
+
+To run the executable directly and filter that one line from output:
+
+```powershell
+.\build\AMidiOrganTests_artefacts\Debug\AMidiOrganTests.exe 2>&1 | Select-String "amtest.mid playback emits all channels and expected note pattern"
 ```
 
 ### Continuous Integration (GitHub Actions)
@@ -454,7 +469,7 @@ ctest --test-dir build -C Debug --output-on-failure
   - Build `AMidiOrganTests`.
   - Run `ctest`.
   - Build `AMidiOrgan` (Debug build on both platforms).
-- Current regression tests cover utility bounds, MIDI split/layer routing (including shared-output-channel fan-out to multiple modules), preset/config persistence roundtrips, MIDI controller reset emission, shutdown-ownership crash paths, shortcut focus deferral (text fields vs global hotkeys), and hotkey duplicate detection rules.
+- Current regression tests cover utility bounds, MIDI split/layer routing (including shared-output-channel fan-out to multiple modules), preset/config persistence roundtrips, MIDI controller reset emission, deterministic MIDI fixture playback coverage across channels 1..16 (`amtest.mid`), shutdown-ownership crash paths, shortcut focus deferral (text fields vs global hotkeys), and hotkey duplicate detection rules.
 
 ### Recommended Manual UI Smoke Test
 
