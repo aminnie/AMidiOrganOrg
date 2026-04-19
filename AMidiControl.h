@@ -7619,7 +7619,7 @@ public:
         const int loadFromProfileButtonW = 136;
         const int profileButtonW = 98;
         const int revertButtonW = 92;
-        const int profileLabelW = 98; // Keep enough room to show "Apply Profile" text.
+        const int profileLabelW = 74; // 25% narrower than previous 98px.
         const int moduleLabelW = 84;
         const int moduleButtonW = 146;
 
@@ -7637,7 +7637,7 @@ public:
         auto loadFromProfileRect = topRow.removeFromRight(loadFromProfileButtonW);
         topRow.removeFromRight(topGap);
         auto profileRegionRect = topRow;
-        const int profileComboWidth = juce::jmax(120, (profileRegionRect.getWidth() * 4) / 5); // reduce combo to 80%
+        const int profileComboWidth = juce::jmax(120, (profileRegionRect.getWidth() * 72) / 100); // reduce combo to 72% (10% less than prior 80%).
         auto profileComboRect = profileRegionRect.removeFromRight(profileComboWidth);
         profileRegionRect.removeFromRight(topGap);
         auto profileLabelRect = profileRegionRect;
