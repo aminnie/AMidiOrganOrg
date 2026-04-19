@@ -51,6 +51,10 @@ Instrument panels use the active configuration and panel data to determine which
 
 ![Effects Tab](docs/images/tab-effects.png)
 
+### Player Tab
+
+![Player Tab](docs/images/tab-player.png)
+
 ### Config Tab
 
 ![Config Tab](docs/images/tab-config.png)
