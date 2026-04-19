@@ -2446,6 +2446,54 @@ namespace
         return true;
     }
 
+    bool runOutputMuteGateBypassForPlayerPath(std::string& details)
+    {
+        auto* devices = MidiDevices::getInstance();
+        if (devices == nullptr)
+        {
+            details = "MidiDevices::getInstance() returned nullptr";
+            return false;
+        }
+
+        devices->clearMidiIOMap();
+        devices->setOutputChannelMuted(3, true);
+
+        std::vector<MidiMessage> sentMessages;
+        devices->testSendHook = [&sentMessages](const MidiMessage& message)
+        {
+            sentMessages.push_back(message);
+        };
+
+        const auto mutedPathMsg = MidiMessage::noteOn(3, 60, (juce::uint8) 100);
+        devices->sendToOutputs(mutedPathMsg);
+        if (!expectEqual(static_cast<int>(sentMessages.size()), 0, "default sendToOutputs respects output mute gate", details))
+        {
+            devices->testSendHook = nullptr;
+            return false;
+        }
+
+        const auto bypassMsg = MidiMessage::noteOn(3, 62, (juce::uint8) 100);
+        devices->sendToOutputs(bypassMsg, true);
+        if (!expectEqual(static_cast<int>(sentMessages.size()), 1, "bypass sendToOutputs ignores output mute gate", details))
+        {
+            devices->testSendHook = nullptr;
+            return false;
+        }
+        if (!expectEqual(sentMessages[0].getChannel(), 3, "bypass keeps original output channel", details))
+        {
+            devices->testSendHook = nullptr;
+            return false;
+        }
+        if (!expectEqual(sentMessages[0].getNoteNumber(), 62, "bypass forwards expected note payload", details))
+        {
+            devices->testSendHook = nullptr;
+            return false;
+        }
+
+        devices->testSendHook = nullptr;
+        return true;
+    }
+
     bool runAmtestPlaybackEmitsAllChannelsAndNotes(std::string& details)
     {
         auto* devices = MidiDevices::getInstance();
@@ -3074,6 +3122,11 @@ int main()
     {
         std::string details;
         results.push_back({ "MIDI IN monitor captures raw traffic including consumed and dropped paths", runIncomingMonitorCapturesRawAndDropped(details), details });
+    }
+
+    {
+        std::string details;
+        results.push_back({ "Output mute gate bypass allows Player-path notes while preserving default mute gate", runOutputMuteGateBypassForPlayerPath(details), details });
     }
 
     {

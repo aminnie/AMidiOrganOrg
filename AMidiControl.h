@@ -8303,7 +8303,7 @@ private:
 
         auto routedMessage = message;
         routedMessage.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
-        mididevices->sendToOutputs(routedMessage);
+        mididevices->sendToOutputs(routedMessage, true);
     }
 
     void sendAllNotesOff()

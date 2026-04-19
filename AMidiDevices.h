@@ -439,12 +439,15 @@ public:
     };
 
     // Send Midi Messages to all connected Output Devices
-    void sendToOutputs(const MidiMessage& msg)
+    void sendToOutputs(const MidiMessage& msg, bool bypassOutputChannelMuteGate = false)
     {
         const int outchan = msg.getChannel();
 
         // Hard mute gate for any direct channelized note emissions.
-        if (msg.isNoteOnOrOff() && isValidMidiChannel(outchan) && isOutputChannelMuted(outchan))
+        if (!bypassOutputChannelMuteGate
+            && msg.isNoteOnOrOff()
+            && isValidMidiChannel(outchan)
+            && isOutputChannelMuted(outchan))
             return;
 
         if (testSendHook)
