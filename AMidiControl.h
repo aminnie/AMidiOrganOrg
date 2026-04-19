@@ -8191,24 +8191,6 @@ private:
             });
     }
 
-    void tryAutoLoadProfileForCurrentMidi()
-    {
-        refreshProfileCombo();
-        const auto preferredProfileId = PlayerSongProfileStore::getLastUsedProfileIdForMidiKey(
-            playerProfilesIndex, currentMidiKey);
-        if (preferredProfileId.isNotEmpty())
-        {
-            if (loadProfileByIdAndApply(preferredProfileId))
-                return;
-        }
-
-        activeProfileId.clear();
-        activeProfileDisplayName.clear();
-        activeProfileCreatedUtc.clear();
-        markPlayerProfileDirty(false);
-        refreshProfileCombo();
-    }
-
     void timerCallback() override
     {
         if (!isPlayingFilePlayback)
@@ -8647,6 +8629,160 @@ private:
         }
     }
 
+    juce::File resolveMidigmInstrumentFile() const
+    {
+        return juce::File::getSpecialLocation(juce::File::userDocumentsDirectory)
+            .getChildFile(organdir)
+            .getChildFile(appState.instrumentdir)
+            .getChildFile("midigm.json");
+    }
+
+    /** Match MIDI file program (0..127) to a General MIDI row in midigm.json (second column is 1..128). */
+    static bool lookupGeneralMidiVoiceFromMidigmFile(const juce::File& midigmFile,
+                                                     int midiFileProgram,
+                                                     juce::String& outVoiceName,
+                                                     juce::String& outCategory)
+    {
+        outVoiceName.clear();
+        outCategory.clear();
+        if (midiFileProgram < 0 || midiFileProgram > 127)
+            return false;
+        if (!midigmFile.existsAsFile())
+            return false;
+
+        const auto parsed = juce::JSON::parse(midigmFile.loadFileAsString());
+        if (!parsed.isObject())
+            return false;
+
+        const auto* root = parsed.getDynamicObject();
+        if (root == nullptr)
+            return false;
+
+        const auto instrumentsVar = root->getProperty("Instruments");
+        const auto* instrumentsArray = instrumentsVar.getArray();
+        if (instrumentsArray == nullptr)
+            return false;
+
+        const int targetRowIndex = midiFileProgram + 1;
+
+        for (const auto& categoryVar : *instrumentsArray)
+        {
+            const auto* categoryArray = categoryVar.getArray();
+            if (categoryArray == nullptr || categoryArray->isEmpty())
+                continue;
+
+            const juce::String catName = categoryArray->getReference(0).toString();
+
+            for (int vi = 1; vi < categoryArray->size(); ++vi)
+            {
+                const auto& rowVar = categoryArray->getReference(vi);
+                const auto* rowArray = rowVar.getArray();
+                if (rowArray == nullptr || rowArray->size() < 5)
+                    continue;
+
+                const int rowPcToken = static_cast<int>(rowArray->getReference(1));
+                const int msb = static_cast<int>(rowArray->getReference(2));
+                const int lsb = static_cast<int>(rowArray->getReference(3));
+
+                if (rowPcToken != targetRowIndex)
+                    continue;
+                if (msb != 0 || lsb != 0)
+                    continue;
+
+                outVoiceName = rowArray->getReference(4).toString().trim();
+                outCategory = catName;
+                return outVoiceName.isNotEmpty();
+            }
+        }
+
+        return false;
+    }
+
+    /** Reset all Player MIDI channels to the same defaults as initial construction (before GM preset). */
+    void resetAllPlayerChannelInstrumentsToDefaults()
+    {
+        selectedChannelIdx = -1;
+        if (soundsButton != nullptr)
+            soundsButton->setEnabled(false);
+        if (effectsButton != nullptr)
+            effectsButton->setEnabled(false);
+
+        for (int i = 0; i < playerChannelCount; ++i)
+        {
+            Instrument instrument;
+            instrument.setVoice("Ch " + juce::String(i + 1));
+            instrument.setChannel(i + 1);
+            instrument.setMSB(0);
+            instrument.setLSB(0);
+            instrument.setFont(0);
+            instrument.setVol(appState.defaultEffectsVol);
+            instrument.setExp(appState.defaultEffectsExp);
+            instrument.setRev(appState.defaultEffectsRev);
+            instrument.setCho(appState.defaultEffectsCho);
+            instrument.setMod(appState.defaultEffectsMod);
+            instrument.setTim(appState.defaultEffectsTim);
+            instrument.setAtk(appState.defaultEffectsAtk);
+            instrument.setRel(appState.defaultEffectsRel);
+            instrument.setBri(appState.defaultEffectsBri);
+            instrument.setPan(appState.defaultEffectsPan);
+
+            channelInstruments[(size_t) i] = instrument;
+            playerChannelConfigured[(size_t) i] = false;
+
+            if (auto* b = channelButtons[(size_t) i])
+            {
+                b->setInstrument(instrument);
+                b->setButtonText(instrument.getVoice());
+                b->setToggleState(false, dontSendNotification);
+            }
+        }
+    }
+
+    /** Preset channel voice buttons from the last PC per channel and GM names in midigm.json (skips channels with no GM match). */
+    void applyGmChannelVoicesFromLoadedMidi()
+    {
+        const juce::File midigmFile = resolveMidigmInstrumentFile();
+        if (!midigmFile.existsAsFile() || programChangeEvents.empty())
+            return;
+
+        std::array<int, 17> lastPc {};
+        lastPc.fill(-1);
+        for (const auto& ev : programChangeEvents)
+        {
+            const int ch = juce::jlimit(1, 16, ev.channel);
+            lastPc[(size_t) ch] = ev.program;
+        }
+
+        for (int ch = 1; ch <= playerChannelCount; ++ch)
+        {
+            const int pc = lastPc[(size_t) ch];
+            if (pc < 0 || pc > 127)
+                continue;
+
+            juce::String voiceName;
+            juce::String categoryName;
+            if (!lookupGeneralMidiVoiceFromMidigmFile(midigmFile, pc, voiceName, categoryName))
+                continue;
+
+            const int idx = ch - 1;
+            auto instrument = channelInstruments[(size_t) idx];
+            instrument.setCategory(categoryName);
+            instrument.setVoice(voiceName);
+            instrument.setMSB(0);
+            instrument.setLSB(0);
+            instrument.setFont(pc);
+            instrument.setChannel(ch);
+            channelInstruments[(size_t) idx] = instrument;
+            playerChannelConfigured[(size_t) idx] = true;
+
+            if (auto* b = channelButtons[(size_t) idx])
+            {
+                b->setInstrument(instrument);
+                b->setButtonText(voiceName);
+            }
+        }
+    }
+
     juce::String buildTopMetadataLine() const
     {
         juce::String line = currentMidiMetadataText;
@@ -8977,7 +9113,14 @@ private:
         playbackStatusLabel->setText("Loaded: " + file.getFileName()
                 + " (" + juce::String(playbackEngine.getEventCount()) + " events)",
             dontSendNotification);
-        tryAutoLoadProfileForCurrentMidi();
+        resetAllPlayerChannelInstrumentsToDefaults();
+        applyGmChannelVoicesFromLoadedMidi();
+        activeProfileId.clear();
+        activeProfileDisplayName.clear();
+        activeProfileCreatedUtc.clear();
+        markPlayerProfileDirty(true);
+        refreshProfileCombo();
+        updateProfileButtonsState();
         updateTransportButtons();
         return true;
     }
