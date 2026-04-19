@@ -6,6 +6,7 @@ using namespace juce;
 #include "../AMidiDevices.h"
 #include "../AMidiInstruments.h"
 #include "../AMidiControl.h"
+#include "../midi_file_player/MidiFilePlaybackEngine.h"
 #include "../midi_file_player/PlayerMidiIdentity.h"
 #include "../midi_file_player/PlayerSongProfile.h"
 #include "../midi_file_player/PlayerSongProfileStore.h"
@@ -2445,6 +2446,101 @@ namespace
         return true;
     }
 
+    bool runAmtestPlaybackEmitsAllChannelsAndNotes(std::string& details)
+    {
+        auto* devices = MidiDevices::getInstance();
+        if (devices == nullptr)
+        {
+            details = "MidiDevices::getInstance() returned nullptr";
+            return false;
+        }
+
+        // Ensure deterministic single-stream observation independent of previous routing tests.
+        devices->clearMidiIOMap();
+
+        const auto repoRoot = File(__FILE__).getParentDirectory().getParentDirectory();
+        const auto amtest = repoRoot.getChildFile("docs").getChildFile("midi").getChildFile("amtest.mid");
+        if (!amtest.existsAsFile())
+        {
+            details = "amtest.mid not found at " + amtest.getFullPathName().toStdString();
+            return false;
+        }
+
+        MidiFilePlaybackEngine engine;
+        juce::String loadError;
+        if (!engine.loadFromFile(amtest, loadError))
+        {
+            details = "MidiFilePlaybackEngine load failed: " + loadError.toStdString();
+            return false;
+        }
+
+        std::array<int, 17> pcCount {};
+        std::array<int, 17> noteOnCount {};
+        std::array<int, 17> firstProgram {};
+        std::array<std::vector<int>, 17> noteOnSequence {};
+        firstProgram.fill(-1);
+
+        devices->setOutgoingMidiMonitor([&](const MidiMessage& msg, const juce::String&)
+            {
+                const int ch = msg.getChannel();
+                if (ch < 1 || ch > 16)
+                    return;
+
+                if (msg.isProgramChange())
+                {
+                    ++pcCount[(size_t) ch];
+                    if (firstProgram[(size_t) ch] < 0)
+                        firstProgram[(size_t) ch] = msg.getProgramChangeNumber();
+                }
+                else if (msg.isNoteOn())
+                {
+                    ++noteOnCount[(size_t) ch];
+                    noteOnSequence[(size_t) ch].push_back(msg.getNoteNumber());
+                }
+            });
+
+        engine.start(0.0);
+        const auto processed = engine.processUntil(1.0e12, [&](const MidiMessage& msg)
+            {
+                devices->sendToOutputs(msg);
+            });
+
+        devices->setOutgoingMidiMonitor({});
+        juce::ignoreUnused(processed);
+
+        static const std::array<int, 8> expectedPattern { 60, 62, 64, 65, 67, 69, 71, 72 };
+        static constexpr int expectedNotesPerChannel = 800;
+
+        for (int ch = 1; ch <= 16; ++ch)
+        {
+            if (!expectEqual(pcCount[(size_t) ch], 1, "program change count channel " + std::to_string(ch), details))
+                return false;
+            if (!expectEqual(firstProgram[(size_t) ch], ch - 1, "first program value channel " + std::to_string(ch), details))
+                return false;
+            if (!expectEqual(noteOnCount[(size_t) ch], expectedNotesPerChannel, "note-on count channel " + std::to_string(ch), details))
+                return false;
+
+            const auto& sequence = noteOnSequence[(size_t) ch];
+            if (!expectEqual((int) sequence.size(), expectedNotesPerChannel, "note sequence size channel " + std::to_string(ch), details))
+                return false;
+
+            for (int i = 0; i < expectedNotesPerChannel; ++i)
+            {
+                const int expectedNote = expectedPattern[(size_t) (i % (int) expectedPattern.size())];
+                if (sequence[(size_t) i] != expectedNote)
+                {
+                    details = "note pattern mismatch channel " + std::to_string(ch)
+                        + " index " + std::to_string(i)
+                        + " expected " + std::to_string(expectedNote)
+                        + " got " + std::to_string(sequence[(size_t) i]);
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
     bool runShortcutFocusDeferralGuard(std::string& details)
     {
         TextEditor editor;
@@ -2854,6 +2950,11 @@ int main()
     {
         std::string details;
         results.push_back({ "MIDI IN monitor captures raw traffic including consumed and dropped paths", runIncomingMonitorCapturesRawAndDropped(details), details });
+    }
+
+    {
+        std::string details;
+        results.push_back({ "amtest.mid playback emits all channels and expected note pattern", runAmtestPlaybackEmitsAllChannelsAndNotes(details), details });
     }
 
     {
