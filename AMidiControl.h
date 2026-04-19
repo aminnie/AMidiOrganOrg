@@ -7423,15 +7423,6 @@ public:
         importMidiButton->setToggleState(true, dontSendNotification);
         importMidiButton->onClick = [this]() { importLoadedMidiToLibrary(); };
 
-        autoLoadLastMidiToggle = addToList(new ToggleButton("Auto-load last MIDI"));
-        autoLoadLastMidiToggle->setColour(ToggleButton::textColourId, Colours::white);
-        autoLoadLastMidiToggle->onClick = [this]()
-            {
-                midiPlayerSettings.autoLoadLastMidiOnStartup = autoLoadLastMidiToggle->getToggleState();
-                saveMidiPlayerSettings();
-                markPlayerProfileDirty();
-            };
-
         remapProgramChangeToggle = addToList(new ToggleButton("Enable Program Change remap"));
         remapProgramChangeToggle->setColour(ToggleButton::textColourId, Colours::white);
         remapProgramChangeToggle->onClick = [this]()
@@ -7595,7 +7586,6 @@ public:
         loadMidiPlayerSettings();
         loadPlayerProfilesIndex();
         seedMidiLibraryFromDocsIfMissing();
-        maybeAutoLoadLastMidi();
         refreshProfileCombo();
         updateProfileButtonsState();
         updatePlaybackGroupTitle();
@@ -7740,7 +7730,7 @@ public:
             const int minToggleEach = 72;
             const int toggleGap = 6;
             const int toggleH = 22;
-            const int minForToggles = minToggleEach * 3 + toggleGap * 2;
+            const int minForToggles = minToggleEach * 2 + toggleGap;
             if (w < statusW + statusGap + minForToggles)
                 statusW = juce::jmax(60, w - statusGap - minForToggles);
 
@@ -7748,21 +7738,18 @@ public:
             playbackStatusLabel->setBounds(statusRect.getX(), playbackButtonY, statusRect.getWidth(), toggleH);
             r.removeFromRight(statusGap);
 
-            const int tRem = juce::jmax(0, r.getWidth() - (toggleGap * 2));
-            const int toggleW = tRem / 3;
+            const int tRem = juce::jmax(0, r.getWidth() - toggleGap);
+            const int toggleW = tRem / 2;
             auto t0 = r.removeFromLeft(toggleW);
-            autoLoadLastMidiToggle->setBounds(t0.getX(), playbackButtonY, t0.getWidth(), toggleH);
+            remapProgramChangeToggle->setBounds(t0.getX(), playbackButtonY, t0.getWidth(), toggleH);
             r.removeFromLeft(toggleGap);
-            auto t1 = r.removeFromLeft(toggleW);
-            remapProgramChangeToggle->setBounds(t1.getX(), playbackButtonY, t1.getWidth(), toggleH);
-            r.removeFromLeft(toggleGap);
-            auto t2 = r;
-            playerStripCcScalingToggle->setBounds(t2.getX(), playbackButtonY, t2.getWidth(), toggleH);
+            auto t1 = r;
+            playerStripCcScalingToggle->setBounds(t1.getX(), playbackButtonY, t1.getWidth(), toggleH);
         }
 
         {
             const int infoH = 18;
-            const int infoY = autoLoadLastMidiToggle->getBottom() + 2;
+            const int infoY = playbackButtonY + 24;
             const int transportGap = 12;
             const int transportW = (playbackStatusLabel != nullptr)
                 ? playbackStatusLabel->getWidth()
@@ -7991,6 +7978,27 @@ private:
         saveProfileAsButton->setEnabled(canUseProfiles);
         revertProfileButton->setEnabled(canUseProfiles && activeProfileId.isNotEmpty());
         loadMidiFromProfileButton->setEnabled(!playerProfilesIndex.entries.empty());
+        updatePlayerProfileSaveButtonsDirtyStyle();
+    }
+
+    void updatePlayerProfileSaveButtonsDirtyStyle()
+    {
+        if (saveProfileButton == nullptr || saveProfileAsButton == nullptr)
+            return;
+
+        const bool highlightPending = playerProfileDirty
+            && saveProfileButton->isEnabled()
+            && saveProfileAsButton->isEnabled();
+
+        const auto baseOff = juce::Colours::lightgrey;
+        const auto baseOn = juce::Colours::lightgrey;
+        const auto pendingOff = juce::Colours::darkred;
+        const auto pendingOn = juce::Colours::darkred.brighter();
+
+        saveProfileButton->setColour(TextButton::buttonColourId, highlightPending ? pendingOff : baseOff);
+        saveProfileButton->setColour(TextButton::buttonOnColourId, highlightPending ? pendingOn : baseOn);
+        saveProfileAsButton->setColour(TextButton::buttonColourId, highlightPending ? pendingOff : baseOff);
+        saveProfileAsButton->setColour(TextButton::buttonOnColourId, highlightPending ? pendingOn : baseOn);
     }
 
     void markPlayerProfileDirty(bool dirty = true)
@@ -7998,25 +8006,35 @@ private:
         if (applyingPlayerProfileState)
             return;
         playerProfileDirty = dirty;
+        updatePlayerProfileSaveButtonsDirtyStyle();
     }
 
-    int promptToResolveDirtyProfile()
+    bool promptToContinueWithDirtyProfile()
     {
         if (!playerProfileDirty)
-            return 2;
-        // Keep 3 choices but map return codes explicitly:
-        // 1 -> Save (first button), 2 -> Cancel (second button), 0 -> Discard (third button).
-        const int decision = juce::AlertWindow::showYesNoCancelBox(
+            return true;
+
+       #if JUCE_MODAL_LOOPS_PERMITTED
+        const auto options = juce::MessageBoxOptions()
+            .withIconType(juce::MessageBoxIconType::WarningIcon)
+            .withTitle("Unsaved Player Profile")
+            .withMessage("Continue without saving the current Player profile?")
+            .withButton("Continue")
+            .withButton("Cancel")
+            .withAssociatedComponent(this);
+
+        const int selectedIndex = juce::NativeMessageBox::show(options);
+        return selectedIndex == 0;
+       #else
+        return juce::AlertWindow::showOkCancelBox(
             juce::AlertWindow::WarningIcon,
             "Unsaved Player Profile",
-            "Save Player profile changes before switching?",
-            "Save",
+            "Continue without saving the current Player profile?",
+            "Continue",
             "Cancel",
-            "Discard",
             this,
             nullptr);
-
-        return decision;
+       #endif
     }
 
     bool saveCurrentProfile(bool forceSaveAs)
@@ -8087,18 +8105,12 @@ private:
         if (targetProfileId == activeProfileId)
             return;
 
-        const int decision = promptToResolveDirtyProfile();
-        if (decision == 0)
+        if (!promptToContinueWithDirtyProfile())
         {
             refreshProfileCombo();
             return;
         }
-
-        if (decision == 1 && !saveCurrentProfile(false))
-        {
-            refreshProfileCombo();
-            return;
-        }
+        markPlayerProfileDirty(false);
 
         if (targetProfileId.isEmpty())
         {
@@ -8138,18 +8150,9 @@ private:
             return false;
         }
 
-        const int decision = promptToResolveDirtyProfile();
-        if (decision == 0)
+        if (!promptToContinueWithDirtyProfile())
             return false;
-        if (decision == 1)
-        {
-            if (!saveCurrentProfile(false))
-                return false;
-        }
-        else
-        {
-            markPlayerProfileDirty(false);
-        }
+        markPlayerProfileDirty(false);
 
         if (!loadedMidiFile.existsAsFile()
             || loadedMidiFile.getFullPathName() != midiFile.getFullPathName())
@@ -9040,21 +9043,10 @@ private:
             && loadedMidiFile.getFullPathName() != file.getFullPathName()
             && playerProfileDirty)
         {
-            const int decision = promptToResolveDirtyProfile();
-            if (decision == 2)
-            {
+            if (!promptToContinueWithDirtyProfile())
                 return false;
-            }
-            if (decision == 1)
-            {
-                if (!saveCurrentProfile(false))
-                    return false;
-            }
-            else
-            {
-                // Discard means continue with the new MIDI file and clear current dirty prompt state.
-                markPlayerProfileDirty(false);
-            }
+            // Continue means ignore unsaved profile edits and proceed with selected MIDI/profile load.
+            markPlayerProfileDirty(false);
         }
 
         stopPlayback();
@@ -9094,7 +9086,6 @@ private:
         currentMidiKey = currentMidiIdentity.midiKey;
         updatePlaybackGroupTitle();
         hasLoadedPlayableMidi = true;
-        midiPlayerSettings.saveLastMidiPath(file);
 
         juce::String metadataError;
         const auto metadata = readMidiMetadata(file, metadataError);
@@ -9194,7 +9185,6 @@ private:
         if (error.isNotEmpty())
             playbackStatusLabel->setText(error, dontSendNotification);
 
-        autoLoadLastMidiToggle->setToggleState(midiPlayerSettings.autoLoadLastMidiOnStartup, dontSendNotification);
         remapProgramChangeToggle->setToggleState(midiPlayerSettings.enableProgramChangeRemap, dontSendNotification);
         playerStripCcScalingToggle->setToggleState(midiPlayerSettings.enablePlayerStripCcScaling, dontSendNotification);
         syncMuteSoloTogglesFromSettings();
@@ -9217,25 +9207,6 @@ private:
             if (auto* soloToggle = channelSoloToggles[(size_t) i])
                 soloToggle->setToggleState(soloChannel == (i + 1), dontSendNotification);
         }
-    }
-
-    void maybeAutoLoadLastMidi()
-    {
-        if (!midiPlayerSettings.autoLoadLastMidiOnStartup)
-            return;
-
-        const auto path = midiPlayerSettings.loadLastMidiPath();
-        if (path.isEmpty())
-            return;
-
-        const juce::File file(path);
-        if (!file.existsAsFile())
-        {
-            midiPlayerSettings.clearLastMidiPath();
-            return;
-        }
-
-        loadMidiFile(file);
     }
 
     static bool hasMidiExtension(const juce::File& file)
@@ -9362,7 +9333,6 @@ private:
 
         loadedMidiFile = targetFile;
         updatePlaybackGroupTitle();
-        midiPlayerSettings.saveLastMidiPath(loadedMidiFile);
         playbackStatusLabel->setText("Imported to MIDI folder: " + loadedMidiFile.getFileName(), dontSendNotification);
     }
 
@@ -9428,7 +9398,6 @@ private:
     TextButton* startMidiButton = nullptr;
     TextButton* stopMidiButton = nullptr;
     TextButton* importMidiButton = nullptr;
-    ToggleButton* autoLoadLastMidiToggle = nullptr;
     ToggleButton* remapProgramChangeToggle = nullptr;
     ToggleButton* playerStripCcScalingToggle = nullptr;
     Label* playbackStatusLabel = nullptr;

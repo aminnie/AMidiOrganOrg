@@ -6,7 +6,6 @@
 
 struct MidiFilePlayerSettings
 {
-    bool autoLoadLastMidiOnStartup = true;
     bool enableProgramChangeRemap = true;
     bool enablePlayerStripCcScaling = false;
     std::array<bool, 17> mutedChannels {};
@@ -24,11 +23,6 @@ struct MidiFilePlayerSettings
         return getConfigDirectory().getChildFile("midi_file_settings.json");
     }
 
-    static juce::File getLastMidiFilePathFile()
-    {
-        return getConfigDirectory().getChildFile("last_midi_file.txt");
-    }
-
     static juce::File getSelectedOutputFile()
     {
         return getConfigDirectory().getChildFile("selected_midi_output.txt");
@@ -42,7 +36,6 @@ struct MidiFilePlayerSettings
     bool load(juce::String& error)
     {
         error.clear();
-        autoLoadLastMidiOnStartup = true;
         enableProgramChangeRemap = true;
         enablePlayerStripCcScaling = false;
         mutedChannels.fill(false);
@@ -63,10 +56,6 @@ struct MidiFilePlayerSettings
             error = "Invalid JSON in MIDI file settings.";
             return false;
         }
-
-        const auto autoLoadValue = object->getProperty("autoLoadLastMidiOnStartup");
-        if (autoLoadValue.isBool())
-            autoLoadLastMidiOnStartup = static_cast<bool>(autoLoadValue);
 
         const auto remapValue = object->getProperty("enableProgramChangeRemap");
         if (remapValue.isBool())
@@ -106,7 +95,6 @@ struct MidiFilePlayerSettings
             return false;
         }
 
-        settingsObject->setProperty("autoLoadLastMidiOnStartup", autoLoadLastMidiOnStartup);
         settingsObject->setProperty("enableProgramChangeRemap", enableProgramChangeRemap);
         settingsObject->setProperty("enablePlayerStripCcScaling", enablePlayerStripCcScaling);
 
@@ -126,28 +114,6 @@ struct MidiFilePlayerSettings
 
         savePersistedDeviceSelection();
         return true;
-    }
-
-    juce::String loadLastMidiPath() const
-    {
-        const auto pathFile = getLastMidiFilePathFile();
-        if (!pathFile.existsAsFile())
-            return {};
-        return pathFile.loadFileAsString().trim();
-    }
-
-    void saveLastMidiPath(const juce::File& midiFile) const
-    {
-        const auto pathFile = getLastMidiFilePathFile();
-        pathFile.getParentDirectory().createDirectory();
-        pathFile.replaceWithText(midiFile.getFullPathName());
-    }
-
-    void clearLastMidiPath() const
-    {
-        const auto pathFile = getLastMidiFilePathFile();
-        if (pathFile.existsAsFile())
-            pathFile.deleteFile();
     }
 
 private:
@@ -183,10 +149,6 @@ private:
         const auto* object = parsed.getDynamicObject();
         if (object == nullptr)
             return;
-
-        const auto autoLoadValue = object->getProperty("autoLoadLastMidiOnStartup");
-        if (autoLoadValue.isBool())
-            autoLoadLastMidiOnStartup = static_cast<bool>(autoLoadValue);
 
         const auto remapValue = object->getProperty("enableProgramChangeRemap");
         if (remapValue.isBool())
