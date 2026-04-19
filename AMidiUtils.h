@@ -938,13 +938,13 @@ enum PanelTabsType {
     PTUpper = 1,
     PTLower = 2,
     PTBass = 3,
-    PTVoices = 4,
-    PTEffects = 5,
-    PTConfig = 6,
-    PTHotkeys = 7,
-    PTMonitor = 8,
-    PTHelp = 9,
-    PTPlayer = 10,
+    PTPlayer = 4,
+    PTVoices = 5,
+    PTEffects = 6,
+    PTConfig = 7,
+    PTHotkeys = 8,
+    PTMonitor = 9,
+    PTHelp = 10,
     PTExit = 11
 };
 

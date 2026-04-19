@@ -7301,12 +7301,12 @@ public:
                     });
             };
 
-        profileLabel = addToList(new Label("player.profile.label", "Profile"));
+        profileLabel = addToList(new Label("player.profile.label", "Apply Profile"));
         profileLabel->setColour(Label::textColourId, Colours::white);
-        profileLabel->setJustificationType(Justification::centredRight);
+        profileLabel->setJustificationType(Justification::centredLeft);
 
         profileComboBox = addToList(new ComboBox("player.profile.combo"));
-        profileComboBox->setTooltip("Select a saved Player profile for the loaded MIDI file.");
+        profileComboBox->setTooltip("Apply a saved Player profile for the loaded MIDI file.");
         profileComboBox->onChange = [this]() { onProfileSelectionChangedFromUi(); };
 
         saveProfileButton = addToList(new TextButton("Save Profile"));
@@ -7330,7 +7330,7 @@ public:
         revertProfileButton->setColour(TextButton::buttonOnColourId, juce::Colours::lightgrey);
         revertProfileButton->onClick = [this]() { revertCurrentProfile(); };
 
-        loadMidiFromProfileButton = addToList(new TextButton("Load MIDI from Profile"));
+        loadMidiFromProfileButton = addToList(new TextButton("Load Profile+MIDI"));
         loadMidiFromProfileButton->setColour(TextButton::textColourOffId, Colours::black);
         loadMidiFromProfileButton->setColour(TextButton::textColourOnId, Colours::black);
         loadMidiFromProfileButton->setColour(TextButton::buttonColourId, juce::Colours::lightgrey);
@@ -7461,8 +7461,9 @@ public:
         refreshMidiMetadataLabel();
 
         midiTransportLabel = addToList(new Label("player.midi.transport", {}));
-        midiTransportLabel->setColour(Label::textColourId, juce::Colours::grey);
-        midiTransportLabel->setJustificationType(Justification::centredRight);
+        midiTransportLabel->setColour(Label::textColourId, juce::Colours::darkred);
+        midiTransportLabel->setFont(midiTransportLabel->getFont().boldened());
+        midiTransportLabel->setJustificationType(Justification::centredLeft);
         midiTransportLabel->setInterceptsMouseClicks(false, false);
         refreshMidiTransportLabel();
 
@@ -7613,12 +7614,12 @@ public:
         const int margin = 10;
         const int soundModuleY = margin + 1;
         const int soundModuleControlY = soundModuleY - 5;
-        const int topControlH = 26;
+        const int topControlH = 42;
         const int topGap = 6;
         const int loadFromProfileButtonW = 136;
         const int profileButtonW = 98;
         const int revertButtonW = 92;
-        const int profileLabelW = 54;
+        const int profileLabelW = 98; // Keep enough room to show "Apply Profile" text.
         const int moduleLabelW = 84;
         const int moduleButtonW = 146;
 
@@ -7627,17 +7628,21 @@ public:
         topRow.removeFromRight(topGap);
         auto moduleLabelRect = topRow.removeFromRight(moduleLabelW);
         topRow.removeFromRight(topGap);
-        auto loadFromProfileRect = topRow.removeFromRight(loadFromProfileButtonW);
-        topRow.removeFromRight(topGap);
         auto revertRect = topRow.removeFromRight(revertButtonW);
         topRow.removeFromRight(topGap);
         auto saveAsRect = topRow.removeFromRight(profileButtonW);
         topRow.removeFromRight(topGap);
         auto saveRect = topRow.removeFromRight(profileButtonW);
         topRow.removeFromRight(topGap);
-        auto profileComboRect = topRow;
-        auto profileLabelRect = profileComboRect.removeFromLeft(profileLabelW);
-        profileComboRect.removeFromLeft(topGap);
+        auto loadFromProfileRect = topRow.removeFromRight(loadFromProfileButtonW);
+        topRow.removeFromRight(topGap);
+        auto profileRegionRect = topRow;
+        const int profileComboWidth = juce::jmax(120, (profileRegionRect.getWidth() * 4) / 5); // reduce combo to 80%
+        auto profileComboRect = profileRegionRect.removeFromRight(profileComboWidth);
+        profileRegionRect.removeFromRight(topGap);
+        auto profileLabelRect = profileRegionRect;
+        if (profileLabelRect.getWidth() < profileLabelW)
+            profileLabelRect.setWidth(profileLabelW);
 
         if (profileLabel != nullptr)
             profileLabel->setBounds(profileLabelRect);
@@ -7656,20 +7661,8 @@ public:
         if (soundModuleButton != nullptr)
             soundModuleButton->setBounds(moduleButtonRect);
 
-        const int metaLabelX = margin + 2;
-        const int metaLabelY = soundModuleControlY + topControlH + 2;
-        const int metaLabelW = juce::jmax(140, getWidth() - margin * 2);
-        const int metaLabelH = 20;
-        const int transportLabelGap = 12;
-        const int transportLabelW = juce::jlimit(190, 320, metaLabelW / 3);
-        const int metadataLabelW = juce::jmax(120, metaLabelW - transportLabelW - transportLabelGap);
-        if (midiMetadataLabel != nullptr)
-            midiMetadataLabel->setBounds(metaLabelX, metaLabelY, metadataLabelW, metaLabelH);
-        if (midiTransportLabel != nullptr)
-            midiTransportLabel->setBounds(metaLabelX + metadataLabelW + transportLabelGap, metaLabelY, transportLabelW, metaLabelH);
-
         const int groupHeight = 132;
-        const int channelsTop = metaLabelY + metaLabelH + 6 - 5;
+        const int channelsTop = soundModuleControlY + topControlH + 7;
         channelsGroup->setBounds(margin, channelsTop, getWidth() - margin * 2, groupHeight);
 
         const int channelButtonInsetX = 14;
@@ -7707,11 +7700,11 @@ public:
         static constexpr int kPlayerVoiceEditBtnH = 42;
 
         const int editsWidth = 190;
-        const int editsHeight = 90;
+        const int editsHeight = 80;
         const int voiceEditsY = channelsGroup->getBottom();
-        const int voiceEditButtonY = voiceEditsY + 30;
+        const int voiceEditButtonY = voiceEditsY + 25;
         const int playbackY = channelsGroup->getBottom();
-        const int playbackButtonY = playbackY + 30;
+        const int playbackButtonY = playbackY + 25;
 
         voiceEditsGroup->setBounds(margin, voiceEditsY, editsWidth, editsHeight);
         soundsButton->setBounds(margin + 10, voiceEditButtonY, kPlayerVoiceEditBtnW, kPlayerVoiceEditBtnH);
@@ -7746,24 +7739,43 @@ public:
             int statusW = juce::jlimit(100, 380, juce::jmax(80, w / 3));
             const int minToggleEach = 72;
             const int toggleGap = 6;
+            const int toggleH = 22;
             const int minForToggles = minToggleEach * 3 + toggleGap * 2;
             if (w < statusW + statusGap + minForToggles)
                 statusW = juce::jmax(60, w - statusGap - minForToggles);
 
             auto statusRect = r.removeFromRight(statusW);
-            playbackStatusLabel->setBounds(statusRect.getX(), playbackButtonY, statusRect.getWidth(), kPlayerVoiceEditBtnH);
+            playbackStatusLabel->setBounds(statusRect.getX(), playbackButtonY, statusRect.getWidth(), toggleH);
             r.removeFromRight(statusGap);
 
             const int tRem = juce::jmax(0, r.getWidth() - (toggleGap * 2));
             const int toggleW = tRem / 3;
             auto t0 = r.removeFromLeft(toggleW);
-            autoLoadLastMidiToggle->setBounds(t0.getX(), playbackButtonY, t0.getWidth(), kPlayerVoiceEditBtnH);
+            autoLoadLastMidiToggle->setBounds(t0.getX(), playbackButtonY, t0.getWidth(), toggleH);
             r.removeFromLeft(toggleGap);
             auto t1 = r.removeFromLeft(toggleW);
-            remapProgramChangeToggle->setBounds(t1.getX(), playbackButtonY, t1.getWidth(), kPlayerVoiceEditBtnH);
+            remapProgramChangeToggle->setBounds(t1.getX(), playbackButtonY, t1.getWidth(), toggleH);
             r.removeFromLeft(toggleGap);
             auto t2 = r;
-            playerStripCcScalingToggle->setBounds(t2.getX(), playbackButtonY, t2.getWidth(), kPlayerVoiceEditBtnH);
+            playerStripCcScalingToggle->setBounds(t2.getX(), playbackButtonY, t2.getWidth(), toggleH);
+        }
+
+        {
+            const int infoH = 18;
+            const int infoY = autoLoadLastMidiToggle->getBottom() + 2;
+            const int transportGap = 12;
+            const int transportW = (playbackStatusLabel != nullptr)
+                ? playbackStatusLabel->getWidth()
+                : juce::jlimit(150, 320, juce::jmax(120, playbackGroup->getWidth() / 3));
+            const int transportX = (playbackStatusLabel != nullptr)
+                ? playbackStatusLabel->getX()
+                : (playbackGroup->getRight() - 12 - transportW);
+            const int metadataX = importMidiButton->getRight() + gap;
+            const int metadataW = juce::jmax(40, transportX - transportGap - metadataX);
+            if (midiMetadataLabel != nullptr)
+                midiMetadataLabel->setBounds(metadataX, infoY, metadataW, infoH);
+            if (midiTransportLabel != nullptr)
+                midiTransportLabel->setBounds(transportX, infoY, transportW, infoH);
         }
     }
 
@@ -14462,7 +14474,8 @@ public:
         //KeyboardPanelPage* basspanel = new KeyboardPanelPage(*this, PTBass, *effectspage, *voicespage);
         addTab("Bass&Drums",   colour, new KeyboardPanelPage(*this, PTBass, *effectspage, *voicespage), true);
 
-        // Create Voices and Effects Pages
+        // Create Player, Voices and Effects Pages
+        addTab("Player",       colour, new PlayerPage(*this), true);
         addTab("Sounds",       colour, voicespage, true);
         addTab("Effects",      colour, effectspage, true);
 
@@ -14471,7 +14484,6 @@ public:
         addTab("Hotkeys",      colour, new HotkeysPage(commandManager, keyPressTarget), true);
         addTab("Monitor",      colour, monitorpage, true);
         addTab("Help",         colour, new HelpPage(), true);
-        addTab("Player",       colour, new PlayerPage(*this), true);
         addTab("Exit",         colour, new Component(), true);
 
         this->setTabBarDepth(30);

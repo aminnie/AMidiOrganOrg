@@ -387,7 +387,7 @@ How to use:
 2. Select one or more channel strips (`Ch 1..16`) and configure voice/effects for those channels.
 3. Optional: enable `Enable Program Change remap` if lookup remapping is desired.
 4. Optional: enable `Scale file CCs with Player strip` to blend file CC automation with strip trims.
-5. Optional: choose an existing profile in `Profile` or create one with `Save Profile As`.
+5. Optional: choose an existing profile in `Apply Profile` or create one with `Save Profile As`.
 6. Start playback.
 
 Behavior:
@@ -403,7 +403,7 @@ Behavior:
   - `Save Profile` updates the active profile.
   - `Save Profile As` creates a new profile entry.
   - `Revert Profile` reloads the active profile from disk.
-  - `Load MIDI from Profile` loads the MIDI file referenced by the selected profile and applies that profile state.
+  - `Load MIDI+Profile` loads the MIDI file referenced by the selected profile and applies that profile state.
   - Profile switch while dirty prompts `Save`, `Discard`, or `Cancel`.
 - Profiles are sidecar files (your source `.mid` is unchanged during normal playback).
 - If a profile references a missing MIDI file, Player shows an error in status and keeps the current session unchanged.
