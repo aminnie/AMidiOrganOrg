@@ -8004,16 +8004,19 @@ private:
     {
         if (!playerProfileDirty)
             return 2;
-
-        return juce::AlertWindow::showYesNoCancelBox(
+        // Keep 3 choices but map return codes explicitly:
+        // 1 -> Save (first button), 2 -> Cancel (second button), 0 -> Discard (third button).
+        const int decision = juce::AlertWindow::showYesNoCancelBox(
             juce::AlertWindow::WarningIcon,
             "Unsaved Player Profile",
             "Save Player profile changes before switching?",
             "Save",
-            "Discard",
             "Cancel",
+            "Discard",
             this,
             nullptr);
+
+        return decision;
     }
 
     bool saveCurrentProfile(bool forceSaveAs)
@@ -9038,8 +9041,10 @@ private:
             && playerProfileDirty)
         {
             const int decision = promptToResolveDirtyProfile();
-            if (decision == 0)
+            if (decision == 2)
+            {
                 return false;
+            }
             if (decision == 1)
             {
                 if (!saveCurrentProfile(false))
