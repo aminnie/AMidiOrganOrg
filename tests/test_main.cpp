@@ -447,6 +447,7 @@ namespace
         profile.channels[0].voice = "Organ 1";
         profile.channels[0].program = 42;
         profile.channels[0].vol = 96;
+        profile.channels[0].effectsDirty = MAPVOL | MAPMOD;
         profile.selectedChannelIdx = 0;
 
         const auto json = PlayerSongProfileCodec::toJsonString(profile);
@@ -463,7 +464,8 @@ namespace
             || !expectEqual(decoded.moduleIdx, profile.moduleIdx, "moduleIdx roundtrip", details)
             || !expectEqual(decoded.soloChannel, profile.soloChannel, "soloChannel roundtrip", details)
             || !expectEqual(decoded.channels[0].program, profile.channels[0].program, "program roundtrip", details)
-            || !expectEqual(decoded.channels[0].vol, profile.channels[0].vol, "vol roundtrip", details))
+            || !expectEqual(decoded.channels[0].vol, profile.channels[0].vol, "vol roundtrip", details)
+            || !expectEqual(decoded.channels[0].effectsDirty, profile.channels[0].effectsDirty, "effectsDirty roundtrip", details))
         {
             return false;
         }

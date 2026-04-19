@@ -168,6 +168,10 @@ public:
         isdirty = isdirty | val;
     }
 
+    void replaceDirtyMask(int val) {
+        isdirty = val;
+    }
+
     int getChannel()
     {
         return midichannel;

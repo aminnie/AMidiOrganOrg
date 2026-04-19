@@ -3,6 +3,7 @@
 #include <JuceHeader.h>
 #include <array>
 #include <vector>
+#include "AMidiUtils.h"
 #include "PlayerMidiIdentity.h"
 
 struct PlayerChannelProfile
@@ -24,11 +25,12 @@ struct PlayerChannelProfile
     int rel = 0;
     int bri = 30;
     int pan = 64;
+    int effectsDirty = EffectsMapAll;
 };
 
 struct PlayerSongProfile
 {
-    static constexpr int schemaVersionCurrent = 1;
+    static constexpr int schemaVersionCurrent = 2;
 
     int schemaVersion = schemaVersionCurrent;
     juce::String profileId;
@@ -193,6 +195,7 @@ inline juce::ValueTree toValueTree(const PlayerSongProfile& profile)
         channelNode.setProperty("rel", clampMidi7(channel.rel), nullptr);
         channelNode.setProperty("bri", clampMidi7(channel.bri), nullptr);
         channelNode.setProperty("pan", clampMidi7(channel.pan), nullptr);
+        channelNode.setProperty("effectsDirty", channel.effectsDirty, nullptr);
         channelsNode.addChild(channelNode, -1, nullptr);
     }
     root.addChild(channelsNode, -1, nullptr);
@@ -296,6 +299,7 @@ inline bool fromValueTree(const juce::ValueTree& root, PlayerSongProfile& outPro
             c.rel = clampMidi7(readInt(channelNode, "rel", 0));
             c.bri = clampMidi7(readInt(channelNode, "bri", 30));
             c.pan = clampMidi7(readInt(channelNode, "pan", 64));
+            c.effectsDirty = readInt(channelNode, "effectsDirty", EffectsMapAll);
             ++loaded;
         }
     }

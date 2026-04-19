@@ -1495,7 +1495,7 @@ private:
                 instrument.setPan(ival);
 
                 ival = childNode.getProperty(dirtyType);
-                instrument.setDirty(ival);
+                instrument.replaceDirtyMask(ival);
             }
 
             ////VoiceButton* pvb = panelvoicebuttons[i];
@@ -2981,16 +2981,16 @@ public:
         if (currenttabidx == PTPlayer && playerRouteActive)
         {
             switch (cctype) {
-                case CCVol: playerWorkingInstrument.setVol(val); break;
-                case CCExp: playerWorkingInstrument.setExp(val); break;
-                case CCRev: playerWorkingInstrument.setRev(val); break;
-                case CCCho: playerWorkingInstrument.setCho(val); break;
-                case CCMod: playerWorkingInstrument.setMod(val); break;
-                case CCTim: playerWorkingInstrument.setTim(val); break;
-                case CCAtk: playerWorkingInstrument.setAtk(val); break;
-                case CCRel: playerWorkingInstrument.setRel(val); break;
-                case CCBri: playerWorkingInstrument.setBri(val); break;
-                case CCPan: playerWorkingInstrument.setPan(val); break;
+                case CCVol: playerWorkingInstrument.setVol(val); playerWorkingInstrument.setDirty(MAPVOL); break;
+                case CCExp: playerWorkingInstrument.setExp(val); playerWorkingInstrument.setDirty(MAPEXP); break;
+                case CCRev: playerWorkingInstrument.setRev(val); playerWorkingInstrument.setDirty(MAPREV); break;
+                case CCCho: playerWorkingInstrument.setCho(val); playerWorkingInstrument.setDirty(MAPCH0); break;
+                case CCMod: playerWorkingInstrument.setMod(val); playerWorkingInstrument.setDirty(MAPMOD); break;
+                case CCTim: playerWorkingInstrument.setTim(val); playerWorkingInstrument.setDirty(MAPTIM); break;
+                case CCAtk: playerWorkingInstrument.setAtk(val); playerWorkingInstrument.setDirty(MAPATK); break;
+                case CCRel: playerWorkingInstrument.setRel(val); playerWorkingInstrument.setDirty(MAPREL); break;
+                case CCBri: playerWorkingInstrument.setBri(val); playerWorkingInstrument.setDirty(MAPBRI); break;
+                case CCPan: playerWorkingInstrument.setPan(val); playerWorkingInstrument.setDirty(MAPPAN); break;
                 default:
                     break;
             }
@@ -7861,6 +7861,7 @@ private:
             target.rel = source.getRel();
             target.bri = source.getBri();
             target.pan = source.getPan();
+            target.effectsDirty = source.getDirty();
         }
         return profile;
     }
@@ -7900,6 +7901,7 @@ private:
             instrument.setRel(source.rel);
             instrument.setBri(source.bri);
             instrument.setPan(source.pan);
+            instrument.replaceDirtyMask(source.effectsDirty);
 
             channelInstruments[(size_t) idx] = instrument;
             playerChannelConfigured[(size_t) idx] = source.configured;
@@ -9372,16 +9374,17 @@ private:
     void sendEffects(Instrument instrument)
     {
         const int midiChannel = instrument.getChannel();
-        sendCC(midiChannel, CCVol, instrument.getVol());
-        sendCC(midiChannel, CCExp, instrument.getExp());
-        sendCC(midiChannel, CCRev, instrument.getRev());
-        sendCC(midiChannel, CCCho, instrument.getCho());
-        sendCC(midiChannel, CCMod, instrument.getMod());
-        sendCC(midiChannel, CCTim, instrument.getTim());
-        sendCC(midiChannel, CCAtk, instrument.getAtk());
-        sendCC(midiChannel, CCRel, instrument.getRel());
-        sendCC(midiChannel, CCBri, instrument.getBri());
-        sendCC(midiChannel, CCPan, instrument.getPan());
+        const int dirty = instrument.getDirty();
+        if (dirty & MAPVOL) sendCC(midiChannel, CCVol, instrument.getVol());
+        if (dirty & MAPEXP) sendCC(midiChannel, CCExp, instrument.getExp());
+        if (dirty & MAPREV) sendCC(midiChannel, CCRev, instrument.getRev());
+        if (dirty & MAPCH0) sendCC(midiChannel, CCCho, instrument.getCho());
+        if (dirty & MAPMOD) sendCC(midiChannel, CCMod, instrument.getMod());
+        if (dirty & MAPTIM) sendCC(midiChannel, CCTim, instrument.getTim());
+        if (dirty & MAPATK) sendCC(midiChannel, CCAtk, instrument.getAtk());
+        if (dirty & MAPREL) sendCC(midiChannel, CCRel, instrument.getRel());
+        if (dirty & MAPBRI) sendCC(midiChannel, CCBri, instrument.getBri());
+        if (dirty & MAPPAN) sendCC(midiChannel, CCPan, instrument.getPan());
     }
 
     template <typename ComponentType>
