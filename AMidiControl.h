@@ -7403,13 +7403,7 @@ public:
         startStopMidiButton->setColour(TextButton::textColourOffId, Colours::black);
         startStopMidiButton->setColour(TextButton::textColourOnId, Colours::black);
         startStopMidiButton->setToggleState(true, dontSendNotification);
-        startStopMidiButton->onClick = [this]()
-            {
-                if (isPlayingFilePlayback)
-                    pausePlayback();
-                else
-                    startPlayback();
-            };
+        startStopMidiButton->onClick = [this]() { toggleStartStopPlayback(); };
 
         continueMidiButton = addToList(new TextButton("Continue"));
         continueMidiButton->setColour(TextButton::textColourOffId, Colours::black);
@@ -7604,6 +7598,11 @@ public:
         DBG("=== PlayerPage(): Destructor " + std::to_string(--zinstcntPlayerPage));
     }
 
+    void triggerStartStopHotkey()
+    {
+        toggleStartStopPlayback();
+    }
+
     void resized() override
     {
         const int margin = 10;
@@ -7785,6 +7784,14 @@ public:
     }
 
 private:
+    void toggleStartStopPlayback()
+    {
+        if (isPlayingFilePlayback)
+            pausePlayback();
+        else
+            startPlayback();
+    }
+
     void registerExplicitVoiceSelection(int selectedChannel)
     {
         selectedChannelIdx = juce::jlimit(0, playerChannelCount - 1, selectedChannel);
@@ -14875,6 +14882,12 @@ public:
             k->triggerRotaryBrakeHotkey();
     }
 
+    void triggerPlayerStartStopHotkey()
+    {
+        if (auto* player = dynamic_cast<PlayerPage*>(getTabContentComponent(PTPlayer)))
+            player->triggerStartStopHotkey();
+    }
+
     bool canOpenVoiceEditTabs()
     {
         return KeyboardPanelPage::anyVoiceEditShortcutsEnabledInTabs(*this)
@@ -15219,6 +15232,7 @@ public:
         keyTarget.onUpperRotaryBrake = [this] { tabs.triggerUpperRotaryBrakeHotkey(); };
         keyTarget.onLowerRotaryFastSlow = [this] { tabs.triggerLowerRotaryFastSlowHotkey(); };
         keyTarget.onLowerRotaryBrake = [this] { tabs.triggerLowerRotaryBrakeHotkey(); };
+        keyTarget.onPlayerStartStop = [this] { tabs.triggerPlayerStartStopHotkey(); };
 
         if (auto* midiDevices = MidiDevices::getInstance())
         {

@@ -1072,10 +1072,11 @@ enum KeyPressCommandIDs {
     btnUpperRotaryFastSlow = 20,
     btnUpperRotaryBrake = 21,
     btnLowerRotaryFastSlow = 22,
-    btnLowerRotaryBrake = 23
+    btnLowerRotaryBrake = 23,
+    btnPlayerStartStop = 24
 };
 
-constexpr int kNumHotkeyCommands = 18;
+constexpr int kNumHotkeyCommands = 19;
 
 inline constexpr std::array<KeyPressCommandIDs, kNumHotkeyCommands> kHotkeyCommandOrder = {
     KeyPressCommandIDs::btnTabUpper,
@@ -1095,7 +1096,8 @@ inline constexpr std::array<KeyPressCommandIDs, kNumHotkeyCommands> kHotkeyComma
     KeyPressCommandIDs::btnUpperRotaryFastSlow,
     KeyPressCommandIDs::btnUpperRotaryBrake,
     KeyPressCommandIDs::btnLowerRotaryFastSlow,
-    KeyPressCommandIDs::btnLowerRotaryBrake
+    KeyPressCommandIDs::btnLowerRotaryBrake,
+    KeyPressCommandIDs::btnPlayerStartStop
 };
 
 struct HotkeyBindings
@@ -1138,6 +1140,7 @@ inline HotkeyBindings HotkeyBindings::withDefaults()
     b.keys[15] = L'b';
     b.keys[16] = L'g';
     b.keys[17] = L'n';
+    b.keys[18] = L'p';
     return b;
 }
 
@@ -1190,7 +1193,8 @@ public:
             KeyPressCommandIDs::btnUpperRotaryFastSlow,
             KeyPressCommandIDs::btnUpperRotaryBrake,
             KeyPressCommandIDs::btnLowerRotaryFastSlow,
-            KeyPressCommandIDs::btnLowerRotaryBrake
+            KeyPressCommandIDs::btnLowerRotaryBrake,
+            KeyPressCommandIDs::btnPlayerStartStop
         };
         commands.addArray(ids, (int) (sizeof(ids) / sizeof(ids[0])));
     }
@@ -1259,6 +1263,9 @@ public:
                 break;
             case KeyPressCommandIDs::btnLowerRotaryBrake:
                 addShortcutInfo("Lower rotary Brake", "Lower manual rotary Brake");
+                break;
+            case KeyPressCommandIDs::btnPlayerStartStop:
+                addShortcutInfo("Player Start/Stop", "Toggle Player transport Start/Stop");
                 break;
             default:
                 break;
@@ -1345,6 +1352,10 @@ public:
                 if (onLowerRotaryBrake) onLowerRotaryBrake();
                 else return false;
                 break;
+            case KeyPressCommandIDs::btnPlayerStartStop:
+                if (onPlayerStartStop) onPlayerStartStop();
+                else return false;
+                break;
             default:
                 return false;
         }
@@ -1366,6 +1377,7 @@ public:
     std::function<void()> onUpperRotaryBrake;
     std::function<void()> onLowerRotaryFastSlow;
     std::function<void()> onLowerRotaryBrake;
+    std::function<void()> onPlayerStartStop;
 
 private:
     HotkeyBindings hotkeyBindings { HotkeyBindings::withDefaults() };

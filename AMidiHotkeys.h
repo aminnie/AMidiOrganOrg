@@ -333,7 +333,8 @@ namespace hotkeyUiDetail
         "Upper rotary Fast/Slow",
         "Upper rotary Brake",
         "Lower rotary Fast/Slow",
-        "Lower rotary Brake"
+        "Lower rotary Brake",
+        "Player Start/Stop"
     };
 
     /** Label column width (~one-third narrower than 220px); shorter columns pull each dropdown closer to its label. */
