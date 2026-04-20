@@ -8012,11 +8012,17 @@ private:
         const auto baseOn = juce::Colours::lightgrey;
         const auto pendingOff = juce::Colours::darkred;
         const auto pendingOn = juce::Colours::darkred.brighter();
+        const auto baseText = juce::Colours::black;
+        const auto pendingText = juce::Colours::white;
 
         saveProfileButton->setColour(TextButton::buttonColourId, highlightPending ? pendingOff : baseOff);
         saveProfileButton->setColour(TextButton::buttonOnColourId, highlightPending ? pendingOn : baseOn);
+        saveProfileButton->setColour(TextButton::textColourOffId, highlightPending ? pendingText : baseText);
+        saveProfileButton->setColour(TextButton::textColourOnId, highlightPending ? pendingText : baseText);
         saveProfileAsButton->setColour(TextButton::buttonColourId, highlightPending ? pendingOff : baseOff);
         saveProfileAsButton->setColour(TextButton::buttonOnColourId, highlightPending ? pendingOn : baseOn);
+        saveProfileAsButton->setColour(TextButton::textColourOffId, highlightPending ? pendingText : baseText);
+        saveProfileAsButton->setColour(TextButton::textColourOnId, highlightPending ? pendingText : baseText);
     }
 
     void markPlayerProfileDirty(bool dirty = true)
