@@ -7450,6 +7450,18 @@ public:
         transposeInput->onReturnKey = [this]() { commitTransposeFromEditor(); };
         transposeInput->onFocusLost = [this]() { commitTransposeFromEditor(); };
 
+        barLabel = addToList(new Label("player.start.bar.label", "Bar"));
+        barLabel->setColour(Label::textColourId, Colours::white);
+        barLabel->setJustificationType(Justification::centredLeft);
+
+        barInput = addToList(new TextEditor("player.start.bar.input"));
+        barInput->setInputRestrictions(4, "0123456789");
+        barInput->setJustification(juce::Justification::centred);
+        barInput->setText(juce::String(playerStartBarRaw), dontSendNotification);
+        barInput->setTooltip("Playback start bar. 0 or 1 starts at bar 1.");
+        barInput->onReturnKey = [this]() { commitStartBarFromEditor(); };
+        barInput->onFocusLost = [this]() { commitStartBarFromEditor(); };
+
         tempoLabel = addToList(new Label("player.tempo.label", "Tempo"));
         tempoLabel->setColour(Label::textColourId, Colours::white);
         tempoLabel->setJustificationType(Justification::centredLeft);
@@ -7812,8 +7824,13 @@ public:
                 const int transposeLabelW = 78;
                 const int transposeInputW = 52;
                 const int transposeGap = 6;
+                const int barLabelW = 34;
+                const int barInputW = 52;
+                const int barGap = 6;
+                const int barColumnGap = 10;
                 const int transposeXMax = juce::jmax(toggleRect.getX(),
-                    statusRect.getX() - (transposeLabelW + transposeGap + transposeInputW + 6));
+                    statusRect.getX() - (transposeLabelW + transposeGap + transposeInputW
+                        + barColumnGap + barLabelW + barGap + barInputW + 6));
                 const int transposeX = juce::jmin(toggleRect.getX() + 300, transposeXMax);
                 transposeLabel->setBounds(
                     transposeX,
@@ -7825,6 +7842,18 @@ public:
                         transposeLabel->getRight() + transposeGap,
                         playbackButtonY,
                         transposeInputW,
+                        toggleH);
+                if (barLabel != nullptr)
+                    barLabel->setBounds(
+                        transposeInput->getRight() + barColumnGap,
+                        playbackButtonY,
+                        barLabelW,
+                        toggleH);
+                if (barInput != nullptr && barLabel != nullptr)
+                    barInput->setBounds(
+                        barLabel->getRight() + barGap,
+                        playbackButtonY,
+                        barInputW,
                         toggleH);
                 if (tempoLabel != nullptr)
                     tempoLabel->setBounds(
@@ -7844,6 +7873,10 @@ public:
                 // Bounds are assigned in the transposeLabel block to keep label+editor aligned.
             }
             if (tempoInput != nullptr)
+            {
+                // Bounds are assigned in the transposeLabel block to keep label+editor aligned.
+            }
+            if (barInput != nullptr)
             {
                 // Bounds are assigned in the transposeLabel block to keep label+editor aligned.
             }
@@ -7875,6 +7908,9 @@ public:
     }
 
 private:
+    struct TempoEvent;
+    struct TimeSignatureEvent;
+
     static int clampPlayerTransposeSemitones(int value)
     {
         return juce::jlimit(-6, 6, value);
@@ -7885,6 +7921,109 @@ private:
         if (value <= 0)
             return 0;
         return juce::jlimit(20, 400, value);
+    }
+
+    static int clampStartBarInputRaw(int value)
+    {
+        return juce::jlimit(0, 9999, value);
+    }
+
+    static int normalizeStartBarInput(int rawValue)
+    {
+        return rawValue <= 1 ? 1 : rawValue;
+    }
+
+    static int getBarNumberAtQuarterPosition(const std::vector<TimeSignatureEvent>& timeSigEvents, double quarterPos)
+    {
+        if (timeSigEvents.empty())
+            return 1;
+
+        const double clampedQuarter = juce::jmax(0.0, quarterPos);
+        int sigIdx = 0;
+        while (sigIdx + 1 < static_cast<int>(timeSigEvents.size())
+               && timeSigEvents[(size_t) (sigIdx + 1)].quarterAtTime <= clampedQuarter)
+        {
+            ++sigIdx;
+        }
+
+        const auto& sig = timeSigEvents[(size_t) sigIdx];
+        const double beatsPerBar = static_cast<double>(sig.numerator) * 4.0 / static_cast<double>(sig.denominator);
+        const double deltaQuarters = juce::jmax(0.0, clampedQuarter - sig.quarterAtTime);
+        const double deltaBeats = deltaQuarters * static_cast<double>(sig.denominator) / 4.0;
+        const double totalBeats = sig.beatsIntoBarAtStart + deltaBeats;
+        const int barsAdvanced = static_cast<int>(std::floor((totalBeats + 1.0e-9) / beatsPerBar));
+        return juce::jmax(1, sig.barAtStart + barsAdvanced);
+    }
+
+    static double getQuarterAtBarDownbeat(const std::vector<TimeSignatureEvent>& timeSigEvents, int barNumber)
+    {
+        if (timeSigEvents.empty())
+            return 0.0;
+
+        const int targetBar = juce::jmax(1, barNumber);
+        int sigIdx = 0;
+        while (sigIdx + 1 < static_cast<int>(timeSigEvents.size())
+               && timeSigEvents[(size_t) (sigIdx + 1)].barAtStart <= targetBar)
+        {
+            ++sigIdx;
+        }
+
+        const auto& sig = timeSigEvents[(size_t) sigIdx];
+        const double beatsPerBar = static_cast<double>(sig.numerator) * 4.0 / static_cast<double>(sig.denominator);
+        const double barDelta = juce::jmax(0, targetBar - sig.barAtStart);
+        const double deltaBeats = static_cast<double>(barDelta) * beatsPerBar;
+        const double deltaQuarters = deltaBeats * static_cast<double>(sig.denominator) / 4.0;
+        return juce::jmax(0.0, sig.quarterAtTime + deltaQuarters);
+    }
+
+    static double getSourceTimeAtQuarter(const std::vector<TempoEvent>& tempoEvents, double quarterPos)
+    {
+        if (tempoEvents.empty())
+            return 0.0;
+
+        const double targetQuarter = juce::jmax(0.0, quarterPos);
+        int idx = 0;
+        while (idx + 1 < static_cast<int>(tempoEvents.size())
+               && tempoEvents[(size_t) (idx + 1)].quarterAtTime <= targetQuarter)
+        {
+            ++idx;
+        }
+
+        const auto& ev = tempoEvents[(size_t) idx];
+        const double deltaQuarter = juce::jmax(0.0, targetQuarter - ev.quarterAtTime);
+        const double bpm = juce::jmax(1.0e-6, ev.bpm);
+        return juce::jmax(0.0, ev.timeSec + deltaQuarter * 60.0 / bpm);
+    }
+
+    double mapSourceTimeToPlaybackTime(double sourceSec) const
+    {
+        if (playerTempoOverrideBpm <= 0)
+            return juce::jmax(0.0, sourceSec);
+
+        const double quarter = getQuarterAtTime(tempoEvents, sourceSec);
+        return juce::jmax(0.0, quarter * 60.0 / static_cast<double>(playerTempoOverrideBpm));
+    }
+
+    int getMaxPlayableBarNumber() const
+    {
+        if (timeSignatureEvents.empty())
+            return 1;
+
+        const auto& scheduled = playbackEngine.getEvents();
+        double lastSourceSec = 0.0;
+        for (const auto& event : scheduled)
+            lastSourceSec = juce::jmax(lastSourceSec, event.sourceTimeSeconds);
+
+        const double endQuarter = getQuarterAtTime(tempoEvents, lastSourceSec);
+        return juce::jmax(1, getBarNumberAtQuarterPosition(timeSignatureEvents, endQuarter));
+    }
+
+    double getPlaybackStartTimeForBar(int normalizedBar) const
+    {
+        const int clampedBar = juce::jlimit(1, getMaxPlayableBarNumber(), juce::jmax(1, normalizedBar));
+        const double quarterPos = getQuarterAtBarDownbeat(timeSignatureEvents, clampedBar);
+        const double sourceSec = getSourceTimeAtQuarter(tempoEvents, quarterPos);
+        return mapSourceTimeToPlaybackTime(sourceSec);
     }
 
     void setPlayerTransposeSemitones(int value, bool markDirty)
@@ -7939,6 +8078,31 @@ private:
     {
         const int requested = (tempoInput != nullptr) ? tempoInput->getText().trim().getIntValue() : 0;
         setPlayerTempoOverrideBpm(requested, true);
+    }
+
+    void setPlayerStartBarRaw(int value, bool markDirty)
+    {
+        const int clamped = clampStartBarInputRaw(value);
+        const bool changed = playerStartBarRaw != clamped;
+        playerStartBarRaw = clamped;
+
+        if (barInput != nullptr)
+            barInput->setText(juce::String(playerStartBarRaw), dontSendNotification);
+
+        if (!changed)
+            return;
+
+        if (isPlayingFilePlayback || canContinuePlayback)
+            stopPlayback();
+
+        if (markDirty)
+            markPlayerProfileDirty();
+    }
+
+    void commitStartBarFromEditor()
+    {
+        const int requested = (barInput != nullptr) ? barInput->getText().trim().getIntValue() : 0;
+        setPlayerStartBarRaw(requested, true);
     }
 
     void toggleStartStopPlayback()
@@ -8007,6 +8171,7 @@ private:
         profile.enablePlayerStripCcScaling = midiPlayerSettings.enablePlayerStripCcScaling;
         profile.transposeSemitones = playerTransposeSemitones;
         profile.playbackTempoBpmOverride = playerTempoOverrideBpm;
+        profile.playbackStartBar = playerStartBarRaw;
         profile.soloChannel = midiPlayerSettings.soloChannel;
         profile.mutedChannels = midiPlayerSettings.mutedChannels;
         profile.selectedChannelIdx = selectedChannelIdx;
@@ -8052,6 +8217,7 @@ private:
         playerStripCcScalingToggle->setToggleState(midiPlayerSettings.enablePlayerStripCcScaling, dontSendNotification);
         setPlayerTransposeSemitones(profile.transposeSemitones, false);
         setPlayerTempoOverrideBpm(profile.playbackTempoBpmOverride, false);
+        setPlayerStartBarRaw(profile.playbackStartBar, false);
         syncMuteSoloTogglesFromSettings();
 
         for (int idx = 0; idx < playerChannelCount; ++idx)
@@ -8397,7 +8563,9 @@ private:
             return;
 
         const auto nowMs = juce::Time::getMillisecondCounterHiRes();
-        const auto elapsedSec = playbackElapsedBeforeResumeSec + juce::jmax(0.0, (nowMs - playbackStartMs) / 1000.0);
+        const auto elapsedSec = playbackTimelineAnchorSec
+            + playbackElapsedBeforeResumeSec
+            + juce::jmax(0.0, (nowMs - playbackStartMs) / 1000.0);
         refreshMidiTransportLabel(elapsedSec);
         const auto result = playbackEngine.processUntil(nowMs, [this](const juce::MidiMessage& message)
             {
@@ -9362,6 +9530,10 @@ private:
             playerTempoOverrideBpm = 0;
             if (tempoInput != nullptr)
                 tempoInput->setText(juce::String(playerTempoOverrideBpm), dontSendNotification);
+            playerStartBarRaw = 0;
+            if (barInput != nullptr)
+                barInput->setText(juce::String(playerStartBarRaw), dontSendNotification);
+            playbackTimelineAnchorSec = 0.0;
             currentMidiMetadata = {};
             currentMidiMetadataText = "Time: n/a    Key: n/a    Tempo: n/a";
             currentProgramChangeSummaryText = "PC: n/a";
@@ -9391,6 +9563,10 @@ private:
         playerTempoOverrideBpm = 0;
         if (tempoInput != nullptr)
             tempoInput->setText(juce::String(playerTempoOverrideBpm), dontSendNotification);
+        playerStartBarRaw = 0;
+        if (barInput != nullptr)
+            barInput->setText(juce::String(playerStartBarRaw), dontSendNotification);
+        playbackTimelineAnchorSec = 0.0;
 
         juce::String metadataError;
         currentMidiMetadata = readMidiMetadata(file, metadataError);
@@ -9449,13 +9625,15 @@ private:
         }
 
         sendAllNotesOff();
+        const int normalizedStartBar = normalizeStartBarInput(playerStartBarRaw);
+        playbackTimelineAnchorSec = getPlaybackStartTimeForBar(normalizedStartBar);
         playbackStartMs = juce::Time::getMillisecondCounterHiRes();
-        playbackEngine.start(playbackStartMs);
+        playbackEngine.startFromPlaybackTime(playbackStartMs, playbackTimelineAnchorSec);
         playbackElapsedBeforeResumeSec = 0.0;
         canContinuePlayback = false;
         isPlayingFilePlayback = true;
         startTimer(1);
-        refreshMidiTransportLabel(0.0);
+        refreshMidiTransportLabel(playbackTimelineAnchorSec);
         updateTransportButtons();
         playbackStatusLabel->setText("Playing: " + loadedMidiFile.getFileName(), dontSendNotification);
     }
@@ -9473,7 +9651,7 @@ private:
         playbackStartMs = 0.0;
         canContinuePlayback = playbackEngine.hasPendingEvents();
         sendAllNotesOff();
-        refreshMidiTransportLabel(playbackElapsedBeforeResumeSec);
+        refreshMidiTransportLabel(playbackTimelineAnchorSec + playbackElapsedBeforeResumeSec);
         updateTransportButtons();
         if (loadedMidiFile.existsAsFile())
             playbackStatusLabel->setText("Stopped: " + loadedMidiFile.getFileName() + " (Continue to resume)", dontSendNotification);
@@ -9498,7 +9676,7 @@ private:
         playbackStartMs = nowMs;
         isPlayingFilePlayback = true;
         startTimer(1);
-        refreshMidiTransportLabel(playbackElapsedBeforeResumeSec);
+        refreshMidiTransportLabel(playbackTimelineAnchorSec + playbackElapsedBeforeResumeSec);
         updateTransportButtons();
         playbackStatusLabel->setText("Continuing: " + loadedMidiFile.getFileName(), dontSendNotification);
     }
@@ -9513,6 +9691,7 @@ private:
         isPlayingFilePlayback = false;
         playbackStartMs = 0.0;
         playbackElapsedBeforeResumeSec = 0.0;
+        playbackTimelineAnchorSec = 0.0;
         canContinuePlayback = false;
         sendAllNotesOff();
         refreshMidiTransportLabel(0.0);
@@ -9758,6 +9937,8 @@ private:
     ToggleButton* playerStripCcScalingToggle = nullptr;
     Label* transposeLabel = nullptr;
     TextEditor* transposeInput = nullptr;
+    Label* barLabel = nullptr;
+    TextEditor* barInput = nullptr;
     Label* tempoLabel = nullptr;
     TextEditor* tempoInput = nullptr;
     Label* playbackStatusLabel = nullptr;
@@ -9793,12 +9974,14 @@ private:
     std::vector<TimeSignatureEvent> timeSignatureEvents { TimeSignatureEvent {} };
     double playbackStartMs = 0.0;
     double playbackElapsedBeforeResumeSec = 0.0;
+    double playbackTimelineAnchorSec = 0.0;
     bool isPlayingFilePlayback = false;
     bool canContinuePlayback = false;
     bool hasLoadedPlayableMidi = false;
     bool hasSeededMidiLibraryFromDocs = false;
     int playerTransposeSemitones = 0;
     int playerTempoOverrideBpm = 0;
+    int playerStartBarRaw = 0;
     bool playerProfileDirty = false;
     bool suppressProfileComboCallback = false;
     bool applyingPlayerProfileState = false;

@@ -30,7 +30,7 @@ struct PlayerChannelProfile
 
 struct PlayerSongProfile
 {
-    static constexpr int schemaVersionCurrent = 4;
+    static constexpr int schemaVersionCurrent = 5;
 
     int schemaVersion = schemaVersionCurrent;
     juce::String profileId;
@@ -49,6 +49,7 @@ struct PlayerSongProfile
     bool enablePlayerStripCcScaling = false;
     int transposeSemitones = 0;
     int playbackTempoBpmOverride = 0;
+    int playbackStartBar = 0;
     int soloChannel = 0;
     std::array<bool, 17> mutedChannels {};
 
@@ -175,6 +176,7 @@ inline juce::ValueTree toValueTree(const PlayerSongProfile& profile)
     flags.setProperty("playbackTempoBpmOverride",
                       profile.playbackTempoBpmOverride <= 0 ? 0 : juce::jlimit(20, 400, profile.playbackTempoBpmOverride),
                       nullptr);
+    flags.setProperty("playbackStartBar", juce::jlimit(0, 9999, profile.playbackStartBar), nullptr);
     flags.setProperty("soloChannel", juce::jlimit(0, 16, profile.soloChannel), nullptr);
     flags.setProperty("mutedChannels", encodeMutedChannels(profile.mutedChannels), nullptr);
     root.addChild(flags, -1, nullptr);
@@ -277,6 +279,7 @@ inline bool fromValueTree(const juce::ValueTree& root, PlayerSongProfile& outPro
         profile.transposeSemitones = juce::jlimit(-6, 6, readInt(flags, "transposeSemitones", 0));
         const int loadedTempoOverride = readInt(flags, "playbackTempoBpmOverride", 0);
         profile.playbackTempoBpmOverride = loadedTempoOverride <= 0 ? 0 : juce::jlimit(20, 400, loadedTempoOverride);
+        profile.playbackStartBar = juce::jlimit(0, 9999, readInt(flags, "playbackStartBar", 0));
         profile.soloChannel = juce::jlimit(0, 16, readInt(flags, "soloChannel", 0));
         decodeMutedChannels(flags.getProperty("mutedChannels").toString(), profile.mutedChannels);
     }

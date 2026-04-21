@@ -98,6 +98,11 @@ public:
 
     void start(double nowMs)
     {
+        startFromPlaybackTime(nowMs, 0.0);
+    }
+
+    void startFromPlaybackTime(double nowMs, double playbackSec)
+    {
         if (events.empty())
         {
             stop();
@@ -105,9 +110,8 @@ public:
         }
 
         isPlaying = true;
-        nextEventIndex = 0;
-        playbackOffsetSeconds = 0.0;
         playbackStartMs = nowMs;
+        seekToPlaybackTime(playbackSec);
     }
 
     void pause(double nowMs)
@@ -137,6 +141,27 @@ public:
         nextEventIndex = 0;
         playbackStartMs = 0.0;
         playbackOffsetSeconds = 0.0;
+    }
+
+    void seekToPlaybackTime(double playbackSec)
+    {
+        if (events.empty())
+        {
+            nextEventIndex = 0;
+            playbackOffsetSeconds = 0.0;
+            return;
+        }
+
+        const double targetSec = juce::jmax(0.0, playbackSec);
+        const double thresholdSec = juce::jmax(0.0, targetSec - 1.0e-6);
+        const auto it = std::lower_bound(events.begin(), events.end(), thresholdSec,
+            [](const ScheduledEvent& event, double value)
+            {
+                return event.timeSeconds < value;
+            });
+
+        nextEventIndex = static_cast<int>(std::distance(events.begin(), it));
+        playbackOffsetSeconds = targetSec;
     }
 
     ProcessResult processUntil(double nowMs, const std::function<void(const juce::MidiMessage&)>& sink)

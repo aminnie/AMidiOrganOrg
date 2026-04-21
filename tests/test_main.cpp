@@ -454,6 +454,7 @@ namespace
         profile.enablePlayerStripCcScaling = true;
         profile.transposeSemitones = -3;
         profile.playbackTempoBpmOverride = 136;
+        profile.playbackStartBar = 24;
         profile.soloChannel = 3;
         profile.mutedChannels[(size_t) 5] = true;
         profile.channels[0].midiChannel = 1;
@@ -479,6 +480,7 @@ namespace
             || !expectEqual(decoded.soloChannel, profile.soloChannel, "soloChannel roundtrip", details)
             || !expectEqual(decoded.transposeSemitones, profile.transposeSemitones, "transposeSemitones roundtrip", details)
             || !expectEqual(decoded.playbackTempoBpmOverride, profile.playbackTempoBpmOverride, "playbackTempoBpmOverride roundtrip", details)
+            || !expectEqual(decoded.playbackStartBar, profile.playbackStartBar, "playbackStartBar roundtrip", details)
             || !expectEqual(decoded.channels[0].program, profile.channels[0].program, "program roundtrip", details)
             || !expectEqual(decoded.channels[0].vol, profile.channels[0].vol, "vol roundtrip", details)
             || !expectEqual(decoded.channels[0].effectsDirty, profile.channels[0].effectsDirty, "effectsDirty roundtrip", details))
@@ -2906,6 +2908,77 @@ namespace
         return true;
     }
 
+    bool runPlaybackEngineSeekToBarStart(std::string& details)
+    {
+        const auto tempRoot = File::getSpecialLocation(File::tempDirectory)
+            .getChildFile("AMidiOrganTests");
+        if (!tempRoot.exists() && !tempRoot.createDirectory())
+        {
+            details = "Failed to create temporary directory: " + tempRoot.getFullPathName().toStdString();
+            return false;
+        }
+
+        const auto midiFilePath = tempRoot.getNonexistentChildFile("bar-start-seek", ".mid");
+
+        MidiFile midiWrite;
+        midiWrite.setTicksPerQuarterNote(480);
+        MidiMessageSequence track;
+        track.addEvent(MidiMessage::tempoMetaEvent(500000), 0.0);        // 120 BPM
+        track.addEvent(MidiMessage::noteOn(1, 60, (uint8) 100), 0.0);    // bar 1
+        track.addEvent(MidiMessage::noteOn(1, 62, (uint8) 100), 1920.0); // bar 2
+        track.addEvent(MidiMessage::noteOn(1, 64, (uint8) 100), 3840.0); // bar 3
+        midiWrite.addTrack(track);
+
+        {
+            FileOutputStream out(midiFilePath);
+            if (!out.openedOk())
+            {
+                details = "Failed to open bar start seek MIDI output file: " + midiFilePath.getFullPathName().toStdString();
+                return false;
+            }
+
+            if (!midiWrite.writeTo(out, 1))
+            {
+                details = "Failed to write bar start seek MIDI file: " + midiFilePath.getFullPathName().toStdString();
+                return false;
+            }
+        }
+
+        MidiFilePlaybackEngine engine;
+        juce::String loadError;
+        if (!engine.loadFromFile(midiFilePath, loadError))
+        {
+            details = "MidiFilePlaybackEngine failed to load seek MIDI: " + loadError.toStdString();
+            return false;
+        }
+
+        std::vector<int> emittedNotes;
+        engine.startFromPlaybackTime(0.0, 2.0); // bar 2 downbeat at 2.0s for 120 BPM 4/4
+        engine.processUntil(0.0, [&](const MidiMessage& msg)
+            {
+                if (msg.isNoteOn())
+                    emittedNotes.push_back(msg.getNoteNumber());
+            });
+
+        if (!expectEqual((int) emittedNotes.size(), 1, "note-on count at seek instant", details))
+            return false;
+        if (!expectEqual(emittedNotes[0], 62, "first note emitted after bar-2 seek", details))
+            return false;
+
+        engine.processUntil(1.0e9, [&](const MidiMessage& msg)
+            {
+                if (msg.isNoteOn())
+                    emittedNotes.push_back(msg.getNoteNumber());
+            });
+
+        if (!expectEqual((int) emittedNotes.size(), 2, "total note-on count after seek playback", details))
+            return false;
+        if (!expectEqual(emittedNotes[1], 64, "second note emitted after bar-2 seek", details))
+            return false;
+
+        return true;
+    }
+
     bool runShortcutFocusDeferralGuard(std::string& details)
     {
         TextEditor editor;
@@ -3340,6 +3413,11 @@ int main()
     {
         std::string details;
         results.push_back({ "Playback engine tempo override remap keeps source times and remaps playback times", runPlaybackEngineTempoOverrideRemap(details), details });
+    }
+
+    {
+        std::string details;
+        results.push_back({ "Playback engine seek starts from requested bar downbeat", runPlaybackEngineSeekToBarStart(details), details });
     }
 
     {
