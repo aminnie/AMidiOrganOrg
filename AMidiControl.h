@@ -7450,6 +7450,18 @@ public:
         transposeInput->onReturnKey = [this]() { commitTransposeFromEditor(); };
         transposeInput->onFocusLost = [this]() { commitTransposeFromEditor(); };
 
+        tempoLabel = addToList(new Label("player.tempo.label", "Tempo"));
+        tempoLabel->setColour(Label::textColourId, Colours::white);
+        tempoLabel->setJustificationType(Justification::centredLeft);
+
+        tempoInput = addToList(new TextEditor("player.tempo.input"));
+        tempoInput->setInputRestrictions(3, "0123456789");
+        tempoInput->setJustification(juce::Justification::centred);
+        tempoInput->setText(juce::String(playerTempoOverrideBpm), dontSendNotification);
+        tempoInput->setTooltip("Tempo override BPM. Enter 0 to follow file tempo map.");
+        tempoInput->onReturnKey = [this]() { commitTempoFromEditor(); };
+        tempoInput->onFocusLost = [this]() { commitTempoFromEditor(); };
+
         playbackStatusLabel = addToList(new Label("player.playback.status", "Ready."));
         playbackStatusLabel->setColour(Label::textColourId, juce::Colours::grey);
         playbackStatusLabel->setJustificationType(Justification::centredLeft);
@@ -7814,13 +7826,30 @@ public:
                         playbackButtonY,
                         transposeInputW,
                         toggleH);
+                if (tempoLabel != nullptr)
+                    tempoLabel->setBounds(
+                        transposeX,
+                        playbackButtonY + toggleH + toggleStackGap,
+                        transposeLabelW,
+                        toggleH);
+                if (tempoInput != nullptr)
+                    tempoInput->setBounds(
+                        transposeLabel->getRight() + transposeGap,
+                        playbackButtonY + toggleH + toggleStackGap,
+                        transposeInputW,
+                        toggleH);
             }
             if (transposeInput != nullptr)
             {
                 // Bounds are assigned in the transposeLabel block to keep label+editor aligned.
             }
+            if (tempoInput != nullptr)
+            {
+                // Bounds are assigned in the transposeLabel block to keep label+editor aligned.
+            }
 
-            metadataRowY = playerStripCcScalingToggle->getBottom() + 2;
+            metadataRowY = juce::jmax(playerStripCcScalingToggle->getBottom(),
+                                      tempoInput != nullptr ? tempoInput->getBottom() : playerStripCcScalingToggle->getBottom()) + 2;
         }
 
         {
@@ -7851,6 +7880,13 @@ private:
         return juce::jlimit(-6, 6, value);
     }
 
+    static int clampTempoOverrideBpm(int value)
+    {
+        if (value <= 0)
+            return 0;
+        return juce::jlimit(20, 400, value);
+    }
+
     void setPlayerTransposeSemitones(int value, bool markDirty)
     {
         const int clamped = clampPlayerTransposeSemitones(value);
@@ -7862,7 +7898,7 @@ private:
 
         if (changed)
         {
-            currentMidiMetadataText = buildMidiMetadataText(currentMidiMetadata, playerTransposeSemitones);
+            currentMidiMetadataText = buildMidiMetadataText(currentMidiMetadata, playerTransposeSemitones, playerTempoOverrideBpm);
             refreshMidiMetadataLabel();
             if (markDirty)
                 markPlayerProfileDirty();
@@ -7873,6 +7909,36 @@ private:
     {
         const int requested = (transposeInput != nullptr) ? transposeInput->getText().trim().getIntValue() : 0;
         setPlayerTransposeSemitones(requested, true);
+    }
+
+    void setPlayerTempoOverrideBpm(int value, bool markDirty)
+    {
+        const int clamped = clampTempoOverrideBpm(value);
+        const bool changed = playerTempoOverrideBpm != clamped;
+        playerTempoOverrideBpm = clamped;
+
+        if (tempoInput != nullptr)
+            tempoInput->setText(juce::String(playerTempoOverrideBpm), dontSendNotification);
+
+        if (!changed)
+            return;
+
+        if (isPlayingFilePlayback || canContinuePlayback)
+            stopPlayback();
+
+        rebuildPlaybackTimingFromTempoOverride();
+        currentMidiMetadataText = buildMidiMetadataText(currentMidiMetadata, playerTransposeSemitones, playerTempoOverrideBpm);
+        refreshMidiMetadataLabel();
+        refreshMidiTransportLabel();
+
+        if (markDirty)
+            markPlayerProfileDirty();
+    }
+
+    void commitTempoFromEditor()
+    {
+        const int requested = (tempoInput != nullptr) ? tempoInput->getText().trim().getIntValue() : 0;
+        setPlayerTempoOverrideBpm(requested, true);
     }
 
     void toggleStartStopPlayback()
@@ -7940,6 +8006,7 @@ private:
         profile.enableProgramChangeRemap = midiPlayerSettings.enableProgramChangeRemap;
         profile.enablePlayerStripCcScaling = midiPlayerSettings.enablePlayerStripCcScaling;
         profile.transposeSemitones = playerTransposeSemitones;
+        profile.playbackTempoBpmOverride = playerTempoOverrideBpm;
         profile.soloChannel = midiPlayerSettings.soloChannel;
         profile.mutedChannels = midiPlayerSettings.mutedChannels;
         profile.selectedChannelIdx = selectedChannelIdx;
@@ -7984,6 +8051,7 @@ private:
         remapProgramChangeToggle->setToggleState(midiPlayerSettings.enableProgramChangeRemap, dontSendNotification);
         playerStripCcScalingToggle->setToggleState(midiPlayerSettings.enablePlayerStripCcScaling, dontSendNotification);
         setPlayerTransposeSemitones(profile.transposeSemitones, false);
+        setPlayerTempoOverrideBpm(profile.playbackTempoBpmOverride, false);
         syncMuteSoloTogglesFromSettings();
 
         for (int idx = 0; idx < playerChannelCount; ++idx)
@@ -8639,7 +8707,7 @@ private:
         return sign + juce::String(semitones);
     }
 
-    static juce::String buildMidiMetadataText(const MidiFileMetadata& metadata, int transposeSemitones)
+    static juce::String buildMidiMetadataText(const MidiFileMetadata& metadata, int transposeSemitones, int tempoOverrideBpm)
     {
         const auto timeSig = metadata.hasTimeSignature
             ? (juce::String(metadata.numerator) + "/" + juce::String(metadata.denominator))
@@ -8647,7 +8715,9 @@ private:
         const auto key = metadata.hasKey
             ? (formatKeySignature(metadata.sharpsOrFlats, metadata.isMajorKey) + formatTransposeOffset(juce::jlimit(-6, 6, transposeSemitones)))
             : "n/a";
-        const auto tempo = metadata.hasTempo ? formatBpm(metadata.bpm) : "n/a";
+        juce::String tempo = metadata.hasTempo ? formatBpm(metadata.bpm) : "n/a";
+        if (tempoOverrideBpm > 0)
+            tempo << " -> " << formatBpm(tempoOverrideBpm);
         return "Time: " + timeSig + "    Key: " + key + "    Tempo: " + tempo;
     }
 
@@ -9148,17 +9218,32 @@ private:
 
     static juce::String buildTransportText(const std::vector<TempoEvent>& tempoEvents,
                                            const std::vector<TimeSignatureEvent>& timeSigEvents,
-                                           double elapsedSec)
+                                           double elapsedSec,
+                                           int tempoOverrideBpm)
     {
         if (tempoEvents.empty() || timeSigEvents.empty())
             return "Bar 1  Beat 1  Quarter 0.00";
 
-        const double quarterPos = getQuarterAtTime(tempoEvents, elapsedSec);
+        const double quarterPos = tempoOverrideBpm > 0
+            ? juce::jmax(0.0, elapsedSec) * static_cast<double>(tempoOverrideBpm) / 60.0
+            : getQuarterAtTime(tempoEvents, elapsedSec);
+
         int sigIdx = 0;
-        while (sigIdx + 1 < static_cast<int>(timeSigEvents.size())
-               && timeSigEvents[(size_t) (sigIdx + 1)].timeSec <= elapsedSec)
+        if (tempoOverrideBpm > 0)
         {
-            ++sigIdx;
+            while (sigIdx + 1 < static_cast<int>(timeSigEvents.size())
+                   && timeSigEvents[(size_t) (sigIdx + 1)].quarterAtTime <= quarterPos)
+            {
+                ++sigIdx;
+            }
+        }
+        else
+        {
+            while (sigIdx + 1 < static_cast<int>(timeSigEvents.size())
+                   && timeSigEvents[(size_t) (sigIdx + 1)].timeSec <= elapsedSec)
+            {
+                ++sigIdx;
+            }
         }
 
         const auto& sig = timeSigEvents[(size_t) sigIdx];
@@ -9176,6 +9261,25 @@ private:
             + "  Quarter " + juce::String(quarterPos, 2);
     }
 
+    void rebuildPlaybackTimingFromTempoOverride()
+    {
+        if (!hasLoadedPlayableMidi)
+            return;
+
+        if (playerTempoOverrideBpm <= 0)
+        {
+            playbackEngine.resetPlaybackTimesFromSource();
+            return;
+        }
+
+        const double bpm = static_cast<double>(playerTempoOverrideBpm);
+        playbackEngine.applyPlaybackTimeRemap([this, bpm](double sourceSec)
+            {
+                const double quarter = getQuarterAtTime(tempoEvents, sourceSec);
+                return quarter * 60.0 / bpm;
+            });
+    }
+
     void refreshMidiMetadataLabel()
     {
         updatePlaybackGroupTitle();
@@ -9188,7 +9292,7 @@ private:
 
     void refreshMidiTransportLabel(double elapsedSec = 0.0)
     {
-        currentMidiTransportText = buildTransportText(tempoEvents, timeSignatureEvents, elapsedSec);
+        currentMidiTransportText = buildTransportText(tempoEvents, timeSignatureEvents, elapsedSec, playerTempoOverrideBpm);
         if (midiTransportLabel != nullptr)
             midiTransportLabel->setText(currentMidiTransportText, dontSendNotification);
     }
@@ -9255,6 +9359,9 @@ private:
             playerTransposeSemitones = 0;
             if (transposeInput != nullptr)
                 transposeInput->setText(juce::String(playerTransposeSemitones), dontSendNotification);
+            playerTempoOverrideBpm = 0;
+            if (tempoInput != nullptr)
+                tempoInput->setText(juce::String(playerTempoOverrideBpm), dontSendNotification);
             currentMidiMetadata = {};
             currentMidiMetadataText = "Time: n/a    Key: n/a    Tempo: n/a";
             currentProgramChangeSummaryText = "PC: n/a";
@@ -9281,10 +9388,13 @@ private:
         playerTransposeSemitones = 0;
         if (transposeInput != nullptr)
             transposeInput->setText(juce::String(playerTransposeSemitones), dontSendNotification);
+        playerTempoOverrideBpm = 0;
+        if (tempoInput != nullptr)
+            tempoInput->setText(juce::String(playerTempoOverrideBpm), dontSendNotification);
 
         juce::String metadataError;
         currentMidiMetadata = readMidiMetadata(file, metadataError);
-        currentMidiMetadataText = buildMidiMetadataText(currentMidiMetadata, playerTransposeSemitones);
+        currentMidiMetadataText = buildMidiMetadataText(currentMidiMetadata, playerTransposeSemitones, playerTempoOverrideBpm);
         if (metadataError.isNotEmpty())
         {
             currentMidiMetadata = {};
@@ -9312,6 +9422,7 @@ private:
             tempoEvents = { TempoEvent {} };
             timeSignatureEvents = { TimeSignatureEvent {} };
         }
+        rebuildPlaybackTimingFromTempoOverride();
         refreshMidiTransportLabel();
 
         playbackStatusLabel->setText("Loaded: " + file.getFileName()
@@ -9647,6 +9758,8 @@ private:
     ToggleButton* playerStripCcScalingToggle = nullptr;
     Label* transposeLabel = nullptr;
     TextEditor* transposeInput = nullptr;
+    Label* tempoLabel = nullptr;
+    TextEditor* tempoInput = nullptr;
     Label* playbackStatusLabel = nullptr;
     Label* midiMetadataLabel = nullptr;
     Label* midiTransportLabel = nullptr;
@@ -9685,6 +9798,7 @@ private:
     bool hasLoadedPlayableMidi = false;
     bool hasSeededMidiLibraryFromDocs = false;
     int playerTransposeSemitones = 0;
+    int playerTempoOverrideBpm = 0;
     bool playerProfileDirty = false;
     bool suppressProfileComboCallback = false;
     bool applyingPlayerProfileState = false;

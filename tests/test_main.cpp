@@ -17,6 +17,7 @@ using namespace juce;
 #include <vector>
 #include <array>
 #include <cstdlib>
+#include <cmath>
 #include <utility>
 
 namespace
@@ -53,6 +54,16 @@ namespace
         if (!value)
         {
             details = label + " expected true but was false";
+            return false;
+        }
+        return true;
+    }
+
+    bool expectNear(double actual, double expected, double epsilon, const std::string& label, std::string& details)
+    {
+        if (std::abs(actual - expected) > epsilon)
+        {
+            details = label + " expected " + std::to_string(expected) + " but got " + std::to_string(actual);
             return false;
         }
         return true;
@@ -442,6 +453,7 @@ namespace
         profile.enableProgramChangeRemap = true;
         profile.enablePlayerStripCcScaling = true;
         profile.transposeSemitones = -3;
+        profile.playbackTempoBpmOverride = 136;
         profile.soloChannel = 3;
         profile.mutedChannels[(size_t) 5] = true;
         profile.channels[0].midiChannel = 1;
@@ -466,6 +478,7 @@ namespace
             || !expectEqual(decoded.moduleIdx, profile.moduleIdx, "moduleIdx roundtrip", details)
             || !expectEqual(decoded.soloChannel, profile.soloChannel, "soloChannel roundtrip", details)
             || !expectEqual(decoded.transposeSemitones, profile.transposeSemitones, "transposeSemitones roundtrip", details)
+            || !expectEqual(decoded.playbackTempoBpmOverride, profile.playbackTempoBpmOverride, "playbackTempoBpmOverride roundtrip", details)
             || !expectEqual(decoded.channels[0].program, profile.channels[0].program, "program roundtrip", details)
             || !expectEqual(decoded.channels[0].vol, profile.channels[0].vol, "vol roundtrip", details)
             || !expectEqual(decoded.channels[0].effectsDirty, profile.channels[0].effectsDirty, "effectsDirty roundtrip", details))
@@ -2775,6 +2788,124 @@ namespace
         return true;
     }
 
+    bool runPlaybackEngineTempoOverrideRemap(std::string& details)
+    {
+        const auto tempRoot = File::getSpecialLocation(File::tempDirectory)
+            .getChildFile("AMidiOrganTests");
+        if (!tempRoot.exists() && !tempRoot.createDirectory())
+        {
+            details = "Failed to create temporary directory: " + tempRoot.getFullPathName().toStdString();
+            return false;
+        }
+
+        const auto midiFilePath = tempRoot.getNonexistentChildFile("tempo-override-remap", ".mid");
+
+        MidiFile midiWrite;
+        midiWrite.setTicksPerQuarterNote(480);
+        MidiMessageSequence track;
+        track.addEvent(MidiMessage::tempoMetaEvent(500000), 0.0);      // 120 BPM
+        track.addEvent(MidiMessage::noteOn(1, 60, (uint8) 100), 960.0); // quarter 2 => 1.0s
+        track.addEvent(MidiMessage::tempoMetaEvent(1000000), 960.0);    // 60 BPM from quarter 2 onward
+        track.addEvent(MidiMessage::noteOn(1, 62, (uint8) 100), 1920.0); // quarter 4 => 3.0s in source timeline
+        midiWrite.addTrack(track);
+
+        {
+            FileOutputStream out(midiFilePath);
+            if (!out.openedOk())
+            {
+                details = "Failed to open tempo override MIDI output file: " + midiFilePath.getFullPathName().toStdString();
+                return false;
+            }
+
+            if (!midiWrite.writeTo(out, 1))
+            {
+                details = "Failed to write tempo override MIDI file: " + midiFilePath.getFullPathName().toStdString();
+                return false;
+            }
+        }
+
+        MidiFilePlaybackEngine engine;
+        juce::String loadError;
+        if (!engine.loadFromFile(midiFilePath, loadError))
+        {
+            details = "MidiFilePlaybackEngine failed to load remap MIDI: " + loadError.toStdString();
+            return false;
+        }
+
+        std::vector<double> noteOnSourceTimes;
+        std::vector<double> noteOnPlaybackTimes;
+        for (const auto& event : engine.getEvents())
+        {
+            if (!event.message.isNoteOn())
+                continue;
+
+            noteOnSourceTimes.push_back(event.sourceTimeSeconds);
+            noteOnPlaybackTimes.push_back(event.timeSeconds);
+        }
+
+        if (!expectEqual((int) noteOnSourceTimes.size(), 2, "source note-on count", details))
+            return false;
+        if (!expectNear(noteOnSourceTimes[0], 1.0, 0.001, "first source note-on time", details)
+            || !expectNear(noteOnSourceTimes[1], 3.0, 0.001, "second source note-on time", details))
+        {
+            return false;
+        }
+        if (!expectNear(noteOnPlaybackTimes[0], 1.0, 0.001, "first playback note-on time before remap", details)
+            || !expectNear(noteOnPlaybackTimes[1], 3.0, 0.001, "second playback note-on time before remap", details))
+        {
+            return false;
+        }
+
+        // Source timeline has 120 BPM until t=1.0s (quarter 2), then 60 BPM.
+        // Map to a fixed 120 BPM playback timeline via quarter position.
+        engine.applyPlaybackTimeRemap([](double sourceSec)
+            {
+                if (sourceSec <= 1.0)
+                    return sourceSec;
+
+                const double quarterPos = 2.0 + (sourceSec - 1.0); // 60 BPM => 1 quarter per second
+                return quarterPos * 0.5; // 120 BPM => 0.5 sec per quarter
+            });
+
+        noteOnSourceTimes.clear();
+        noteOnPlaybackTimes.clear();
+        for (const auto& event : engine.getEvents())
+        {
+            if (!event.message.isNoteOn())
+                continue;
+
+            noteOnSourceTimes.push_back(event.sourceTimeSeconds);
+            noteOnPlaybackTimes.push_back(event.timeSeconds);
+        }
+
+        if (!expectNear(noteOnSourceTimes[0], 1.0, 0.001, "first source note-on time preserved after remap", details)
+            || !expectNear(noteOnSourceTimes[1], 3.0, 0.001, "second source note-on time preserved after remap", details))
+        {
+            return false;
+        }
+        if (!expectNear(noteOnPlaybackTimes[0], 1.0, 0.001, "first playback note-on time after remap", details)
+            || !expectNear(noteOnPlaybackTimes[1], 2.0, 0.001, "second playback note-on time after remap", details))
+        {
+            return false;
+        }
+
+        engine.resetPlaybackTimesFromSource();
+        noteOnPlaybackTimes.clear();
+        for (const auto& event : engine.getEvents())
+        {
+            if (event.message.isNoteOn())
+                noteOnPlaybackTimes.push_back(event.timeSeconds);
+        }
+
+        if (!expectNear(noteOnPlaybackTimes[0], 1.0, 0.001, "first playback note-on time after reset", details)
+            || !expectNear(noteOnPlaybackTimes[1], 3.0, 0.001, "second playback note-on time after reset", details))
+        {
+            return false;
+        }
+
+        return true;
+    }
+
     bool runShortcutFocusDeferralGuard(std::string& details)
     {
         TextEditor editor;
@@ -3204,6 +3335,11 @@ int main()
     {
         std::string details;
         results.push_back({ "Type 0 MIDI regression: parse + playback emits expected channel events", runType0MidiLoadAndPlaybackRegression(details), details });
+    }
+
+    {
+        std::string details;
+        results.push_back({ "Playback engine tempo override remap keeps source times and remaps playback times", runPlaybackEngineTempoOverrideRemap(details), details });
     }
 
     {

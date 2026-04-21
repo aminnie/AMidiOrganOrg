@@ -11,6 +11,7 @@ public:
     struct ScheduledEvent
     {
         double timeSeconds = 0.0;
+        double sourceTimeSeconds = 0.0;
         juce::MidiMessage message;
     };
 
@@ -58,15 +59,12 @@ public:
                 if (msg.isMetaEvent() || msg.isEndOfTrackMetaEvent())
                     continue;
 
-                events.push_back({ msg.getTimeStamp(), msg });
+                const double sourceTime = msg.getTimeStamp();
+                events.push_back({ sourceTime, sourceTime, msg });
             }
         }
 
-        std::sort(events.begin(), events.end(),
-                  [](const ScheduledEvent& a, const ScheduledEvent& b)
-                  {
-                      return a.timeSeconds < b.timeSeconds;
-                  });
+        sortEventsByPlaybackTime();
 
         return !events.empty();
     }
@@ -75,6 +73,27 @@ public:
     {
         stop();
         events.clear();
+    }
+
+    void resetPlaybackTimesFromSource()
+    {
+        for (auto& event : events)
+            event.timeSeconds = event.sourceTimeSeconds;
+        sortEventsByPlaybackTime();
+    }
+
+    void applyPlaybackTimeRemap(const std::function<double(double sourceSec)>& remap)
+    {
+        if (remap == nullptr)
+        {
+            resetPlaybackTimesFromSource();
+            return;
+        }
+
+        for (auto& event : events)
+            event.timeSeconds = remap(event.sourceTimeSeconds);
+
+        sortEventsByPlaybackTime();
     }
 
     void start(double nowMs)
@@ -151,6 +170,15 @@ public:
     const std::vector<ScheduledEvent>& getEvents() const { return events; }
 
 private:
+    void sortEventsByPlaybackTime()
+    {
+        std::sort(events.begin(), events.end(),
+                  [](const ScheduledEvent& a, const ScheduledEvent& b)
+                  {
+                      return a.timeSeconds < b.timeSeconds;
+                  });
+    }
+
     std::vector<ScheduledEvent> events;
     bool isPlaying = false;
     int nextEventIndex = 0;
