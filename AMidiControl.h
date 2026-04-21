@@ -7439,6 +7439,17 @@ public:
                 markPlayerProfileDirty();
             };
 
+        transposeLabel = addToList(new Label("player.transpose.label", "Transpose"));
+        transposeLabel->setColour(Label::textColourId, Colours::white);
+        transposeLabel->setJustificationType(Justification::centredLeft);
+
+        transposeInput = addToList(new TextEditor("player.transpose.input"));
+        transposeInput->setInputRestrictions(3, "+-0123456789");
+        transposeInput->setJustification(juce::Justification::centred);
+        transposeInput->setText(juce::String(playerTransposeSemitones), dontSendNotification);
+        transposeInput->onReturnKey = [this]() { commitTransposeFromEditor(); };
+        transposeInput->onFocusLost = [this]() { commitTransposeFromEditor(); };
+
         playbackStatusLabel = addToList(new Label("player.playback.status", "Ready."));
         playbackStatusLabel->setColour(Label::textColourId, juce::Colours::grey);
         playbackStatusLabel->setJustificationType(Justification::centredLeft);
@@ -7603,6 +7614,26 @@ public:
         toggleStartStopPlayback();
     }
 
+    static bool tryTransposePlaybackNoteMessage(const juce::MidiMessage& input,
+                                                int semitones,
+                                                juce::MidiMessage& output)
+    {
+        output = input;
+        if (!input.isNoteOnOrOff() || semitones == 0)
+            return true;
+
+        const int transposedNote = input.getNoteNumber() + semitones;
+        if (transposedNote < 0 || transposedNote > 127)
+            return false;
+
+        const int channel = input.getChannel();
+        const juce::uint8 velocity = (input.getRawDataSize() >= 3) ? input.getRawData()[2] : 0;
+        output = input.isNoteOn()
+            ? juce::MidiMessage::noteOn(channel, transposedNote, velocity)
+            : juce::MidiMessage::noteOff(channel, transposedNote, velocity);
+        return true;
+    }
+
     void resized() override
     {
         const int margin = 10;
@@ -7739,15 +7770,16 @@ public:
         importMidiButton->setBounds(midiBtnX, playbackButtonY, kPlayerVoiceEditBtnW, kPlayerVoiceEditBtnH);
         midiBtnX += kPlayerVoiceEditBtnW + gap;
 
+        int metadataRowY = playbackButtonY + 24;
         {
             auto r = controlRow.withX(midiBtnX).withWidth(juce::jmax(0, controlRow.getRight() - midiBtnX));
             const int statusGap = 6;
             const int w = r.getWidth();
             int statusW = juce::jlimit(100, 380, juce::jmax(80, w / 3));
             const int minToggleEach = 72;
-            const int toggleGap = 6;
             const int toggleH = 22;
-            const int minForToggles = minToggleEach * 2 + toggleGap;
+            const int toggleStackGap = 2;
+            const int minForToggles = minToggleEach;
             if (w < statusW + statusGap + minForToggles)
                 statusW = juce::jmax(60, w - statusGap - minForToggles);
 
@@ -7755,18 +7787,48 @@ public:
             playbackStatusLabel->setBounds(statusRect.getX(), playbackButtonY, statusRect.getWidth(), toggleH);
             r.removeFromRight(statusGap);
 
-            const int tRem = juce::jmax(0, r.getWidth() - toggleGap);
-            const int toggleW = tRem / 2;
-            auto t0 = r.removeFromLeft(toggleW);
-            remapProgramChangeToggle->setBounds(t0.getX(), playbackButtonY, t0.getWidth(), toggleH);
-            r.removeFromLeft(toggleGap);
-            auto t1 = r;
-            playerStripCcScalingToggle->setBounds(t1.getX(), playbackButtonY, t1.getWidth(), toggleH);
+            const int toggleW = juce::jmax(minToggleEach, r.getWidth());
+            const auto toggleRect = r.withWidth(toggleW);
+            remapProgramChangeToggle->setBounds(toggleRect.getX(), playbackButtonY, toggleRect.getWidth(), toggleH);
+            playerStripCcScalingToggle->setBounds(
+                toggleRect.getX(),
+                playbackButtonY + toggleH + toggleStackGap,
+                toggleRect.getWidth(),
+                toggleH);
+            if (transposeLabel != nullptr)
+            {
+                const int transposeLabelW = 78;
+                const int transposeInputW = 52;
+                const int transposeGap = 6;
+                const int transposeXMax = juce::jmax(toggleRect.getX(),
+                    statusRect.getX() - (transposeLabelW + transposeGap + transposeInputW + 6));
+                const int transposeX = juce::jmin(toggleRect.getX() + 300, transposeXMax);
+                transposeLabel->setBounds(
+                    transposeX,
+                    playbackButtonY,
+                    transposeLabelW,
+                    toggleH);
+                if (transposeInput != nullptr)
+                    transposeInput->setBounds(
+                        transposeLabel->getRight() + transposeGap,
+                        playbackButtonY,
+                        transposeInputW,
+                        toggleH);
+            }
+            if (transposeInput != nullptr)
+            {
+                // Bounds are assigned in the transposeLabel block to keep label+editor aligned.
+            }
+
+            metadataRowY = playerStripCcScalingToggle->getBottom() + 2;
         }
 
         {
             const int infoH = 18;
-            const int infoY = playbackButtonY + 24;
+            const int infoY = metadataRowY;
+            const int transportY = (playerStripCcScalingToggle != nullptr)
+                ? playerStripCcScalingToggle->getY()
+                : infoY;
             const int transportGap = 12;
             const int transportW = (playbackStatusLabel != nullptr)
                 ? playbackStatusLabel->getWidth()
@@ -7779,11 +7841,40 @@ public:
             if (midiMetadataLabel != nullptr)
                 midiMetadataLabel->setBounds(metadataX, infoY, metadataW, infoH);
             if (midiTransportLabel != nullptr)
-                midiTransportLabel->setBounds(transportX, infoY, transportW, infoH);
+                midiTransportLabel->setBounds(transportX, transportY, transportW, infoH);
         }
     }
 
 private:
+    static int clampPlayerTransposeSemitones(int value)
+    {
+        return juce::jlimit(-6, 6, value);
+    }
+
+    void setPlayerTransposeSemitones(int value, bool markDirty)
+    {
+        const int clamped = clampPlayerTransposeSemitones(value);
+        const bool changed = playerTransposeSemitones != clamped;
+        playerTransposeSemitones = clamped;
+
+        if (transposeInput != nullptr)
+            transposeInput->setText(juce::String(playerTransposeSemitones), dontSendNotification);
+
+        if (changed)
+        {
+            currentMidiMetadataText = buildMidiMetadataText(currentMidiMetadata, playerTransposeSemitones);
+            refreshMidiMetadataLabel();
+            if (markDirty)
+                markPlayerProfileDirty();
+        }
+    }
+
+    void commitTransposeFromEditor()
+    {
+        const int requested = (transposeInput != nullptr) ? transposeInput->getText().trim().getIntValue() : 0;
+        setPlayerTransposeSemitones(requested, true);
+    }
+
     void toggleStartStopPlayback()
     {
         if (isPlayingFilePlayback)
@@ -7848,6 +7939,7 @@ private:
         profile.moduleDisplayName = instrumentmodules->getDisplayName(playerModuleIdx);
         profile.enableProgramChangeRemap = midiPlayerSettings.enableProgramChangeRemap;
         profile.enablePlayerStripCcScaling = midiPlayerSettings.enablePlayerStripCcScaling;
+        profile.transposeSemitones = playerTransposeSemitones;
         profile.soloChannel = midiPlayerSettings.soloChannel;
         profile.mutedChannels = midiPlayerSettings.mutedChannels;
         profile.selectedChannelIdx = selectedChannelIdx;
@@ -7891,6 +7983,7 @@ private:
         midiPlayerSettings.mutedChannels = profile.mutedChannels;
         remapProgramChangeToggle->setToggleState(midiPlayerSettings.enableProgramChangeRemap, dontSendNotification);
         playerStripCcScalingToggle->setToggleState(midiPlayerSettings.enablePlayerStripCcScaling, dontSendNotification);
+        setPlayerTransposeSemitones(profile.transposeSemitones, false);
         syncMuteSoloTogglesFromSettings();
 
         for (int idx = 0; idx < playerChannelCount; ++idx)
@@ -8331,7 +8424,10 @@ private:
         if (isPlaybackMutedForMessage(message))
             return;
 
-        auto routedMessage = message;
+        juce::MidiMessage routedMessage;
+        if (!tryTransposePlaybackNoteMessage(message, playerTransposeSemitones, routedMessage))
+            return;
+
         routedMessage.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
         mididevices->sendToOutputs(routedMessage, true);
     }
@@ -8382,7 +8478,13 @@ private:
             return;
 
         if (loadedMidiFile.existsAsFile())
-            playbackGroup->setText(baseTitle + " - " + loadedMidiFile.getFileName());
+        {
+            juce::String statusText = extractTimeStatusText(currentMidiMetadataText);
+            const auto extraStatus = buildTopMetadataLine();
+            if (extraStatus.isNotEmpty())
+                statusText << "    " << extraStatus;
+            playbackGroup->setText(baseTitle + " - " + loadedMidiFile.getFileName() + " - " + statusText);
+        }
         else
             playbackGroup->setText(baseTitle);
     }
@@ -8529,13 +8631,21 @@ private:
         return metadata;
     }
 
-    static juce::String buildMidiMetadataText(const MidiFileMetadata& metadata)
+    static juce::String formatTransposeOffset(int semitones)
+    {
+        if (semitones == 0)
+            return {};
+        const juce::String sign = semitones > 0 ? " +" : " ";
+        return sign + juce::String(semitones);
+    }
+
+    static juce::String buildMidiMetadataText(const MidiFileMetadata& metadata, int transposeSemitones)
     {
         const auto timeSig = metadata.hasTimeSignature
             ? (juce::String(metadata.numerator) + "/" + juce::String(metadata.denominator))
             : "n/a";
         const auto key = metadata.hasKey
-            ? formatKeySignature(metadata.sharpsOrFlats, metadata.isMajorKey)
+            ? (formatKeySignature(metadata.sharpsOrFlats, metadata.isMajorKey) + formatTransposeOffset(juce::jlimit(-6, 6, transposeSemitones)))
             : "n/a";
         const auto tempo = metadata.hasTempo ? formatBpm(metadata.bpm) : "n/a";
         return "Time: " + timeSig + "    Key: " + key + "    Tempo: " + tempo;
@@ -8842,10 +8952,38 @@ private:
 
     juce::String buildTopMetadataLine() const
     {
-        juce::String line = currentMidiMetadataText;
+        juce::String line = extractNonTimeMetadataText(currentMidiMetadataText);
         if (currentProgramChangeSummaryText.isNotEmpty())
-            line << "    " << currentProgramChangeSummaryText;
+        {
+            if (line.isNotEmpty())
+                line << "    ";
+            line << currentProgramChangeSummaryText;
+        }
         return line;
+    }
+
+    static juce::String extractTimeStatusText(const juce::String& metadataText)
+    {
+        const auto trimmed = metadataText.trim();
+        if (!trimmed.startsWithIgnoreCase("Time:"))
+            return "Time: n/a";
+
+        const int splitIdx = trimmed.indexOf("    ");
+        if (splitIdx >= 0)
+            return trimmed.substring(0, splitIdx).trim();
+        return trimmed;
+    }
+
+    static juce::String extractNonTimeMetadataText(const juce::String& metadataText)
+    {
+        const auto trimmed = metadataText.trim();
+        if (!trimmed.startsWithIgnoreCase("Time:"))
+            return trimmed;
+
+        const int splitIdx = trimmed.indexOf("    ");
+        if (splitIdx < 0)
+            return {};
+        return trimmed.substring(splitIdx).trim();
     }
 
     static void sortAndCoalesceTempoEvents(std::vector<TempoEvent>& events)
@@ -9040,9 +9178,10 @@ private:
 
     void refreshMidiMetadataLabel()
     {
+        updatePlaybackGroupTitle();
         if (midiMetadataLabel != nullptr)
         {
-            midiMetadataLabel->setText(buildTopMetadataLine(), dontSendNotification);
+            midiMetadataLabel->setText({}, dontSendNotification);
             midiMetadataLabel->setTooltip(programChangeDetailText);
         }
     }
@@ -9113,6 +9252,10 @@ private:
             markPlayerProfileDirty(false);
             refreshProfileCombo();
             updatePlaybackGroupTitle();
+            playerTransposeSemitones = 0;
+            if (transposeInput != nullptr)
+                transposeInput->setText(juce::String(playerTransposeSemitones), dontSendNotification);
+            currentMidiMetadata = {};
             currentMidiMetadataText = "Time: n/a    Key: n/a    Tempo: n/a";
             currentProgramChangeSummaryText = "PC: n/a";
             programChangeDetailText = {};
@@ -9135,12 +9278,18 @@ private:
         currentMidiKey = currentMidiIdentity.midiKey;
         updatePlaybackGroupTitle();
         hasLoadedPlayableMidi = true;
+        playerTransposeSemitones = 0;
+        if (transposeInput != nullptr)
+            transposeInput->setText(juce::String(playerTransposeSemitones), dontSendNotification);
 
         juce::String metadataError;
-        const auto metadata = readMidiMetadata(file, metadataError);
-        currentMidiMetadataText = buildMidiMetadataText(metadata);
+        currentMidiMetadata = readMidiMetadata(file, metadataError);
+        currentMidiMetadataText = buildMidiMetadataText(currentMidiMetadata, playerTransposeSemitones);
         if (metadataError.isNotEmpty())
+        {
+            currentMidiMetadata = {};
             currentMidiMetadataText = "Time: n/a    Key: n/a    Tempo: n/a";
+        }
 
         juce::String pcError;
         if (readProgramChangeEvents(file, programChangeEvents, pcError))
@@ -9496,6 +9645,8 @@ private:
     TextButton* importMidiButton = nullptr;
     ToggleButton* remapProgramChangeToggle = nullptr;
     ToggleButton* playerStripCcScalingToggle = nullptr;
+    Label* transposeLabel = nullptr;
+    TextEditor* transposeInput = nullptr;
     Label* playbackStatusLabel = nullptr;
     Label* midiMetadataLabel = nullptr;
     Label* midiTransportLabel = nullptr;
@@ -9520,6 +9671,7 @@ private:
     juce::String activeProfileDisplayName;
     juce::String activeProfileCreatedUtc;
     juce::String currentMidiMetadataText = "Time: n/a    Key: n/a    Tempo: n/a";
+    MidiFileMetadata currentMidiMetadata;
     juce::String currentProgramChangeSummaryText = "PC: n/a";
     juce::String programChangeDetailText;
     std::vector<ProgramChangeEvent> programChangeEvents;
@@ -9532,6 +9684,7 @@ private:
     bool canContinuePlayback = false;
     bool hasLoadedPlayableMidi = false;
     bool hasSeededMidiLibraryFromDocs = false;
+    int playerTransposeSemitones = 0;
     bool playerProfileDirty = false;
     bool suppressProfileComboCallback = false;
     bool applyingPlayerProfileState = false;

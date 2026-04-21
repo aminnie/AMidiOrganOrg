@@ -441,6 +441,7 @@ namespace
         profile.moduleDisplayName = "Integra-7";
         profile.enableProgramChangeRemap = true;
         profile.enablePlayerStripCcScaling = true;
+        profile.transposeSemitones = -3;
         profile.soloChannel = 3;
         profile.mutedChannels[(size_t) 5] = true;
         profile.channels[0].midiChannel = 1;
@@ -464,6 +465,7 @@ namespace
             || !expectEqualStr(decoded.displayName, profile.displayName, "displayName roundtrip", details)
             || !expectEqual(decoded.moduleIdx, profile.moduleIdx, "moduleIdx roundtrip", details)
             || !expectEqual(decoded.soloChannel, profile.soloChannel, "soloChannel roundtrip", details)
+            || !expectEqual(decoded.transposeSemitones, profile.transposeSemitones, "transposeSemitones roundtrip", details)
             || !expectEqual(decoded.channels[0].program, profile.channels[0].program, "program roundtrip", details)
             || !expectEqual(decoded.channels[0].vol, profile.channels[0].vol, "vol roundtrip", details)
             || !expectEqual(decoded.channels[0].effectsDirty, profile.channels[0].effectsDirty, "effectsDirty roundtrip", details))
@@ -2494,6 +2496,66 @@ namespace
         return true;
     }
 
+    bool runPlayerTransposeRealtimeNoteHelper(std::string& details)
+    {
+        juce::MidiMessage output;
+
+        const auto noteOn = juce::MidiMessage::noteOn(2, 60, (juce::uint8) 100);
+        if (!PlayerPage::tryTransposePlaybackNoteMessage(noteOn, 2, output))
+        {
+            details = "note-on transpose helper unexpectedly dropped in-range note";
+            return false;
+        }
+        if (!expectEqual(output.getChannel(), 2, "transpose helper preserves channel", details)
+            || !expectEqual(output.getNoteNumber(), 62, "transpose helper shifts note-on", details)
+            || !expectEqual(output.isNoteOn() ? 1 : 0, 1, "transpose helper preserves note-on type", details))
+        {
+            return false;
+        }
+
+        const auto noteOff = juce::MidiMessage::noteOff(3, 64, (juce::uint8) 45);
+        if (!PlayerPage::tryTransposePlaybackNoteMessage(noteOff, -4, output))
+        {
+            details = "note-off transpose helper unexpectedly dropped in-range note";
+            return false;
+        }
+        if (!expectEqual(output.getChannel(), 3, "transpose helper preserves note-off channel", details)
+            || !expectEqual(output.getNoteNumber(), 60, "transpose helper shifts note-off", details)
+            || !expectEqual(output.isNoteOff() ? 1 : 0, 1, "transpose helper preserves note-off type", details))
+        {
+            return false;
+        }
+
+        const auto outOfRangeLow = juce::MidiMessage::noteOn(1, 1, (juce::uint8) 100);
+        if (!expectEqual(PlayerPage::tryTransposePlaybackNoteMessage(outOfRangeLow, -6, output) ? 1 : 0,
+                         0,
+                         "transpose helper drops low out-of-range note",
+                         details))
+        {
+            return false;
+        }
+
+        const auto outOfRangeHigh = juce::MidiMessage::noteOn(1, 126, (juce::uint8) 100);
+        if (!expectEqual(PlayerPage::tryTransposePlaybackNoteMessage(outOfRangeHigh, 6, output) ? 1 : 0,
+                         0,
+                         "transpose helper drops high out-of-range note",
+                         details))
+        {
+            return false;
+        }
+
+        const auto cc = juce::MidiMessage::controllerEvent(4, CCMod, 40);
+        if (!PlayerPage::tryTransposePlaybackNoteMessage(cc, 5, output))
+        {
+            details = "transpose helper should pass through non-note events";
+            return false;
+        }
+        if (!expectEqual(output.isController() ? 1 : 0, 1, "transpose helper keeps controller events", details))
+            return false;
+
+        return true;
+    }
+
     bool runAmtestPlaybackEmitsAllChannelsAndNotes(std::string& details)
     {
         auto* devices = MidiDevices::getInstance();
@@ -3127,6 +3189,11 @@ int main()
     {
         std::string details;
         results.push_back({ "Output mute gate bypass allows Player-path notes while preserving default mute gate", runOutputMuteGateBypassForPlayerPath(details), details });
+    }
+
+    {
+        std::string details;
+        results.push_back({ "Player realtime transpose helper shifts notes and drops out-of-range", runPlayerTransposeRealtimeNoteHelper(details), details });
     }
 
     {

@@ -30,7 +30,7 @@ struct PlayerChannelProfile
 
 struct PlayerSongProfile
 {
-    static constexpr int schemaVersionCurrent = 2;
+    static constexpr int schemaVersionCurrent = 3;
 
     int schemaVersion = schemaVersionCurrent;
     juce::String profileId;
@@ -47,6 +47,7 @@ struct PlayerSongProfile
 
     bool enableProgramChangeRemap = true;
     bool enablePlayerStripCcScaling = false;
+    int transposeSemitones = 0;
     int soloChannel = 0;
     std::array<bool, 17> mutedChannels {};
 
@@ -169,6 +170,7 @@ inline juce::ValueTree toValueTree(const PlayerSongProfile& profile)
     juce::ValueTree flags("playerFlags");
     flags.setProperty("enableProgramChangeRemap", profile.enableProgramChangeRemap, nullptr);
     flags.setProperty("enablePlayerStripCcScaling", profile.enablePlayerStripCcScaling, nullptr);
+    flags.setProperty("transposeSemitones", juce::jlimit(-6, 6, profile.transposeSemitones), nullptr);
     flags.setProperty("soloChannel", juce::jlimit(0, 16, profile.soloChannel), nullptr);
     flags.setProperty("mutedChannels", encodeMutedChannels(profile.mutedChannels), nullptr);
     root.addChild(flags, -1, nullptr);
@@ -268,6 +270,7 @@ inline bool fromValueTree(const juce::ValueTree& root, PlayerSongProfile& outPro
     {
         profile.enableProgramChangeRemap = readBool(flags, "enableProgramChangeRemap", true);
         profile.enablePlayerStripCcScaling = readBool(flags, "enablePlayerStripCcScaling", false);
+        profile.transposeSemitones = juce::jlimit(-6, 6, readInt(flags, "transposeSemitones", 0));
         profile.soloChannel = juce::jlimit(0, 16, readInt(flags, "soloChannel", 0));
         decodeMutedChannels(flags.getProperty("mutedChannels").toString(), profile.mutedChannels);
     }
