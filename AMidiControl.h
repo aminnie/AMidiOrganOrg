@@ -2002,7 +2002,7 @@ public:
         mchannel = midiChannel;
         ptrvoicebutton = nullptr;
 
-        group->setColour(GroupComponent::outlineColourId, Colours::slategrey);
+        group->setColour(GroupComponent::outlineColourId, Colours::cornflowerblue);
         lblsgrouptxt.setText("Midi Channels   [Out:" + juce::String(midiChannel) + "]", {});
         lblskeyboardtxt.setText("Player", {});
         lblsvoicetxt.setText(instrument.getVoice(), {});
@@ -3213,7 +3213,7 @@ public:
         panelbuttonidx = -1;
         buttongroupmidiout = midiChannel;
 
-        group->setColour(GroupComponent::outlineColourId, Colours::slategrey);
+        group->setColour(GroupComponent::outlineColourId, Colours::cornflowerblue);
         group->setText(moduleName.isNotEmpty()
             ? (moduleName + " - Effects for Voice Button")
             : "Effects for Voice Button");
@@ -7338,7 +7338,7 @@ public:
         loadMidiFromProfileButton->onClick = [this]() { showLoadMidiFromProfileMenu(); };
 
         channelsGroup = addToList(new GroupComponent("player.channels", "Midi Channels"));
-        channelsGroup->setColour(GroupComponent::outlineColourId, Colours::slategrey);
+        channelsGroup->setColour(GroupComponent::outlineColourId, Colours::cornflowerblue);
         voiceEditsGroup = addToList(new GroupComponent("player.voiceEdits", "Voice Edits"));
         voiceEditsGroup->setColour(GroupComponent::outlineColourId, Colours::grey.darker());
 
