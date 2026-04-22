@@ -136,6 +136,7 @@ target_sources(AMidiOrgan
         AMidiRotors.h
         AMidiUtils.h
         AMidiHotkeys.h
+        midi_file_player/PlayerProfilesManageDialog.h
 )
 
 target_include_directories(AMidiOrgan
@@ -159,6 +160,7 @@ endif()
 
 target_compile_definitions(AMidiOrgan
     PRIVATE
+        JUCE_MODAL_LOOPS_PERMITTED=1
         JUCE_WEB_BROWSER=0
         JUCE_USE_CURL=0
         AMIDIORGAN_PROJECT_VERSION="${PROJECT_VERSION}"

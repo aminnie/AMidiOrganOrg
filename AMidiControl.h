@@ -20,6 +20,7 @@
 #include "midi_file_player/PlayerSongProfileStore.h"
 #include "midi_file_player/PlayerStripCcMerge.h"
 #include "midi_file_player/ProgramChangeRemapper.h"
+#include "midi_file_player/PlayerProfilesManageDialog.h"
 
 #include <functional>
 #include <atomic>
@@ -7337,6 +7338,15 @@ public:
         loadMidiFromProfileButton->setColour(TextButton::buttonOnColourId, juce::Colours::lightgrey);
         loadMidiFromProfileButton->onClick = [this]() { showLoadMidiFromProfileMenu(); };
 
+        manageProfilesButton = addToList(new TextButton("Manage Profiles"));
+        manageProfilesButton->setComponentID("player.profiles.manage");
+        manageProfilesButton->setTooltip("Rename, delete, or clean the saved player profile list on disk.");
+        manageProfilesButton->setColour(TextButton::textColourOffId, Colours::black);
+        manageProfilesButton->setColour(TextButton::textColourOnId, Colours::black);
+        manageProfilesButton->setColour(TextButton::buttonColourId, juce::Colours::lightgrey);
+        manageProfilesButton->setColour(TextButton::buttonOnColourId, juce::Colours::lightgrey);
+        manageProfilesButton->onClick = [this]() { openPlayerProfilesManager(); };
+
         channelsGroup = addToList(new GroupComponent("player.channels", "Midi Channels"));
         channelsGroup->setColour(GroupComponent::outlineColourId, Colours::cornflowerblue);
         voiceEditsGroup = addToList(new GroupComponent("player.voiceEdits", "Voice Edits"));
@@ -7666,6 +7676,7 @@ public:
         const int topControlH = 42;
         const int topGap = 6;
         const int loadFromProfileButtonW = 136;
+        const int manageProfilesButtonW = 128;
         const int profileButtonW = 98;
         const int revertButtonW = 92;
         const int profileLabelW = 74; // 25% narrower than previous 98px.
@@ -7682,6 +7693,8 @@ public:
         auto saveAsRect = topRow.removeFromRight(profileButtonW);
         topRow.removeFromRight(topGap);
         auto saveRect = topRow.removeFromRight(profileButtonW);
+        topRow.removeFromRight(topGap);
+        auto manageRect = topRow.removeFromRight(manageProfilesButtonW);
         topRow.removeFromRight(topGap);
         auto loadFromProfileRect = topRow.removeFromRight(loadFromProfileButtonW);
         topRow.removeFromRight(topGap);
@@ -7701,6 +7714,8 @@ public:
             revertProfileButton->setBounds(revertRect);
         if (loadMidiFromProfileButton != nullptr)
             loadMidiFromProfileButton->setBounds(loadFromProfileRect);
+        if (manageProfilesButton != nullptr)
+            manageProfilesButton->setBounds(manageRect);
         if (moduleLabel != nullptr)
             moduleLabel->setBounds(moduleLabelRect);
         if (soundModuleButton != nullptr)
@@ -8330,6 +8345,8 @@ private:
         saveProfileAsButton->setEnabled(canUseProfiles);
         revertProfileButton->setEnabled(canUseProfiles && activeProfileId.isNotEmpty());
         loadMidiFromProfileButton->setEnabled(!playerProfilesIndex.entries.empty());
+        if (manageProfilesButton != nullptr)
+            manageProfilesButton->setEnabled(true);
         updatePlayerProfileSaveButtonsDirtyStyle();
     }
 
@@ -8372,18 +8389,8 @@ private:
         if (!playerProfileDirty)
             return true;
 
-       #if JUCE_MODAL_LOOPS_PERMITTED
-        const auto options = juce::MessageBoxOptions()
-            .withIconType(juce::MessageBoxIconType::WarningIcon)
-            .withTitle("Unsaved Player Profile")
-            .withMessage("Continue without saving the current Player profile?")
-            .withButton("Continue")
-            .withButton("Cancel")
-            .withAssociatedComponent(this);
-
-        const int selectedIndex = juce::NativeMessageBox::show(options);
-        return selectedIndex == 0;
-       #else
+        // JUCE-styled dialog (not NativeMessageBox). Synchronous showOkCancelBox requires
+        // JUCE_MODAL_LOOPS_PERMITTED=1 (set for AMidiOrgan in CMake); without it, OK/Continue does not return correctly.
         return juce::AlertWindow::showOkCancelBox(
             juce::AlertWindow::WarningIcon,
             "Unsaved Player Profile",
@@ -8392,7 +8399,6 @@ private:
             "Cancel",
             this,
             nullptr);
-       #endif
     }
 
     bool saveCurrentProfile(bool forceSaveAs)
@@ -8526,6 +8532,31 @@ private:
                 + " -> " + midiFile.getFileName(), dontSendNotification);
         }
         return applied;
+    }
+
+    void openPlayerProfilesManager()
+    {
+        if (playerProfilesManagerWindow != nullptr)
+        {
+            playerProfilesManagerWindow->toFront (true);
+            return;
+        }
+        juce::String err;
+        (void) PlayerSongProfileStore::loadIndex (playerProfilesIndex, err);
+        playerProfilesManagerWindow = new PlayerProfilesManagerWindow (
+            "Manage Player Profiles",
+            playerProfilesIndex,
+            activeProfileId,
+            activeProfileDisplayName,
+            activeProfileCreatedUtc,
+            [this]()
+            {
+                juce::String e2;
+                (void) PlayerSongProfileStore::loadIndex (playerProfilesIndex, e2);
+                refreshProfileCombo();
+                updateProfileButtonsState();
+            });
+        playerProfilesManagerWindow->setVisible (true);
     }
 
     void showLoadMidiFromProfileMenu()
@@ -9924,6 +9955,8 @@ private:
     TextButton* saveProfileAsButton = nullptr;
     TextButton* revertProfileButton = nullptr;
     TextButton* loadMidiFromProfileButton = nullptr;
+    TextButton* manageProfilesButton = nullptr;
+    juce::Component::SafePointer<PlayerProfilesManagerWindow> playerProfilesManagerWindow;
     GroupComponent* channelsGroup = nullptr;
     GroupComponent* voiceEditsGroup = nullptr;
     GroupComponent* playbackGroup = nullptr;
@@ -12146,11 +12179,11 @@ public:
         setOpaque(true);
         monitorKeyboard.setOctaveForMiddleC(kProjectMiddleCOctave);
 
-        monitorGroup.setColour(juce::GroupComponent::outlineColourId, juce::Colours::grey.darker());
+        monitorGroup.setColour(juce::GroupComponent::outlineColourId, juce::Colours::cornflowerblue);
         monitorGroup.setText("MIDI In / Out Monitor");
         monitorGroup.setComponentID("mon.group.monitor");
         addAndMakeVisible(monitorGroup);
-        keyboardGroup.setColour(juce::GroupComponent::outlineColourId, juce::Colours::grey.darker());
+        keyboardGroup.setColour(juce::GroupComponent::outlineColourId, juce::Colours::cornflowerblue);
         keyboardGroup.setComponentID("mon.group.keyboard");
         addAndMakeVisible(keyboardGroup);
 

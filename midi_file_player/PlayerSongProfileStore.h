@@ -246,4 +246,116 @@ inline void setLastUsedProfileIdForMidiKey(PlayerSongProfilesIndex& index,
         return;
     index.lastUsedByMidiKey[midiKey] = profileId;
 }
+
+/** Removes all lastUsedByMidiKey entries that reference @a profileId. */
+inline void removeLastUsedRefsToProfileId (PlayerSongProfilesIndex& index, const juce::String& profileId)
+{
+    for (auto it = index.lastUsedByMidiKey.begin(); it != index.lastUsedByMidiKey.end();)
+    {
+        if (it->second == profileId)
+            it = index.lastUsedByMidiKey.erase (it);
+        else
+            ++it;
+    }
+}
+
+/** Strips index in-memory: removes entries with matching @a profileId, fixes lastUsed map. */
+inline void removeIndexEntriesForProfileIdInMemory (PlayerSongProfilesIndex& index, const juce::String& profileId)
+{
+    for (auto it = index.entries.begin(); it != index.entries.end();)
+    {
+        if (it->profileId == profileId)
+            it = index.entries.erase (it);
+        else
+            ++it;
+    }
+    removeLastUsedRefsToProfileId (index, profileId);
+}
+
+/** Permanently delete profile file and remove from @a index; persist index. */
+inline bool deleteProfileById (const juce::String& profileId, PlayerSongProfilesIndex& index, juce::String& error)
+{
+    error.clear();
+    if (profileId.isEmpty())
+    {
+        error = "Empty profile id.";
+        return false;
+    }
+    const auto profileFile = getProfileFileForId (profileId);
+    if (profileFile.existsAsFile() && ! profileFile.deleteFile())
+    {
+        error = "Could not delete profile file.";
+        return false;
+    }
+    bool found = false;
+    for (const auto& e : index.entries)
+    {
+        if (e.profileId == profileId)
+        {
+            found = true;
+            break;
+        }
+    }
+    if (! found)
+    {
+        error = "Profile is not in the index.";
+        return false;
+    }
+    removeIndexEntriesForProfileIdInMemory (index, profileId);
+    return saveIndex (index, error);
+}
+
+/**
+ * Removes index rows whose profile file is missing on disk (e.g. manual delete) without
+ * requiring a per-file delete. One save. Returns the number of rows removed.
+ */
+inline int removeStaleIndexEntriesForMissingProfileFiles (PlayerSongProfilesIndex& index, juce::String& error)
+{
+    error.clear();
+    juce::StringArray toRemove;
+    for (const auto& e : index.entries)
+    {
+        if (! getProfileFileForId (e.profileId).existsAsFile())
+            toRemove.add (e.profileId);
+    }
+    for (int i = 0; i < toRemove.size(); ++i)
+    {
+        const juce::String& id = toRemove.getReference (i);
+        removeIndexEntriesForProfileIdInMemory (index, id);
+    }
+    if (toRemove.isEmpty())
+        return 0;
+    if (! saveIndex (index, error))
+        return 0;
+    return toRemove.size();
+}
+
+/** Update displayName (and index row) in place; rewrites the JSON file. */
+inline bool setProfileDisplayName (const juce::String& profileId,
+                                    const juce::String& newName,
+                                    PlayerSongProfilesIndex& index,
+                                    juce::String& error)
+{
+    error.clear();
+    if (profileId.isEmpty())
+    {
+        error = "Profile id is required.";
+        return false;
+    }
+    const auto trimmed = newName.trim();
+    if (trimmed.isEmpty())
+    {
+        error = "Name cannot be empty.";
+        return false;
+    }
+    PlayerSongProfile profile;
+    if (! loadProfileById (profileId, profile, error))
+        return false;
+    profile.displayName = trimmed;
+    profile.updatedUtc = PlayerSongProfileCodec::utcNowIso8601();
+    if (! saveProfile (profile, error))
+        return false;
+    upsertIndexEntry (index, profile);
+    return saveIndex (index, error);
+}
 }
