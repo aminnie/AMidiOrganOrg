@@ -864,6 +864,18 @@ inline std::function<void()> gNotifyStatusLinesChanged;
 /** Optional: apply selected UI profile to live tab layouts when changed in Config tab. */
 inline std::function<void()> gNotifyUiProfileChanged;
 
+/** Current keyboard overlay transport state driven by PlayerPage playback. */
+struct KeyboardBarBeatOverlayState
+{
+    bool isPlaying = false;
+    juce::String text = "1:1";
+};
+
+inline KeyboardBarBeatOverlayState gKeyboardBarBeatOverlayState;
+
+/** Optional: refresh keyboard tab bar/beat overlays after Player transport updates. */
+inline std::function<void()> gNotifyKeyboardBarBeatOverlay;
+
 /** Preset rotary encoding in .pnl per ButtonGroup: 0=slow, 1=fast, 2=brake (see tests). */
 inline int encodePresetRotaryFromManual(bool isFast, bool brake) noexcept
 {

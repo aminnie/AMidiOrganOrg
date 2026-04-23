@@ -3541,6 +3541,7 @@ struct KeyboardPanelPage final : public Component,
     KeyboardPanelPage(TabbedComponent& tabs, PanelTabsType tabidx,
         EffectsPage& effectspage,
         VoicesPage& voicespage) :
+        tabsRef(tabs),
         startTime(juce::Time::getMillisecondCounterHiRes() * 0.001),
         instrumentmodules(InstrumentModules::getInstance()),
         midiInstruments(MidiInstruments::getInstance()), // Singletons if there isn't already one
@@ -5824,6 +5825,17 @@ struct KeyboardPanelPage final : public Component,
             tbSaveAs->setTooltip("Save the current panel to a new file name.");
             tbSaveAs->setBounds(mgroup + 1360, 230, 80, 30);
             tbSaveAs->setToggleState(false, dontSendNotification);
+            auto* tbBarBeatOverlay = addToList(new Label());
+            tbBarBeatOverlay->setComponentID("kbd." + profileTabKey + ".barBeat");
+            barBeatOverlayLabel = tbBarBeatOverlay;
+            tbBarBeatOverlay->setBounds(tbSaveAs->getBounds());
+            tbBarBeatOverlay->setJustificationType(juce::Justification::centred);
+            tbBarBeatOverlay->setFont(juce::Font(juce::FontOptions(20.0f, juce::Font::bold)));
+            tbBarBeatOverlay->setColour(juce::Label::textColourId, juce::Colours::red);
+            tbBarBeatOverlay->setColour(juce::Label::backgroundColourId, juce::Colours::black);
+            tbBarBeatOverlay->setOpaque(true);
+            tbBarBeatOverlay->setInterceptsMouseClicks(false, false);
+            tbBarBeatOverlay->setVisible(false);
             tbSaveAs->onClick = [=]()
                 {
                     bool useNativeVersion = false;
@@ -5925,6 +5937,7 @@ struct KeyboardPanelPage final : public Component,
         lblpanelfile->setBounds(mgroup + 1260, 210, 200, 30);
         updatePanelFileStatusLabel();
         applyCurrentUiProfile();
+        refreshBarBeatOverlay();
 
     }   // End KeyboardManual Page Constructor
 
@@ -6309,7 +6322,25 @@ struct KeyboardPanelPage final : public Component,
             }
         }
 
+        refreshBarBeatOverlay();
         updatePanelSaveButtonsPendingStyle();
+    }
+
+    void refreshBarBeatOverlay()
+    {
+        if (barBeatOverlayLabel == nullptr)
+            return;
+
+        const bool isActiveKeyboardTab = tabsRef.getCurrentTabIndex() == currenttabidx;
+        const bool shouldShow = gKeyboardBarBeatOverlayState.isPlaying && isActiveKeyboardTab;
+        if (!shouldShow)
+        {
+            barBeatOverlayLabel->setVisible(false);
+            return;
+        }
+
+        barBeatOverlayLabel->setText("Bar " + gKeyboardBarBeatOverlayState.text, dontSendNotification);
+        barBeatOverlayLabel->setVisible(true);
     }
 
     void refreshStatusLinesFromAppState()
@@ -6890,6 +6921,7 @@ private:
 
     OwnedArray<Component> components;
 
+    TabbedComponent& tabsRef;
     double startTime;
 
     MidiInstruments* midiInstruments = nullptr;
@@ -6918,6 +6950,7 @@ private:
     Label* lblpanelfile;
     CommandButton* cbSave = nullptr;
     CommandButton* cbSaveAs = nullptr;
+    Label* barBeatOverlayLabel = nullptr;
 
     bool isFastUpper = false;
     bool rotarybrake = false;
@@ -7449,7 +7482,7 @@ public:
                 markPlayerProfileDirty();
             };
 
-        transposeLabel = addToList(new Label("player.transpose.label", "Transpose"));
+        transposeLabel = addToList(new Label("player.transpose.label", "Key +/-"));
         transposeLabel->setColour(Label::textColourId, Colours::white);
         transposeLabel->setJustificationType(Justification::centredLeft);
 
@@ -9415,15 +9448,23 @@ private:
         return true;
     }
 
-    static juce::String buildTransportText(const std::vector<TempoEvent>& tempoEvents,
-                                           const std::vector<TimeSignatureEvent>& timeSigEvents,
-                                           double elapsedSec,
-                                           int tempoOverrideBpm)
+    static void getTransportBarBeatAndQuarter(const std::vector<TempoEvent>& tempoEvents,
+                                              const std::vector<TimeSignatureEvent>& timeSigEvents,
+                                              double elapsedSec,
+                                              int tempoOverrideBpm,
+                                              int& barNumber,
+                                              int& beatInBar,
+                                              double& quarterPos)
     {
         if (tempoEvents.empty() || timeSigEvents.empty())
-            return "Bar 1  Beat 1  Quarter 0.00";
+        {
+            barNumber = 1;
+            beatInBar = 1;
+            quarterPos = 0.0;
+            return;
+        }
 
-        const double quarterPos = tempoOverrideBpm > 0
+        quarterPos = tempoOverrideBpm > 0
             ? juce::jmax(0.0, elapsedSec) * static_cast<double>(tempoOverrideBpm) / 60.0
             : getQuarterAtTime(tempoEvents, elapsedSec);
 
@@ -9453,11 +9494,36 @@ private:
         const int barsAdvanced = static_cast<int>(std::floor((totalBeats + 1.0e-9) / beatsPerBar));
         const double beatInBarZero = totalBeats - static_cast<double>(barsAdvanced) * beatsPerBar;
 
-        const int barNumber = juce::jmax(1, sig.barAtStart + barsAdvanced);
-        const int beatInBar = juce::jlimit(1, juce::jmax(1, sig.numerator), static_cast<int>(std::floor(beatInBarZero + 1.0e-9)) + 1);
+        barNumber = juce::jmax(1, sig.barAtStart + barsAdvanced);
+        beatInBar = juce::jlimit(1, juce::jmax(1, sig.numerator), static_cast<int>(std::floor(beatInBarZero + 1.0e-9)) + 1);
+    }
+
+    static juce::String buildTransportText(const std::vector<TempoEvent>& tempoEvents,
+                                           const std::vector<TimeSignatureEvent>& timeSigEvents,
+                                           double elapsedSec,
+                                           int tempoOverrideBpm)
+    {
+        int barNumber = 1;
+        int beatInBar = 1;
+        double quarterPos = 0.0;
+        getTransportBarBeatAndQuarter(tempoEvents, timeSigEvents, elapsedSec, tempoOverrideBpm,
+                                      barNumber, beatInBar, quarterPos);
         return "Bar " + juce::String(barNumber)
             + "  Beat " + juce::String(beatInBar)
             + "  Quarter " + juce::String(quarterPos, 2);
+    }
+
+    static juce::String buildCompactBarBeatString(const std::vector<TempoEvent>& tempoEvents,
+                                                  const std::vector<TimeSignatureEvent>& timeSigEvents,
+                                                  double elapsedSec,
+                                                  int tempoOverrideBpm)
+    {
+        int barNumber = 1;
+        int beatInBar = 1;
+        double quarterPos = 0.0;
+        getTransportBarBeatAndQuarter(tempoEvents, timeSigEvents, elapsedSec, tempoOverrideBpm,
+                                      barNumber, beatInBar, quarterPos);
+        return juce::String(barNumber) + ":" + juce::String(beatInBar);
     }
 
     void rebuildPlaybackTimingFromTempoOverride()
@@ -9494,6 +9560,11 @@ private:
         currentMidiTransportText = buildTransportText(tempoEvents, timeSignatureEvents, elapsedSec, playerTempoOverrideBpm);
         if (midiTransportLabel != nullptr)
             midiTransportLabel->setText(currentMidiTransportText, dontSendNotification);
+
+        gKeyboardBarBeatOverlayState.isPlaying = isPlayingFilePlayback;
+        gKeyboardBarBeatOverlayState.text = buildCompactBarBeatString(tempoEvents, timeSignatureEvents, elapsedSec, playerTempoOverrideBpm);
+        if (gNotifyKeyboardBarBeatOverlay)
+            gNotifyKeyboardBarBeatOverlay();
     }
 
     void loadMidiFromChooser()
@@ -15283,11 +15354,16 @@ public:
                         hk->applyCurrentUiProfile();
                 }
             };
+        gNotifyKeyboardBarBeatOverlay = [this]()
+            {
+                refreshKeyboardBarBeatOverlays();
+            };
         updateVoiceEditTabAccessUi();
         if (gNotifyStatusLinesChanged)
             gNotifyStatusLinesChanged();
         if (gNotifyUiProfileChanged)
             gNotifyUiProfileChanged();
+        refreshKeyboardBarBeatOverlays();
 
         //this->grabKeyboardFocus();
     }
@@ -15302,6 +15378,7 @@ public:
         gNotifyVoiceEditTabAccessChanged = {};
         gNotifyStatusLinesChanged = {};
         gNotifyUiProfileChanged = {};
+        gNotifyKeyboardBarBeatOverlay = {};
     }
 
     /** Phase 1 hotkeys: recall preset on all keyboard pages (single loadPreset + radio sync). */
@@ -15546,6 +15623,17 @@ public:
         {
             if (auto* k = dynamic_cast<KeyboardPanelPage*>(getTabContentComponent(newCurrentTabIndex)))
                 k->applyManualRotaryFromAppState(false);
+        }
+
+        refreshKeyboardBarBeatOverlays();
+    }
+
+    void refreshKeyboardBarBeatOverlays()
+    {
+        for (const int tabIdx : { PTUpper, PTLower, PTBass })
+        {
+            if (auto* k = dynamic_cast<KeyboardPanelPage*>(getTabContentComponent(tabIdx)))
+                k->refreshBarBeatOverlay();
         }
     }
 
