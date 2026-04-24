@@ -26,7 +26,7 @@
       "subDirectory": "BlackBox",
       "moduleFileName": "maxplus.json",
       "moduleIdString": "Blackbox",
-      "matchStrings": ["Blackbox"],
+      "matchStrings": ["Blackbox", "Black Box", "Deebach BlackBox", "Deebach Black Box", "Deebach"],
       "defaultVoiceName": "Deebach Grand 1",
       "defaultMSB": 121,
       "defaultLSB": 8,

@@ -9098,6 +9098,67 @@ private:
         }
     }
 
+    void logPlayerOutputRoutingSummaryAtPlaybackStart() const
+    {
+        if (mididevices == nullptr)
+        {
+            juce::Logger::writeToLog("*** PlayerPage(): Playback routing map unavailable (MidiDevices is null).");
+            return;
+        }
+
+        const juce::String moduleName = (instrumentmodules != nullptr)
+            ? instrumentmodules->getDisplayName(playerModuleIdx)
+            : juce::String("n/a");
+        const juce::String profileName = activeProfileDisplayName.isNotEmpty()
+            ? activeProfileDisplayName
+            : juce::String("<none>");
+        juce::Logger::writeToLog("*** PlayerPage(): Playback context: module="
+            + moduleName
+            + ", profile="
+            + profileName
+            + ", midi="
+            + loadedMidiFile.getFileName());
+        juce::Logger::writeToLog("*** PlayerPage(): Playback routing summary (channel -> mapped output devices)");
+        bool loggedAnyChannel = false;
+        for (int ch = 1; ch <= playerChannelCount; ++ch)
+        {
+            const auto& mappedModules = mididevices->moduleout[ch];
+            if (!playerChannelConfigured[(size_t) (ch - 1)] && mappedModules.isEmpty())
+                continue;
+
+            loggedAnyChannel = true;
+            juce::String mappedText;
+            if (mappedModules.isEmpty())
+            {
+                mappedText = "none";
+            }
+            else
+            {
+                for (int i = 0; i < mappedModules.size(); ++i)
+                {
+                    const int outmodidx = mappedModules.getUnchecked(i);
+                    juce::String name = "index " + juce::String(outmodidx);
+                    bool isOpen = false;
+                    if (outmodidx >= 0 && outmodidx < mididevices->midiOutputs.size())
+                    {
+                        const auto& outDev = mididevices->midiOutputs[outmodidx];
+                        name = outDev->deviceInfo.name;
+                        isOpen = (outDev->outDevice.get() != nullptr);
+                    }
+
+                    if (mappedText.isNotEmpty())
+                        mappedText << ", ";
+                    mappedText << name << (isOpen ? " (open)" : " (closed)");
+                }
+            }
+
+            juce::Logger::writeToLog("*** PlayerPage(): Ch " + juce::String(ch) + " -> " + mappedText);
+        }
+
+        if (!loggedAnyChannel)
+            juce::Logger::writeToLog("*** PlayerPage(): No configured channels or mapped output routes.");
+    }
+
     juce::File resolveMidigmInstrumentFile() const
     {
         return juce::File::getSpecialLocation(juce::File::userDocumentsDirectory)
@@ -9736,6 +9797,7 @@ private:
         isPlayingFilePlayback = true;
         startTimer(1);
         refreshMidiTransportLabel(playbackTimelineAnchorSec);
+        logPlayerOutputRoutingSummaryAtPlaybackStart();
         updateTransportButtons();
         playbackStatusLabel->setText("Playing: " + loadedMidiFile.getFileName(), dontSendNotification);
     }

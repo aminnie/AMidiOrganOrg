@@ -65,6 +65,18 @@ inline StringArray normalizeModuleMatchStrings(const StringArray& rawMatchers, c
     return normalized;
 }
 
+inline String normalizeModuleMatcherToken(const String& value)
+{
+    String normalized;
+    normalized.preallocateBytes(value.length());
+    for (auto c : value)
+    {
+        if (juce::CharacterFunctions::isLetterOrDigit(c))
+            normalized << juce::CharacterFunctions::toLowerCase(c);
+    }
+    return normalized;
+}
+
 inline bool doesModuleMatcherMatchDeviceName(const String& matcher, const String& deviceName)
 {
     const String normalizedMatcher = matcher.trim().toLowerCase();
@@ -78,7 +90,17 @@ inline bool doesModuleMatcherMatchDeviceName(const String& matcher, const String
     if (normalizedMatcher == "midi")
         return normalizedDeviceName.startsWith("midi") || normalizedDeviceName == "midi";
 
-    return normalizedDeviceName.contains(normalizedMatcher);
+    if (normalizedDeviceName.contains(normalizedMatcher))
+        return true;
+
+    // Also compare compacted alpha-numeric forms so "Blackbox" matches "Black Box",
+    // and similar punctuation/spacing variants from different MIDI drivers.
+    const String compactMatcher = normalizeModuleMatcherToken(normalizedMatcher);
+    const String compactDevice = normalizeModuleMatcherToken(normalizedDeviceName);
+    if (compactMatcher.isEmpty() || compactDevice.isEmpty())
+        return false;
+
+    return compactDevice.contains(compactMatcher);
 }
 
 inline bool doesAnyModuleMatcherMatchDeviceName(const StringArray& rawMatchers, const String& deviceName)
@@ -654,9 +676,9 @@ private:
 
             if (outmodidx >= 0 && outmodidx < midiOutputs.size())
             {
-                sentToOutput = true;
                 if (midiOutputs[outmodidx]->outDevice.get() != nullptr)
                 {
+                    sentToOutput = true;
                     midiOutputs[outmodidx]->outDevice->sendMessageNow(msg);
                     if (logOnSuccess)
                         DBG("*** sendToOutputs " << routeChannel << " to module " << outmodidx << " sent!");
@@ -1129,6 +1151,8 @@ private:
             ModuleDefinition{ 5, "Ketron EVM", "KetronEVM", "ketronevm.json", "EVM", "Piano", 0, 0, 0, true, true, 1, 0x1E, 0, 0x40, 0x7F }
         };
 
+        defs.getReference(1).moduleMatchStrings.addArray(
+            juce::StringArray{ "BLACK BOX", "DEEBACH BLACKBOX", "DEEBACH BLACK BOX", "DEEBACH" });
         defs.getReference(2).moduleMatchStrings.add("INTEGRA-7");
         defs.getReference(4).moduleMatchStrings.addArray(juce::StringArray{ "MIDIVIEW", "MIDI VIEW", "MIDIVIEW PORT", "MIDIVIEW IN", "MIDIVIEW OUT" });
         defs.getReference(5).moduleMatchStrings.add("MIDI GADGET");
