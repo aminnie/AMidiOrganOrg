@@ -8304,10 +8304,12 @@ private:
         if (selectedChannelIdx >= 0)
             enableVoiceEditButtons();
 
-        if (selectedChannelIdx >= 0 && selectedChannelIdx < playerChannelCount)
+        // Force-refresh every Player channel on profile load/revert so hardware state
+        // is fully synchronized with the profile, not only the selected channel.
+        for (int idx = 0; idx < playerChannelCount; ++idx)
         {
-            auto instrument = channelInstruments[(size_t) selectedChannelIdx];
-            instrument.setChannel(selectedChannelIdx + 1);
+            auto instrument = channelInstruments[(size_t) idx];
+            instrument.setChannel(idx + 1);
             sendProgramSelect(instrument);
             sendEffects(instrument);
         }
