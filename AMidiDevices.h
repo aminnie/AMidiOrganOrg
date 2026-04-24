@@ -460,44 +460,10 @@ public:
         return true;
     };
 
-    // Send Midi Messages to all connected Output Devices
-    void sendToOutputs(const MidiMessage& msg, bool bypassOutputChannelMuteGate = false)
-    {
-        const int outchan = msg.getChannel();
-
-        // Hard mute gate for any direct channelized note emissions.
-        if (!bypassOutputChannelMuteGate
-            && msg.isNoteOnOrOff()
-            && isValidMidiChannel(outchan)
-            && isOutputChannelMuted(outchan))
-            return;
-
-        if (testSendHook)
-            testSendHook(msg);
-
-        std::function<void(const MidiMessage&, const juce::String&)> monitorHookCopy;
-        {
-            const juce::SpinLock::ScopedLockType hookLock(outgoingMonitorHookLock);
-            monitorHookCopy = outgoingMonitorHook;
-        }
-
-        // Route MIDI message to all mapped output modules for this channel.
-        bool hasMappedRoute = false;
-        if (outchan > 0 && outchan < 17)
-        {
-            hasMappedRoute = sendToMappedOutputsForRouteChannel(msg, outchan, monitorHookCopy, true);
-        }
-
-        // Keep monitor visibility for unmapped channel traffic.
-        if (!hasMappedRoute && monitorHookCopy)
-            monitorHookCopy(msg, {});
-
-        // If MidiView connected duplicate message for display in monitor
-        if (midiviewidx < midiOutputs.size()) {
-            if (midiOutputs[midiviewidx]->outDevice.get() != nullptr)
-                midiOutputs[midiviewidx]->outDevice->sendMessageNow(msg);
-        }
-    }
+    // Send Midi Messages to all connected Output Devices.
+    // When playerFallbackModuleIndex >= 0 (Player tab file playback), and no panel route exists for msg's channel,
+    // sends to the first open MIDI output whose name matches that instrument module (same matching as button groups).
+    void sendToOutputs(const MidiMessage& msg, bool bypassOutputChannelMuteGate = false, int playerFallbackModuleIndex = -1);
 
     bool routeGlobalCcThroughForChannel16(const MidiMessage& message)
     {
@@ -1443,4 +1409,64 @@ private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(InstrumentModules)
 };
 juce_ImplementSingleton(InstrumentModules)
+
+//==============================================================================
+inline void MidiDevices::sendToOutputs(const MidiMessage& msg, bool bypassOutputChannelMuteGate, int playerFallbackModuleIndex)
+{
+    const int outchan = msg.getChannel();
+
+    if (!bypassOutputChannelMuteGate
+        && msg.isNoteOnOrOff()
+        && isValidMidiChannel(outchan)
+        && isOutputChannelMuted(outchan))
+        return;
+
+    if (testSendHook)
+        testSendHook(msg);
+
+    std::function<void(const MidiMessage&, const juce::String&)> monitorHookCopy;
+    {
+        const juce::SpinLock::ScopedLockType hookLock(outgoingMonitorHookLock);
+        monitorHookCopy = outgoingMonitorHook;
+    }
+
+    bool hasMappedRoute = false;
+    if (outchan > 0 && outchan < 17)
+    {
+        hasMappedRoute = sendToMappedOutputsForRouteChannel(msg, outchan, monitorHookCopy, true);
+    }
+
+    bool playerFallbackSent = false;
+    if (!hasMappedRoute && playerFallbackModuleIndex >= 0)
+    {
+        auto* mods = InstrumentModules::getInstance();
+        if (mods != nullptr && playerFallbackModuleIndex < mods->getNumModules())
+        {
+            for (auto& dev : midiOutputs)
+            {
+                if (!mods->deviceNameMatchesModule(playerFallbackModuleIndex, dev->deviceInfo.name))
+                    continue;
+
+                if (dev->outDevice.get() != nullptr)
+                {
+                    if (monitorHookCopy)
+                        monitorHookCopy(msg, dev->deviceInfo.name);
+                    dev->outDevice->sendMessageNow(msg);
+                    playerFallbackSent = true;
+                }
+                break;
+            }
+        }
+    }
+
+    const bool reachedHardware = hasMappedRoute || playerFallbackSent;
+
+    if (!reachedHardware && monitorHookCopy)
+        monitorHookCopy(msg, {});
+
+    if (midiviewidx < midiOutputs.size()) {
+        if (midiOutputs[midiviewidx]->outDevice.get() != nullptr)
+            midiOutputs[midiviewidx]->outDevice->sendMessageNow(msg);
+    }
+}
 

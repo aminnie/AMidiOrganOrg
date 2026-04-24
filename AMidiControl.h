@@ -8731,7 +8731,7 @@ private:
             return;
 
         routedMessage.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
-        mididevices->sendToOutputs(routedMessage, true);
+        mididevices->sendToOutputs(routedMessage, true, playerModuleIdx);
     }
 
     void sendAllNotesOff()
