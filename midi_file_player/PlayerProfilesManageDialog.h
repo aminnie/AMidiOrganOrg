@@ -122,25 +122,33 @@ private:
         juce::String startName = rowEntries[(size_t) r].displayName;
         if (startName.isEmpty())
             startName = profileId;
-        juce::AlertWindow w ("Rename profile", "New display name:", juce::AlertWindow::NoIcon, this);
-        w.addTextEditor ("n", startName, "Name");
-        w.addButton ("OK", 1, juce::KeyPress (juce::KeyPress::returnKey));
-        w.addButton ("Cancel", 0, juce::KeyPress (juce::KeyPress::escapeKey));
-        if (w.runModalLoop() != 1)
-            return;
-        const juce::String newName = w.getTextEditorContents ("n");
-        juce::String err;
-        if (PlayerSongProfileStore::setProfileDisplayName (profileId, newName, profileIndex, err))
-        {
-            if (profileId == activeId)
-                activeDisplay = newName.trim();
-            onMutated();
-            refreshFromIndex();
-        }
-        else
-        {
-            juce::NativeMessageBox::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, "Rename failed", err);
-        }
+        auto* w = new juce::AlertWindow ("Rename profile", "New display name:", juce::AlertWindow::NoIcon, this);
+        w->addTextEditor ("n", startName, "Name");
+        w->addButton ("OK", 1, juce::KeyPress (juce::KeyPress::returnKey));
+        w->addButton ("Cancel", 0, juce::KeyPress (juce::KeyPress::escapeKey));
+
+        auto safeThis = juce::Component::SafePointer<PlayerProfilesManageContent> (this);
+        w->enterModalState (true,
+            juce::ModalCallbackFunction::create ([safeThis, profileId, w] (int result)
+            {
+                if (safeThis == nullptr || result != 1)
+                    return;
+
+                const juce::String newName = w->getTextEditorContents ("n");
+                juce::String err;
+                if (PlayerSongProfileStore::setProfileDisplayName (profileId, newName, safeThis->profileIndex, err))
+                {
+                    if (profileId == safeThis->activeId)
+                        safeThis->activeDisplay = newName.trim();
+                    safeThis->onMutated();
+                    safeThis->refreshFromIndex();
+                }
+                else
+                {
+                    juce::NativeMessageBox::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, "Rename failed", err);
+                }
+            }),
+            true);
     }
 
     void doDelete()

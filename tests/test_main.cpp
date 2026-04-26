@@ -1013,7 +1013,7 @@ namespace
 
         devices->setOutgoingMidiMonitor({});
 
-        return expectEqual(monitorHits, 2, "channel fanout emits one routed send per mapped module", details);
+        return expectEqual(monitorHits, 3, "channel fanout emits mapped-route hits plus unresolved-route monitor hit", details);
     }
 
     bool runPanelPresetBounds(std::string& details)
@@ -2571,6 +2571,39 @@ namespace
         return true;
     }
 
+    bool runPlayerModuleLiveOutputHelperGuards(std::string& details)
+    {
+        auto* modules = InstrumentModules::getInstance();
+        auto* devices = MidiDevices::getInstance();
+        if (modules == nullptr || devices == nullptr)
+        {
+            details = "Singleton dependency unavailable for player module live check helper";
+            return false;
+        }
+
+        const auto oldOutputs = devices->midiOutputs;
+        devices->midiOutputs.clear();
+
+        const int validModule = juce::jlimit(0, juce::jmax(0, modules->getNumModules() - 1), 0);
+
+        const bool nullModules = PlayerPage::hasLiveOutputForModule(nullptr, devices, validModule);
+        const bool nullDevices = PlayerPage::hasLiveOutputForModule(modules, nullptr, validModule);
+        const bool badModule = PlayerPage::hasLiveOutputForModule(modules, devices, modules->getNumModules());
+        const bool emptyDeviceList = PlayerPage::hasLiveOutputForModule(modules, devices, validModule);
+
+        devices->midiOutputs = oldOutputs;
+
+        if (!expectEqual(nullModules ? 1 : 0, 0, "player live helper rejects null modules", details)
+            || !expectEqual(nullDevices ? 1 : 0, 0, "player live helper rejects null devices", details)
+            || !expectEqual(badModule ? 1 : 0, 0, "player live helper rejects out-of-range module", details)
+            || !expectEqual(emptyDeviceList ? 1 : 0, 0, "player live helper requires matching open output", details))
+        {
+            return false;
+        }
+
+        return true;
+    }
+
     bool runAmtestPlaybackEmitsAllChannelsAndNotes(std::string& details)
     {
         auto* devices = MidiDevices::getInstance();
@@ -3398,6 +3431,11 @@ int main()
     {
         std::string details;
         results.push_back({ "Player realtime transpose helper shifts notes and drops out-of-range", runPlayerTransposeRealtimeNoteHelper(details), details });
+    }
+
+    {
+        std::string details;
+        results.push_back({ "Player module live-output helper blocks null/missing routes", runPlayerModuleLiveOutputHelperGuards(details), details });
     }
 
     {

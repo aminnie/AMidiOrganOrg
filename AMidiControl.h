@@ -7701,6 +7701,28 @@ public:
         return true;
     }
 
+    static bool hasLiveOutputForModule(InstrumentModules* modules,
+                                       MidiDevices* devices,
+                                       int moduleIdx)
+    {
+        if (modules == nullptr || devices == nullptr)
+            return false;
+
+        if (moduleIdx < 0 || moduleIdx >= modules->getNumModules())
+            return false;
+
+        for (const auto& dev : devices->midiOutputs)
+        {
+            if (!modules->deviceNameMatchesModule(moduleIdx, dev->deviceInfo.name))
+                continue;
+
+            if (dev->outDevice.get() != nullptr)
+                return true;
+        }
+
+        return false;
+    }
+
     void resized() override
     {
         const int margin = 10;
@@ -8731,7 +8753,7 @@ private:
             return;
 
         routedMessage.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
-        mididevices->sendToOutputs(routedMessage, true, playerModuleIdx);
+        mididevices->sendToOutputs(routedMessage, true);
     }
 
     void sendAllNotesOff()
@@ -9786,6 +9808,20 @@ private:
         if (!hasLoadedPlayableMidi || !loadedMidiFile.existsAsFile())
         {
             playbackStatusLabel->setText("Load a MIDI file before starting.", dontSendNotification);
+            return;
+        }
+
+        if (!hasLiveOutputForModule(instrumentmodules, mididevices, playerModuleIdx))
+        {
+            const juce::String moduleName = (instrumentmodules != nullptr)
+                ? instrumentmodules->getDisplayName(playerModuleIdx)
+                : juce::String("selected module");
+            playbackStatusLabel->setText("Cannot start: selected module is not live (" + moduleName + ").", dontSendNotification);
+            juce::AlertWindow::showMessageBoxAsync(
+                juce::AlertWindow::WarningIcon,
+                "Player Module Not Live",
+                "The selected Player Sound Module (" + moduleName + ") has no open MIDI OUT device.\n\n"
+                "Open/select that module on the Start tab, then try Start again.");
             return;
         }
 
