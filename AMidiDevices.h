@@ -464,6 +464,7 @@ public:
     // When playerFallbackModuleIndex >= 0 (Player tab file playback), and no panel route exists for msg's channel,
     // sends to the first open MIDI output whose name matches that instrument module (same matching as button groups).
     void sendToOutputs(const MidiMessage& msg, bool bypassOutputChannelMuteGate = false, int playerFallbackModuleIndex = -1);
+    void sendToPlayerModuleOnly(const MidiMessage& msg, int moduleIndex, bool bypassOutputChannelMuteGate = false);
 
     bool routeGlobalCcThroughForChannel16(const MidiMessage& message)
     {
@@ -1468,5 +1469,48 @@ inline void MidiDevices::sendToOutputs(const MidiMessage& msg, bool bypassOutput
         if (midiOutputs[midiviewidx]->outDevice.get() != nullptr)
             midiOutputs[midiviewidx]->outDevice->sendMessageNow(msg);
     }
+}
+
+inline void MidiDevices::sendToPlayerModuleOnly(const MidiMessage& msg, int moduleIndex, bool bypassOutputChannelMuteGate)
+{
+    const int outchan = msg.getChannel();
+
+    if (!bypassOutputChannelMuteGate
+        && msg.isNoteOnOrOff()
+        && isValidMidiChannel(outchan)
+        && isOutputChannelMuted(outchan))
+        return;
+
+    if (testSendHook)
+        testSendHook(msg);
+
+    std::function<void(const MidiMessage&, const juce::String&)> monitorHookCopy;
+    {
+        const juce::SpinLock::ScopedLockType hookLock(outgoingMonitorHookLock);
+        monitorHookCopy = outgoingMonitorHook;
+    }
+
+    bool reachedHardware = false;
+    auto* mods = InstrumentModules::getInstance();
+    if (mods != nullptr && moduleIndex >= 0 && moduleIndex < mods->getNumModules())
+    {
+        for (auto& dev : midiOutputs)
+        {
+            if (!mods->deviceNameMatchesModule(moduleIndex, dev->deviceInfo.name))
+                continue;
+
+            if (dev->outDevice.get() != nullptr)
+            {
+                if (monitorHookCopy)
+                    monitorHookCopy(msg, dev->deviceInfo.name);
+                dev->outDevice->sendMessageNow(msg);
+                reachedHardware = true;
+            }
+            break;
+        }
+    }
+
+    if (!reachedHardware && monitorHookCopy)
+        monitorHookCopy(msg, {});
 }
 

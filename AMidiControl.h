@@ -8753,7 +8753,7 @@ private:
             return;
 
         routedMessage.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
-        mididevices->sendToOutputs(routedMessage, true);
+        mididevices->sendToPlayerModuleOnly(routedMessage, playerModuleIdx, true);
     }
 
     void sendAllNotesOff()
@@ -8762,11 +8762,11 @@ private:
         {
             auto notesOff = juce::MidiMessage::allNotesOff(channel);
             notesOff.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
-            mididevices->sendToOutputs(notesOff);
+            mididevices->sendToPlayerModuleOnly(notesOff, playerModuleIdx, true);
 
             auto soundOff = juce::MidiMessage::allSoundOff(channel);
             soundOff.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
-            mididevices->sendToOutputs(soundOff);
+            mididevices->sendToPlayerModuleOnly(soundOff, playerModuleIdx, true);
         }
     }
 
@@ -9126,7 +9126,7 @@ private:
     {
         if (mididevices == nullptr)
         {
-            juce::Logger::writeToLog("*** PlayerPage(): Playback routing map unavailable (MidiDevices is null).");
+            juce::Logger::writeToLog("*** PlayerPage(): Playback routing unavailable (MidiDevices is null).");
             return;
         }
 
@@ -9142,45 +9142,36 @@ private:
             + profileName
             + ", midi="
             + loadedMidiFile.getFileName());
-        juce::Logger::writeToLog("*** PlayerPage(): Playback routing summary (channel -> mapped output devices)");
-        bool loggedAnyChannel = false;
-        for (int ch = 1; ch <= playerChannelCount; ++ch)
+        juce::Logger::writeToLog("*** PlayerPage(): Playback routing mode=selected module only (no channel map fanout, no MidiView mirror).");
+
+        if (instrumentmodules == nullptr || playerModuleIdx < 0 || playerModuleIdx >= instrumentmodules->getNumModules())
         {
-            const auto& mappedModules = mididevices->moduleout[ch];
-            if (!playerChannelConfigured[(size_t) (ch - 1)] && mappedModules.isEmpty())
-                continue;
-
-            loggedAnyChannel = true;
-            juce::String mappedText;
-            if (mappedModules.isEmpty())
-            {
-                mappedText = "none";
-            }
-            else
-            {
-                for (int i = 0; i < mappedModules.size(); ++i)
-                {
-                    const int outmodidx = mappedModules.getUnchecked(i);
-                    juce::String name = "index " + juce::String(outmodidx);
-                    bool isOpen = false;
-                    if (outmodidx >= 0 && outmodidx < mididevices->midiOutputs.size())
-                    {
-                        const auto& outDev = mididevices->midiOutputs[outmodidx];
-                        name = outDev->deviceInfo.name;
-                        isOpen = (outDev->outDevice.get() != nullptr);
-                    }
-
-                    if (mappedText.isNotEmpty())
-                        mappedText << ", ";
-                    mappedText << name << (isOpen ? " (open)" : " (closed)");
-                }
-            }
-
-            juce::Logger::writeToLog("*** PlayerPage(): Ch " + juce::String(ch) + " -> " + mappedText);
+            juce::Logger::writeToLog("*** PlayerPage(): Selected module index is invalid.");
+            return;
         }
 
-        if (!loggedAnyChannel)
-            juce::Logger::writeToLog("*** PlayerPage(): No configured channels or mapped output routes.");
+        juce::String matchingDevices;
+        bool hasOpenMatch = false;
+        for (const auto& outDev : mididevices->midiOutputs)
+        {
+            if (!instrumentmodules->deviceNameMatchesModule(playerModuleIdx, outDev->deviceInfo.name))
+                continue;
+
+            if (matchingDevices.isNotEmpty())
+                matchingDevices << ", ";
+
+            const bool isOpen = (outDev->outDevice.get() != nullptr);
+            matchingDevices << outDev->deviceInfo.name << (isOpen ? " (open)" : " (closed)");
+            hasOpenMatch = hasOpenMatch || isOpen;
+        }
+
+        if (matchingDevices.isEmpty())
+            juce::Logger::writeToLog("*** PlayerPage(): No output devices match selected module.");
+        else
+            juce::Logger::writeToLog("*** PlayerPage(): Matching module outputs: " + matchingDevices);
+
+        if (!hasOpenMatch)
+            juce::Logger::writeToLog("*** PlayerPage(): Selected module has no open output device.");
     }
 
     juce::File resolveMidigmInstrumentFile() const
@@ -10078,7 +10069,7 @@ private:
     {
         auto message = juce::MidiMessage::controllerEvent(midiChannel, controller, value);
         message.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
-        mididevices->sendToOutputs(message);
+        mididevices->sendToPlayerModuleOnly(message, playerModuleIdx, false);
     }
 
     void sendProgramSelect(Instrument instrument)
@@ -10089,7 +10080,7 @@ private:
 
         auto programChange = juce::MidiMessage::programChange(midiChannel, instrument.getFont());
         programChange.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
-        mididevices->sendToOutputs(programChange);
+        mididevices->sendToPlayerModuleOnly(programChange, playerModuleIdx, false);
     }
 
     void sendEffects(Instrument instrument)

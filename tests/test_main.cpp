@@ -1016,6 +1016,62 @@ namespace
         return expectEqual(monitorHits, 3, "channel fanout emits mapped-route hits plus unresolved-route monitor hit", details);
     }
 
+    bool runPlayerModuleOnlySendBypassesChannelMap(std::string& details)
+    {
+        auto* devices = MidiDevices::getInstance();
+        auto* modules = InstrumentModules::getInstance();
+        if (devices == nullptr || modules == nullptr)
+        {
+            details = "MidiDevices/InstrumentModules singleton unavailable";
+            return false;
+        }
+
+        const auto oldOutputs = devices->midiOutputs;
+        const auto oldModuleOut1 = devices->moduleout[1];
+        const int oldMidiViewIdx = devices->midiviewidx;
+
+        devices->clearMidiIOMap();
+
+        MidiDeviceInfo outA;
+        outA.identifier = "player-direct-out-1";
+        outA.name = "PlayerDirectOut1";
+
+        MidiDeviceInfo outB;
+        outB.identifier = "player-direct-out-2";
+        outB.name = "PlayerDirectOut2";
+
+        devices->midiOutputs.clear();
+        devices->midiOutputs.add(new MidiDeviceListEntry(outA));
+        devices->midiOutputs.add(new MidiDeviceListEntry(outB));
+
+        // Populate channel fanout map to prove Player module-only path ignores it.
+        devices->moduleout[1].clearQuick();
+        devices->moduleout[1].add(0);
+        devices->moduleout[1].add(1);
+        devices->midiviewidx = 0;
+
+        int monitorHits = 0;
+        int namedEndpointHits = 0;
+        devices->setOutgoingMidiMonitor([&](const MidiMessage&, const juce::String& endpoint)
+            {
+                ++monitorHits;
+                if (endpoint.isNotEmpty())
+                    ++namedEndpointHits;
+            });
+
+        const auto noteOn = MidiMessage::noteOn(1, 60, (juce::uint8) 100);
+        devices->sendToPlayerModuleOnly(noteOn, 0, true);
+
+        devices->setOutgoingMidiMonitor({});
+        devices->midiOutputs = oldOutputs;
+        devices->moduleout[1] = oldModuleOut1;
+        devices->midiviewidx = oldMidiViewIdx;
+
+        if (!expectEqual(monitorHits, 1, "player module-only send emits a single monitor event when no module output is open", details))
+            return false;
+        return expectEqual(namedEndpointHits, 0, "player module-only send does not emit channel-map endpoint fanout hits", details);
+    }
+
     bool runPanelPresetBounds(std::string& details)
     {
         auto* presets = PanelPresets::getInstance();
@@ -3316,6 +3372,11 @@ int main()
     {
         std::string details;
         results.push_back({ "MidiDevices fanout routes one channel to multiple modules", runModuleFanoutByOutputChannel(details), details });
+    }
+
+    {
+        std::string details;
+        results.push_back({ "Player module-only send bypasses channel fanout map", runPlayerModuleOnlySendBypassesChannelMap(details), details });
     }
 
     {
