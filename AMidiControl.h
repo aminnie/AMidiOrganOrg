@@ -7437,8 +7437,8 @@ public:
         loadMidiButton = addToList(new TextButton("Load MIDI"));
         loadMidiButton->setColour(TextButton::textColourOffId, Colours::black);
         loadMidiButton->setColour(TextButton::textColourOnId, Colours::black);
-        loadMidiButton->setColour(TextButton::buttonColourId, juce::Colours::lightgrey);
-        loadMidiButton->setColour(TextButton::buttonOnColourId, juce::Colours::lightgrey);
+        loadMidiButton->setColour(TextButton::buttonColourId, juce::Colour(0xff8aa3b6));
+        loadMidiButton->setColour(TextButton::buttonOnColourId, juce::Colour(0xff8aa3b6).interpolatedWith(juce::Colours::black, 0.10f));
         loadMidiButton->setToggleState(true, dontSendNotification);
         loadMidiButton->onClick = [this]() { loadMidiFromChooser(); };
 
@@ -7459,8 +7459,8 @@ public:
         importMidiButton = addToList(new TextButton("Import MIDI"));
         importMidiButton->setColour(TextButton::textColourOffId, Colours::black);
         importMidiButton->setColour(TextButton::textColourOnId, Colours::black);
-        importMidiButton->setColour(TextButton::buttonColourId, juce::Colours::lightgrey);
-        importMidiButton->setColour(TextButton::buttonOnColourId, juce::Colours::lightgrey);
+        importMidiButton->setColour(TextButton::buttonColourId, juce::Colour(0xff8aa3b6));
+        importMidiButton->setColour(TextButton::buttonOnColourId, juce::Colour(0xff8aa3b6).interpolatedWith(juce::Colours::black, 0.10f));
         importMidiButton->setToggleState(true, dontSendNotification);
         importMidiButton->onClick = [this]() { importLoadedMidiToLibrary(); };
 
@@ -7855,11 +7855,11 @@ public:
         const int gap = 4;
 
         int midiBtnX = controlRow.getX();
-        loadMidiButton->setBounds(midiBtnX, playbackButtonY, kPlayerVoiceEditBtnW, kPlayerVoiceEditBtnH);
-        midiBtnX += kPlayerVoiceEditBtnW + gap;
         startStopMidiButton->setBounds(midiBtnX, playbackButtonY, kPlayerVoiceEditBtnW, kPlayerVoiceEditBtnH);
         midiBtnX += kPlayerVoiceEditBtnW + gap;
         continueMidiButton->setBounds(midiBtnX, playbackButtonY, kPlayerVoiceEditBtnW, kPlayerVoiceEditBtnH);
+        midiBtnX += kPlayerVoiceEditBtnW + gap;
+        loadMidiButton->setBounds(midiBtnX, playbackButtonY, kPlayerVoiceEditBtnW, kPlayerVoiceEditBtnH);
         midiBtnX += kPlayerVoiceEditBtnW + gap;
         importMidiButton->setBounds(midiBtnX, playbackButtonY, kPlayerVoiceEditBtnW, kPlayerVoiceEditBtnH);
         midiBtnX += kPlayerVoiceEditBtnW + gap;
@@ -9796,7 +9796,8 @@ private:
         activeProfileId.clear();
         activeProfileDisplayName.clear();
         activeProfileCreatedUtc.clear();
-        markPlayerProfileDirty(true);
+        // Loading a file to play should not imply unsaved profile edits.
+        markPlayerProfileDirty(false);
         refreshProfileCombo();
         updateProfileButtonsState();
         updateTransportButtons();
