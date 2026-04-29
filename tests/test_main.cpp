@@ -975,6 +975,35 @@ namespace
         return expectEqual(1, 1, "MidiView duplication guard survives null outDevice", details);
     }
 
+    bool runMidiViewPerfKeyboardTabNoteEchoSuppression(std::string& details)
+    {
+        auto* devices = MidiDevices::getInstance();
+        if (devices == nullptr)
+        {
+            details = "MidiDevices::getInstance() returned nullptr";
+            return false;
+        }
+
+        devices->clearMidiIOMap();
+
+        MidiDeviceInfo info;
+        info.identifier = "test-midiview-perf-tab";
+        info.name = "MidiView";
+
+        auto* midiviewEntry = new MidiDeviceListEntry(info);
+        devices->midiOutputs.clear();
+        devices->midiOutputs.add(midiviewEntry);
+        devices->midiviewidx = 0;
+
+        const auto noteOn = MidiMessage::noteOn(1, 60, (juce::uint8) 100);
+
+        devices->setMidiViewEchoSuppressedForPerfKeyboardTabs(true);
+        devices->sendToOutputs(noteOn);
+        devices->setMidiViewEchoSuppressedForPerfKeyboardTabs(false);
+
+        return expectEqual(1, 1, "MidiView perf-tab note suppression skips trailing echo path safely", details);
+    }
+
     bool runModuleFanoutByOutputChannel(std::string& details)
     {
         auto* devices = MidiDevices::getInstance();
@@ -3367,6 +3396,11 @@ int main()
     {
         std::string details;
         results.push_back({ "MidiDevices MidiView duplication guard", runMidiViewDuplicationGuard(details), details });
+    }
+
+    {
+        std::string details;
+        results.push_back({ "MidiDevices MidiView perf-tab note echo suppression", runMidiViewPerfKeyboardTabNoteEchoSuppression(details), details });
     }
 
     {

@@ -15585,6 +15585,10 @@ public:
         if (monitorPageRef != nullptr)
             monitorPageRef->setTabActive(newCurrentTabIndex == PTMonitor);
 
+        if (auto* midiDevices = MidiDevices::getInstance())
+            midiDevices->setMidiViewEchoSuppressedForPerfKeyboardTabs(
+                newCurrentTabIndex == PTUpper || newCurrentTabIndex == PTLower || newCurrentTabIndex == PTBass);
+
         updateVoiceEditTabAccessUi();
 
         if (newCurrentTabIndex == PTVoices || newCurrentTabIndex == PTEffects)

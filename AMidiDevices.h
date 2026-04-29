@@ -9,6 +9,7 @@
 */
 
 #pragma once
+#include <atomic>
 #include <functional>
 #include <map>
 
@@ -518,6 +519,12 @@ public:
         presetNextTriggerHook = std::move(hook);
     }
 
+    /** When true and message is Note On/Off, skip trailing MidiView echo in sendToOutputs (performance Upper/Lower/Bass tabs). */
+    void setMidiViewEchoSuppressedForPerfKeyboardTabs(bool suppressed) noexcept
+    {
+        suppressMidiViewEchoForPerfKeyboardTabs.store(suppressed, std::memory_order_relaxed);
+    }
+
     void resetAllControllers()
     {
         // Reset all Controllers - is it implemented by BlackBox?
@@ -621,6 +628,8 @@ public:
     juce_DeclareSingleton(MidiDevices, true)
 
 private:
+    std::atomic<bool> suppressMidiViewEchoForPerfKeyboardTabs { false };
+
     bool sendToMappedOutputsForRouteChannel(const MidiMessage& msg,
                                             int routeChannel,
                                             const std::function<void(const MidiMessage&, const juce::String&)>& monitorHookCopy,
@@ -1465,7 +1474,10 @@ inline void MidiDevices::sendToOutputs(const MidiMessage& msg, bool bypassOutput
     if (!reachedHardware && monitorHookCopy)
         monitorHookCopy(msg, {});
 
-    if (midiviewidx < midiOutputs.size()) {
+    const bool skipMidiViewEcho = msg.isNoteOnOrOff()
+        && suppressMidiViewEchoForPerfKeyboardTabs.load(std::memory_order_relaxed);
+
+    if (!skipMidiViewEcho && midiviewidx < midiOutputs.size()) {
         if (midiOutputs[midiviewidx]->outDevice.get() != nullptr)
             midiOutputs[midiviewidx]->outDevice->sendMessageNow(msg);
     }
