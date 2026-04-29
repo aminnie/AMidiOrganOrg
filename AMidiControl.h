@@ -12358,11 +12358,21 @@ public:
         enableButton.setColour(juce::TextButton::buttonColourId, juce::Colours::black.darker());
         enableButton.setColour(juce::TextButton::buttonOnColourId, juce::Colours::antiquewhite);
         enableButton.setToggleState(false, juce::dontSendNotification);
-        enableButton.setTooltip("Monitoring appends MIDI rows globally while enabled.");
+        enableButton.setTooltip(kMonitorEnableTooltipBase);
         updateEnableButtonText(false);
         enableButton.onClick = [this]()
             {
-                setMonitoringEnabled(enableButton.getToggleState());
+                const bool wantsEnable = enableButton.getToggleState();
+                if (wantsEnable)
+                {
+                    syncMonitorLineCountsFromEditors();
+                    if (midiInLineCount >= kMonitorLineLimit || midiOutLineCount >= kMonitorLineLimit)
+                    {
+                        stopMonitoringDueToLineLimit();
+                        return;
+                    }
+                }
+                setMonitoringEnabled(wantsEnable);
             };
 
         addAndMakeVisible(clearButton);
@@ -12377,6 +12387,11 @@ public:
             {
                 midiInTextArea.clear();
                 midiOutTextArea.clear();
+                midiInLineCount = 0;
+                midiOutLineCount = 0;
+                monitorStoppedForLineLimit = false;
+                applyMonitorEnableButtonColours();
+                refreshMonitorEnableTooltip();
             };
 
         addAndMakeVisible(filterMidiClockToggle);
@@ -12584,6 +12599,9 @@ public:
 
     void setMonitoringEnabled(bool enabled)
     {
+        if (enabled)
+            monitorStoppedForLineLimit = false;
+
         enableButton.setToggleState(enabled, juce::dontSendNotification);
         monitorEnabled.store(enabled, std::memory_order_relaxed);
         updateEnableButtonText(enabled);
@@ -12603,6 +12621,10 @@ private:
         juce::String endpointName;
         Direction direction { Direction::midiOut };
     };
+
+    static constexpr int kMonitorLineLimit = 50;
+    static constexpr const char* kMonitorEnableTooltipBase = "Monitoring appends MIDI rows globally while enabled.";
+    static constexpr const char* kMonitorEnableTooltipLineLimit = "Monitoring paused at 50 lines. Press Clear to resume monitoring.";
 
     bool isVirtualKeyboardInputEnabled() const
     {
@@ -12646,6 +12668,53 @@ private:
     void updateEnableButtonText(bool enabled)
     {
         enableButton.setButtonText(enabled ? "Enabled" : "Disabled");
+        applyMonitorEnableButtonColours();
+        refreshMonitorEnableTooltip();
+    }
+
+    void applyMonitorEnableButtonColours()
+    {
+        const bool showLineLimitAlert = monitorStoppedForLineLimit && !monitorEnabled.load(std::memory_order_relaxed);
+        const auto offColour = showLineLimitAlert ? juce::Colours::darkred : juce::Colours::black.darker();
+        const auto onColour = showLineLimitAlert ? juce::Colours::darkred.brighter() : juce::Colours::antiquewhite;
+        const auto offTextColour = juce::Colours::white;
+        const auto onTextColour = showLineLimitAlert ? juce::Colours::white : juce::Colours::black;
+
+        enableButton.setColour(juce::TextButton::buttonColourId, offColour);
+        enableButton.setColour(juce::TextButton::buttonOnColourId, onColour);
+        enableButton.setColour(juce::TextButton::textColourOffId, offTextColour);
+        enableButton.setColour(juce::TextButton::textColourOnId, onTextColour);
+    }
+
+    void refreshMonitorEnableTooltip()
+    {
+        if (monitorStoppedForLineLimit && !monitorEnabled.load(std::memory_order_relaxed))
+            enableButton.setTooltip(kMonitorEnableTooltipLineLimit);
+        else
+            enableButton.setTooltip(kMonitorEnableTooltipBase);
+    }
+
+    int getLineCount(const juce::TextEditor& editor) const
+    {
+        const auto text = editor.getText();
+        if (text.isEmpty())
+            return 0;
+
+        juce::StringArray lines;
+        lines.addLines(text);
+        return lines.size();
+    }
+
+    void syncMonitorLineCountsFromEditors()
+    {
+        midiInLineCount = getLineCount(midiInTextArea);
+        midiOutLineCount = getLineCount(midiOutTextArea);
+    }
+
+    void stopMonitoringDueToLineLimit()
+    {
+        monitorStoppedForLineLimit = true;
+        setMonitoringEnabled(false);
     }
 
     void setFilterMidiClockEnabled(bool enabled)
@@ -12746,28 +12815,29 @@ private:
         if (flushMessages.isEmpty())
             return;
 
-        juce::String inLines;
-        juce::String outLines;
-        inLines.preallocateBytes(flushMessages.size() * 32);
-        outLines.preallocateBytes(flushMessages.size() * 32);
         for (const auto& entry : flushMessages)
         {
-            const juce::String line = formatMessage(entry, updateAndGetCurrentVolume(entry.message)) + "\n";
-            if (entry.direction == MonitorMessageEntry::Direction::midiIn)
-                inLines << line;
-            else
-                outLines << line;
-        }
+            if (!monitorEnabled.load(std::memory_order_relaxed))
+                break;
 
-        if (inLines.isNotEmpty())
-        {
-            midiInTextArea.moveCaretToEnd();
-            midiInTextArea.insertTextAtCaret(inLines);
-        }
-        if (outLines.isNotEmpty())
-        {
-            midiOutTextArea.moveCaretToEnd();
-            midiOutTextArea.insertTextAtCaret(outLines);
+            auto* targetEditor = entry.direction == MonitorMessageEntry::Direction::midiIn ? &midiInTextArea : &midiOutTextArea;
+            int& lineCount = entry.direction == MonitorMessageEntry::Direction::midiIn ? midiInLineCount : midiOutLineCount;
+            if (lineCount >= kMonitorLineLimit)
+            {
+                stopMonitoringDueToLineLimit();
+                break;
+            }
+
+            const juce::String line = formatMessage(entry, updateAndGetCurrentVolume(entry.message)) + "\n";
+            targetEditor->moveCaretToEnd();
+            targetEditor->insertTextAtCaret(line);
+
+            ++lineCount;
+            if (lineCount >= kMonitorLineLimit)
+            {
+                stopMonitoringDueToLineLimit();
+                break;
+            }
         }
     }
 
@@ -12831,6 +12901,9 @@ private:
     juce::CriticalSection queueLock;
     juce::Array<MonitorMessageEntry> pendingMessages;
     int currentVolumeByChannel[17] { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 };
+    int midiInLineCount = 0;
+    int midiOutLineCount = 0;
+    bool monitorStoppedForLineLimit = false;
 
     std::atomic<bool> monitorEnabled { false };
     std::atomic<bool> filterMidiProgramChangeEnabled { false };
