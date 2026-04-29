@@ -113,6 +113,7 @@ On startup, the app also attempts to auto-restore the last used panel and config
 #### Upper / Lower / Bass&Drums
 
 - These are the main performance tabs.
+- If you use the **MidiView** pseudo-module for diagnostics, routed **Note On/Off** echoes to MidiView’s duplicate output path are suppressed while **Upper**, **Lower**, or **Bass&Drums** is active (avoids doubled notes alongside normal module output during live play).
 - Each tab contains voice button groups, volume controls, mute, and preset recall.
 - `Upper` and `Lower` also include rotary controls.
 - `Save` and `Save As` write the current panel (`.pnl`) to disk.
@@ -198,15 +199,29 @@ On startup, the app also attempts to auto-restore the last used panel and config
 
 #### Monitor
 
-- Shows outgoing MIDI messages in a live monitor view.
-- Capture is controlled by the `Enable` button and remains active globally while enabled.
+- Shows **incoming** MIDI (MIDI **In**) and **outgoing** MIDI (MIDI **Out**) in separate scrolling areas (“MIDI In / Out Monitor”).
+- Capture is controlled by the **Enabled / Disabled** toggle and applies globally while active (not tied to staying on this tab).
 - If Config `Startup Monitor` is enabled, capture also starts automatically during app startup before the user opens the `Monitor` tab.
-- `Clear` clears the visible monitor history.
-- Each line includes routed channel/message details and the routed sound module name.
+- **Line limit:** Each of the In and Out panes stores at most **50** lines. Appending reaches the limit **disables monitoring** automatically; when stopped for this reason, the toggle shifts to **Disabled** styling with a **red** emphasis and tooltip explaining the cap so you notice that capture halted (use **Clear**, then enable again).
+- `Clear` clears the visible monitor history in both panes.
+- Lines include routed channel/message details where applicable module context is printed for traffic that goes through routed outputs.
 - The Monitor tab includes a virtual MIDI keyboard and an `Octave` control for range positioning.
-- Monitor note names and keyboard labels now follow the same `C4 = 60` convention used by Solo split values in Config.
+- Monitor note names and keyboard labels follow the same `C4 = 60` convention used by Solo split values in Config.
 
 #### Player
+
+- Playback targets **only MIDI outputs belonging to** the selected Player sound module: file traffic does not reuse the generic button-group route fan-out, and MidiView duplicate mirroring is not applied to MIDI-file playback (debug logs recap routing choices at playback start).
+- **Start playback** requires a loaded MIDI file, a valid Player module selection, **and at least one open MIDI output device** matching that module; otherwise playback is blocked until `Start`/devices/module selection are fixed.
+- **Load MIDI** opens the file picker; **Import MIDI** saves a copy into the profile/MIDI workspace for repeatable use.
+- **Start** / **Stop** toggles transport; **Continue** resumes after stop when playback can continue from the current position from the tempo map engine.
+- **Bar** sets the MIDI **playback start bar** (tooltip: `0` or `1` starts at bar 1). Value is persisted in Player profiles alongside other Player flags.
+- **Key +/-** (**transpose**) shifts played notes **-6…+6** semitones (clamped in saved profiles); out-of-range notes after transpose are dropped.
+- **Tempo** accepts a **BPM override**; **`0`** means follow the MIDI file tempo map (`Tempo override BPM`, tooltip).
+- Strip **M** (mute per channel during playback) and **S** (solo one channel; other channels are gated in the Player path). Toggling solo sends **All Notes Off** and **All Sound Off** on all 16 channels via the Player module routing to clear stuck notes when changing the soloed channel.
+- **Player** strip mute/solo is specific to MIDI-file playback and is **not** tied to Upper/Lower/Bass group mutes on the live panel.
+- While a file plays, transport text can show **bar / beat / quarter** position derived from the MIDI tempo map (see the status area under the metadata line).
+- **Manage Profiles** opens a dialog to rename, delete, or clean up saved profiles on disk.
+- **Save Profile** uses stronger text contrast while the profile has unsaved edits (dirty).
 
 - `Scale file CCs with Player strip` is an optional playback-time merge in the `Player` tab.
 - Merge is active only for channels that are explicitly configured from `Player` (`Ch 1..16` voice button selected at least once).
@@ -217,13 +232,14 @@ On startup, the app also attempts to auto-restore the last used panel and config
 - `CC10` (`Pan`) is intentionally passed through unchanged during this merge mode to avoid incorrect left/right behavior from naive 0..127 scaling around pan center.
 - Non-controller MIDI events continue through the normal playback path unchanged.
 - Player now supports per-song profile workflows:
-  - `Apply Profile` selector + `Save Profile`, `Save Profile As`, `Revert Profile`, and `Load MIDI+Profile`.
+  - `Apply Profile` selector + `Save Profile`, `Save Profile As`, `Revert Profile`, and `Load Profile+MIDI`.
   - Profiles are sidecar data (the `.mid` file is not rewritten during normal playback).
-  - Profiles capture per-channel voice/effect strips, configured-channel flags, module selection, mute/solo state, and Player remap/merge toggles.
-  - `Load MIDI+Profile` uses the selected profile's saved MIDI path, loads that MIDI file into Player, and then applies that exact profile.
+  - Profiles capture per-channel voice/effect strips, configured-channel flags, module selection, transpose (-6…+6), tempo override BPM, playback start bar, mute/solo state, and Player remap/merge toggles.
+  - `Load Profile+MIDI` uses the selected profile's saved MIDI path, loads that MIDI file into Player, and then applies that exact profile.
   - Missing/invalid MIDI path in a profile is reported in Player status and the current session is left unchanged.
   - Profile files are stored under `Documents/AMidiOrgan/configs/player_profiles/`.
   - Profile index and last-used mapping are stored in `Documents/AMidiOrgan/configs/player_profiles_index.json`.
+  - Channels that are not mapped in the live **Config** route can still be heard during file playback when the Player routes them through the selected Player module (configure each channel strip as needed).
 
 #### Help
 
@@ -361,13 +377,14 @@ When the main window has focus:
 | Upper rotary Brake       | B         |
 | Lower rotary Fast/Slow   | G         |
 | Lower rotary Brake       | N         |
+| Player Start / Stop       | `p`       |
 
 
 Upper and Lower rotary keys always target their respective manuals, even when another tab is selected.
 
 ### Editing Shortcuts
 
-Use the `Hotkeys` tab (between `Config` and `Monitor`) to assign each command to a key from `A-Z` or `0-9`, or `(None)` for no mapping. `Save` writes `Documents/AMidiOrgan/configs/hotkeys.json` and applies the mapping; the app also loads that file on startup. If two or more commands share the same non-empty key, `Save` is blocked and a warning is shown. `Cancel` discards unsaved edits in the tab and restores the last applied bindings.
+Use the `Hotkeys` tab (between `Config` and `Monitor`) to assign each command—including **Player Start/Stop**—to a key from `A-Z` or `0-9`, or `(None)` for no mapping. `Save` writes `Documents/AMidiOrgan/configs/hotkeys.json` and applies the mapping; the app also loads that file on startup. If two or more commands share the same non-empty key, `Save` is blocked and a warning is shown. `Cancel` discards unsaved edits in the tab and restores the last applied bindings.
 
 Current preset hotkeys cover `Manual`, `Preset 1..6`, and `Next preset`. Dedicated hotkeys for `Preset 7..12` are not defined.
 
@@ -495,9 +512,8 @@ After a successful build, run this quick checklist (5-10 minutes):
   - Return to a keyboard tab and confirm state is preserved.
   - Confirm the keyboard-tab `Effects` shortcut button turns orange if the selected voice has `VOL`, `EXP`, or `BRI` set to `0`.
 5. On `Monitor`:
-  - Toggle `Enable` on and confirm outgoing MIDI traffic is appended.
-  - Toggle `Enable` off and confirm history remains visible.
-  - Click `Clear` and confirm the monitor view is cleared.
+  - Toggle **Enabled**, confirm MIDI **In** and/or **Out** lines append until the **50-line cap** per pane disables capture (toggle shows **Disabled** with red cue); use **Clear** and enable again if needed.
+  - Toggle monitoring off and confirm existing history stays until cleared.
 6. On `Config`:
   - Change one mapping value, save, reload, and confirm it persists.
   - Click into a text field and type digits/letters; confirm **global shortcuts do not** change tabs or presets while typing. Click the tab bar or an empty area, then confirm shortcuts work again.
