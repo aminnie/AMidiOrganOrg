@@ -111,17 +111,25 @@ Contact the developer for additional module support.
 
 ### Hotkeys
 
-- Lets you assign keyboard shortcuts for tabs, presets, and rotary controls.
+- Lets you assign keyboard shortcuts for tabs, presets, rotary controls, **and Player Start / Stop**.
 - Available values are `A-Z`, `0-9`, and `(None)`.
 - `Save` applies the current shortcut map and writes it to disk.
 - `Cancel` restores the last applied shortcut map.
 - Duplicate non-empty shortcuts are blocked.
+- Defaults include **Player Start / Stop** on **`p`**.
+
+### Monitor
+
+- Separates routed **IN** vs **OUT** histories (MIDI **In / Out Monitor** panes).
+- Each pane retains up to **50** lines—reaching this limit **automatically disables** capture; use **Clear** and enable again after reviewing.
+- `Enabled`/`Disabled`, `Clear`, optional virtual octave keyboard aligned with Solo split (`C4=60 convention` elsewhere).
 
 ### Player
 
-- Plays `.mid` files through the app's MIDI output routing path.
+- Targets the **currently selected Sound Module** outputs for `.mid` playback (orthogonal to Upper/Lower/Bass group mutes; strip **M**/**S** handle playback gating).
 - Channel strips (`Ch 1..16`) hold per-channel Program/Bank and effect values.
 - Selecting a channel strip sends Program/Bank and Effects immediately on that channel.
+- **Load MIDI** / **Import MIDI**, **Start**/**Stop**, **Continue**, **Bar** start, **Key +/-** transpose (`-6..+6`), **Tempo** override (`0` follows file map), bar/beat transport readout while playing.
 - During playback, Program Change on configured Player channels is replaced by strip `MSB/LSB/PC`.
 - `Enable Program Change remap` applies lookup remapping to remaining Program Change traffic.
 - `Scale file CCs with Player strip` is optional (default OFF):
@@ -131,11 +139,12 @@ Contact the developer for additional module support.
   - Keeps `CC10` (`Pan`) passthrough (not scaled).
 - Player profile workflow:
   - `Apply Profile` dropdown lists saved profiles for the loaded MIDI file.
-  - `Save Profile` updates active profile values.
+  - `Save Profile` updates active profile values (emphasizes unsaved edits when dirty).
   - `Save Profile As` creates a new profile.
   - `Revert Profile` reloads the active profile.
-  - `Load MIDI+Profile` loads the selected profile's saved MIDI file path and then applies that profile.
-  - Dirty profile switches prompt to save/discard/cancel.
+  - `Load Profile+MIDI` loads the selected profile's saved MIDI path, then applies that profile state.
+  - **Manage Profiles…** trims/renames list entries offline.
+  - Dirty profile switches prompt to save/discard/cancel as needed.
 - Profiles are saved as sidecar files under `Documents/AMidiOrgan/configs/player_profiles/` and do not rewrite the source `.mid` file.
 - If a profile points to a missing MIDI file, Player reports this in status and leaves the current state unchanged.
 
@@ -207,6 +216,7 @@ When the main window has focus, the default shortcuts are:
 | Bass tab | `D` |
 | Sounds tab | `Z` |
 | Effects tab | `X` |
+| Monitor tab | `M` |
 | Manual preset | `0` |
 | Preset 1 | `1` |
 | Preset 2 | `2` |
@@ -219,6 +229,7 @@ When the main window has focus, the default shortcuts are:
 | Upper rotary Brake | `B` |
 | Lower rotary Fast/Slow | `G` |
 | Lower rotary Brake | `N` |
+| Player Start / Stop | `P` |
 
 Shortcut notes:
 

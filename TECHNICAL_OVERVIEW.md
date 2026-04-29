@@ -82,25 +82,28 @@ Primary implementation files:
 - **Hotkeys**
   - User-editable key mapping persisted to `hotkeys.json`
   - Duplicate key conflict prevention
-  - Includes Monitor tab hotkey command
+  - Includes Monitor tab hotkey command plus **Player Start/Stop** (default **`p`** in `HotkeyBindings::withDefaults`)
   - Preset hotkeys currently cover `Manual`, `Preset 1..6`, and `Next` (no dedicated `Preset 7..12` hotkeys yet)
 - **Player**
   - MIDI-file playback (`MidiFilePlaybackEngine`) with timed event dispatch from file timestamps
+  - Playback output uses **`MidiDevices::sendToPlayerModuleOnly(...)`** — matches only MIDI outputs mapped to `playerModuleIdx` (no implicit channel-route fan-out, no MidiView mirror duplication on file traffic)
+  - `logPlayerOutputRoutingSummaryAtPlaybackStart()` records module name, matching output devices (`open` vs `closed`), and reinforces routing posture in logs
   - Per-channel (`1..16`) Player strips backed by `channelInstruments`
-  - Program/Bank replacement on configured channels (`MSB`, `LSB`, `PC`)
+  - Program/Bank replacement on configured channels (`MSB`, `LSB`, `PC`), prior to CC merge + generic PC remap traversal
   - Optional Program Change lookup remap (`ProgramChangeRemapper`)
-  - Optional CC merge against Player strip trims (`PlayerStripCcMerge`)
-  - ValueTree-backed song profiles (sidecar JSON) for per-MIDI/per-module Player state
-  - Explicit `Load MIDI+Profile` action for profile-first recall (load referenced MIDI path, then apply profile)
-  - Profile index + last-used mapping for auto-load on MIDI open
-  - Mute/Solo gating reused from playback routing path
+  - Optional CC merge against Player strip trims via `PlayerStripCcMerge::mergeControllerWithStripIfApplicable` when `midiPlayerSettings.enablePlayerStripCcScaling` is enabled
+  - Transpose `-6…+6` semitones (note helper drops out-of-range after shift), BPM override remap (`0` keeps file tempo), playback start bar surfaced on UI/tooltip
+  - Start/Continue transport pair with `MidiFilePlaybackEngine`-backed cue position; **`Continue`** gated when no continuation state exists.
+  - Per-strip **mute** bitmask + exclusivity **`solo`** gating handled in `PlayerPage::isPlaybackMutedForMessage(...)` solo toggles enqueue `sendAllNotesOff()` (All Notes Off + All Sound Off per channel) through the Player-only send path before persisting mute/solo data.
+  - Player playback mute gates are **orthogonal** to live button-group mute state (explicit decouple from Upper/Lower/Bass mute pipeline).
+  - ValueTree-backed song profiles persist transpose, tempo override, playback start bar, mute/solo, remap/CC-merge booleans module id, strips, UI metadata
+  - `Manage Profiles…` launcher edits sidecar catalogue + **`Load Profile+MIDI`** (button label casing) restores referenced `.mid`
+  - Profile index + last-used mapping for auto-load on MIDI identity key
 - **Monitor**
-  - Outgoing MIDI monitor with enable/disable capture
+  - Dedicated **Incoming** (`midiIn`) and **Outgoing** (`midiOut`) text editors capped at **`kMonitorLineLimit = 50`** lines each; hitting the cap calls `stopMonitoringDueToLineLimit()` which lowers `monitorEnabled` and renders the Enable toggle **red/off** while `monitorStoppedForLineLimit` latch is set (`applyMonitorEnableButtonColours`).
+  - Existing monitor hook drains queue on message thread respecting the same counters.
   - Optional startup auto-enable without tab navigation
-  - History retention and clear action
-  - Includes routed module name and current volume context
-  - Virtual MIDI keyboard with octave control
-  - Shares the same `C4 = 60` note-label convention as Config split values
+  - Virtual MIDI keyboard respects tab-active gating (`setTabActive`); note labels follow `C4 = 60` convention aligned with Solo split editor
 - **Help**
   - In-app guide sourced from `assets/help.md`
 
@@ -123,12 +126,13 @@ Primary implementation files:
   - query profile index for matching entries
   - apply last-used profile when available
   - preserve current state when no profile exists
-- Player profile-first load order (`Load MIDI+Profile` button):
+- Player profile-first load order (`Load Profile+MIDI` button):
   - read selected profile from index/storage
   - resolve `midiRef.originalPath` and validate file existence
   - load MIDI file through normal `loadMidiFile(...)` path
   - apply selected profile state explicitly
 - Output monitoring hook captures final routed messages
+- Optional MidiView duplicate-send mirroring skips **Note On/Off** echoes when **Upper**, **Lower**, or **Bass&Drums** is active (`MidiDevices::setMidiViewEchoSuppressedForPerfKeyboardTabs`)
 - When startup-monitor config is enabled, the outgoing monitor hook is armed during startup before Start-tab initialization completes
 
 ### 3.3 Mute and Safety Behavior
@@ -278,7 +282,7 @@ Config persistence notes:
 - Config root also persists `presetMidiPcInputChannel` and `presetMidiPcValue` for external Program Change preset-next triggering.
 - Config root also persists `uiProfileId` for fixed-size profile selection.
 - MIDI-file settings persist `enablePlayerStripCcScaling` (default `false` when missing for backward compatibility).
-- Player profile schema root: `playerSongProfile` with `midiRef`, `moduleRef`, `playerFlags`, `channels`, and optional `uiState`.
+- Player profile schema root: `playerSongProfile` with `midiRef`, `moduleRef`, `playerFlags`, `channels`, and optional `uiState`; flags include transpose (`-6..6`), tempo override (`playbackTempoBpmOverride`), playback start bar, solo/mute bitmask, remap/CC-merge toggles.
 - Player profile schema version starts at `1`; missing/new properties follow defensive defaults for backward compatibility.
 - Each `group` child also persists SysEx-through settings:
   - `sysexThrough` (bool, default `false`)
@@ -337,6 +341,7 @@ cmake --build build --config Release --target AMidiOrgan
 - Muting and preset restore interactions
 - Startup ordering for state restore vs page initialization
 - Cross-tab selected-voice context and edit gating
+- MIDI monitor ingest path (dual 50-row caps, auto-stop hook, MidiView echo suppression interplay with routed sends)
 
 ## 9. Known Technical Risks / Improvement Opportunities
 

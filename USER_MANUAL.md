@@ -208,6 +208,7 @@ Rotary controls:
   - Group 2 selected: rotary follows Button Group 2 routing/module.
 - Selector changes immediately retarget rotary behavior for that manual.
 - Rotary selector choice is saved with the panel and restored when the panel is loaded.
+- If you use **MidiView** as a routed output duplicate, routed **note** traffic to MidiView while on **Upper**, **Lower**, or **Bass&Drums** does not double-echo MidiView playback (helps avoid audible doubled notes versus your main outputs).
 
 Expected result:
 
@@ -351,7 +352,7 @@ Reference image:
 
 Quick read (look here first):
 
-- Focus first on command rows; each row maps one action to one key.
+- Focus first on command rows; each row maps one action to one key (**Player Start/Stop** is the last row by default mapped to **`p`**).
 - Then use Save/Cancel to apply or discard shortcut edits.
 
 You can:
@@ -366,7 +367,7 @@ Rules:
 - Saved hotkeys persist to `Documents/AMidiOrgan/configs/hotkeys.json`.
 - Preset hotkeys currently cover `Manual`, `Preset 1..6`, and `Next`; dedicated keys for `Preset 7..12` are not defined.
 
-Default includes `Monitor` tab hotkey (`M`) and `Next preset` (`7`).
+Default includes `Monitor` tab hotkey (`M`), **Player Start / Stop** (`p`), and `Next preset` (`7`).
 
 Expected result:
 
@@ -374,47 +375,57 @@ Expected result:
 
 ## 6.7 Player Tab
 
-Primary use: route MIDI-file playback through per-channel Player voice/effects strips.
+Primary use: play `.mid` files through MIDI outputs that match the **selected Player sound module**, with per-channel strip programming and optional song profiles.
 
 Quick read (look here first):
 
-- Focus first on channel strip selection (`Ch 1..16`) to define which channels are Player-configured.
-- Then use playback toggles to choose Program Change remap behavior and optional file-CC scaling.
+- Pick **Sound Module**: file playback sends only through outputs that belong to that module (separate path from keyboard fan-out routing; MidiView’s duplicate echo path does not substitute for MIDI file output).
+- **Start** stays disabled until a playable file is loaded, the module picker is coherent, **and at least one MIDI output matching that module on `Start` is actually open**.
+- Then pick **Ch 1..16** strips, optional **S** (solo) / **M** (mute) per channel, transport, and profile actions.
 
 How to use:
 
-1. Load a MIDI file in `Player`.
-2. Select one or more channel strips (`Ch 1..16`) and configure voice/effects for those channels.
-3. Optional: enable `Enable Program Change remap` if lookup remapping is desired.
-4. Optional: enable `Scale file CCs with Player strip` to blend file CC automation with strip trims.
-5. Optional: choose an existing profile in `Apply Profile` or create one with `Save Profile As`.
-6. Start playback.
+1. Use **Load MIDI** (file dialog) or **Import MIDI** (copy into your profile/MIDI workspace).
+2. Choose the **Sound Module** target for file playback.
+3. Select one or more **Ch 1..16** strips and edit voice/effects (or use **Sounds** / **Effects** shortcut buttons for the active strip).
+4. Optional: enable `Enable Program Change remap` and/or `Scale file CCs with Player strip`.
+5. Optional: set **Bar** (playback start bar; `0` or `1` starts at bar 1), **Key +/-** (transpose `-6`..`+6` semitones), **Tempo** (`0` = follow file tempo map; otherwise BPM override).
+6. Optional: select or create a profile (`Apply Profile`, `Save Profile`, `Save Profile As`, `Revert Profile`, `Load Profile+MIDI`, **Manage Profiles**).
+7. Press **Start** (shows **Stop** while playing), or press **Player Start/Stop** (**`p`** default). After **Stop**, use **Continue** when the transport retains a cue point for resumption.
 
 Behavior:
 
-- On configured channels, file Program Change is replaced by the strip Program/Bank (`MSB`, `LSB`, `PC`).
-- `Enable Program Change remap` still applies to non-replaced Program Change events via the lookup mapping path.
+- Player strip **Mute/Solo** are independent of Upper/Lower/Bass group mutes; live panel mutes do not silence MIDI-file playback lanes.
+- **Solo** (`S`) plays only the selected channel; **mute** (`M`) drops selected channels. Toggling **solo** issues **All Notes Off** and **All Sound Off** on all 16 channels through the Player routing path to clear stuck notes when changing which channel is soloed.
+- On configured strips, file Program Change is replaced by strip `MSB` / `LSB` / `PC` before other rewrite steps.
+- `Enable Program Change remap` still applies to remaining Program Change events via the lookup mapping path.
 - `Scale file CCs with Player strip` is OFF by default and applies only on configured channels.
 - CC merge formula:
   - `merged = clamp(round(fileValue * stripValue / 127.0))`
 - Merged CC list: `CC1`, `CC7`, `CC11`, `CC71`, `CC72`, `CC73`, `CC74`, `CC91`, `CC93`.
-- `CC10` (`Pan`) remains passthrough (not scaled) to avoid incorrect pan-center behavior.
-- Profile workflow:
-  - `Save Profile` updates the active profile.
-  - `Save Profile As` creates a new profile entry.
-  - `Revert Profile` reloads the active profile from disk.
-  - `Load MIDI+Profile` loads the MIDI file referenced by the selected profile and applies that profile state.
-  - Profile switch while dirty prompts `Save`, `Discard`, or `Cancel`.
-- Profiles are sidecar files (your source `.mid` is unchanged during normal playback).
-- If a profile references a missing MIDI file, Player shows an error in status and keeps the current session unchanged.
+- `CC10` (`Pan`) remains passthrough (not scaled).
+- While playing, UI text lines can show metadata **time/key/tempo**, plus transport **bar / beat / quarter** derived from file position.
+- **Save Profile** label uses higher-contrast styling when edits are not saved (dirty).
+
+Profile workflow:
+
+- `Save Profile` updates the active profile (prompts appear when switching away dirty).
+- `Save Profile As` creates a new profile entry.
+- `Revert Profile` reloads the active profile from disk.
+- `Load Profile+MIDI` loads the MIDI path stored in that profile then applies profile state after load.
+- **Manage Profiles** opens maintenance (rename/remove profile entries backed by disk).
+- Profiles persist transpose, tempo override (`0`=file), playback start bar, mute/solo, remap/CC-merge switches, strips, module id, etc.
+- Profiles are sidecar files (your `.mid` is not rewritten during normal playback).
+- If a profile references a missing MIDI file, Player surfaces an error in status and keeps the loaded session unchanged.
+- Applying a saved profile reapplies voices and effects across the channel strips pulled from disk.
 
 Expected result:
 
-- Playback follows Player channel sound selection while preserving relative file CC movement for merged controllers.
+- You hear the file routed through strips on the targeted module according to mute/solo, transpose, tempo, remap, and profile choices.
 
 ## 6.8 Monitor Tab
 
-Primary use: troubleshoot outgoing MIDI.
+Primary use: troubleshoot routed **MIDI In** vs **MIDI Out** paths.
 
 Reference image:
 
@@ -422,21 +433,22 @@ Reference image:
 
 Quick read (look here first):
 
-- Focus first on the capture controls (`Enable`/`Disabled`, `Clear`) at the top of the section.
-- Then watch the monitor text area to confirm real-time outgoing MIDI activity.
+- Separate **In** vs **Out** panes (**MIDI In / Out Monitor** group).
+- **Enabled / Disabled** starts or stops buffered capture (**Clear** empties both panes).
 
 Controls:
 
-- `Enable` / `Disabled` toggle for capture
-- `Clear` to clear visible history
+- `Enabled` / `Disabled` toggle for capture
+- `Clear` to reset both histories
 - Virtual MIDI keyboard + `Octave` control
 
 Behavior:
 
-- Capture runs globally while enabled (not limited to when tab is visible).
-- If Config `Startup Monitor` is enabled, capture begins automatically during startup and keeps buffering history until you open `Monitor`.
-- Disabling capture keeps existing history until manually cleared.
-- Monitor lines include message/channel details and routed module context.
+- Capture runs globally while enabled (also works when viewing other tabs).
+- If Config `Startup Monitor` is enabled, capture arms during startup as well.
+- **Each pane retains at most 50 lines.** When adding another line would exceed the limit, monitoring **automatically turns off**. If capture stopped automatically, the Disabled state uses **red** highlighting and tooltip text so it is visible that you hit the capacity — **Clear**, then enable again.
+- Turning capture off deliberately keeps existing text until cleared.
+- Lines include direction labels (`IN` vs `OUT`), channel/message details, and module context when present.
 - Monitor note names and the virtual keyboard use the same `C4 = 60` octave naming as Solo split values in Config.
 
 Use cases:
@@ -447,7 +459,7 @@ Use cases:
 
 Expected result:
 
-- You can see outgoing MIDI lines while enabled and retain history until cleared.
+- You can review both inbound and outbound rows while enabled; history survives until Cleared unless the 50-line safety stop fires.
 
 ## 6.9 Help Tab
 
