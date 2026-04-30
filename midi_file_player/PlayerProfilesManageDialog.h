@@ -76,6 +76,8 @@ private:
         juce::String line = e.displayName;
         if (line.isEmpty())
             line = e.profileId;
+        if (e.moduleDisplayName.isNotEmpty())
+            line << " [" << e.moduleDisplayName << "]";
         line << "  |  " << (e.midiKey.isNotEmpty() ? e.midiKey : juce::String ("(no key)"));
         if (e.updatedUtc.isNotEmpty())
             line << "  |  " << e.updatedUtc;

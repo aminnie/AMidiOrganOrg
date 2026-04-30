@@ -8211,11 +8211,9 @@ private:
 
     juce::String makeDefaultProfileDisplayName() const
     {
-        const auto midiName = loadedMidiFile.existsAsFile()
+        return loadedMidiFile.existsAsFile()
             ? loadedMidiFile.getFileNameWithoutExtension()
             : juce::String("Player");
-        const auto moduleName = instrumentmodules->getDisplayName(playerModuleIdx).trim();
-        return moduleName.isNotEmpty() ? (midiName + " - " + moduleName) : midiName;
     }
 
     void loadPlayerProfilesIndex()
