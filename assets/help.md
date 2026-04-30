@@ -130,6 +130,7 @@ Contact the developer for additional module support.
 - Channel strips (`Ch 1..16`) hold per-channel Program/Bank and effect values.
 - Selecting a channel strip sends Program/Bank and Effects immediately on that channel.
 - **Load MIDI** / **Import MIDI**, **Start**/**Stop**, **Continue**, **Bar** start, **Key +/-** transpose (`-6..+6`), **Tempo** override (`0` follows file map), bar/beat transport readout while playing.
+- **Reset GM** restores strip voices from loaded MIDI Program Changes using the **first event per channel** and marks profile save actions dirty.
 - During playback, Program Change on configured Player channels is replaced by strip `MSB/LSB/PC`.
 - `Enable Program Change remap` applies lookup remapping to remaining Program Change traffic.
 - `Scale file CCs with Player strip` is optional (default OFF):

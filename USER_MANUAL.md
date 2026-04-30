@@ -386,6 +386,7 @@ Quick read (look here first):
 How to use:
 
 1. Use **Load MIDI** (file dialog) or **Import MIDI** (copy into your profile/MIDI workspace).
+   - Use **Reset GM** to restore Player strips from the loaded MIDI file's Program Change scan using the **first Program Change event per channel** (`1..16`).
 2. Choose the **Sound Module** target for file playback.
 3. Select one or more **Ch 1..16** strips and edit voice/effects (or use **Sounds** / **Effects** shortcut buttons for the active strip).
 4. Optional: enable `Enable Program Change remap` and/or `Scale file CCs with Player strip`.
@@ -400,6 +401,7 @@ Behavior:
 - On configured strips, file Program Change is replaced by strip `MSB` / `LSB` / `PC` before other rewrite steps.
 - `Enable Program Change remap` still applies to remaining Program Change events via the lookup mapping path.
 - `Scale file CCs with Player strip` is OFF by default and applies only on configured channels.
+- Running **Reset GM** marks the active Player profile state as changed, so **Save Profile** and **Save Profile As** become active for committing that reset layout.
 - CC merge formula:
   - `merged = clamp(round(fileValue * stripValue / 127.0))`
 - Merged CC list: `CC1`, `CC7`, `CC11`, `CC71`, `CC72`, `CC73`, `CC74`, `CC91`, `CC93`.

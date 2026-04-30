@@ -7464,6 +7464,14 @@ public:
         importMidiButton->setToggleState(true, dontSendNotification);
         importMidiButton->onClick = [this]() { importLoadedMidiToLibrary(); };
 
+        resetGmButton = addToList(new TextButton("Reset GM"));
+        resetGmButton->setColour(TextButton::textColourOffId, Colours::black);
+        resetGmButton->setColour(TextButton::textColourOnId, Colours::black);
+        resetGmButton->setColour(TextButton::buttonColourId, juce::Colour(0xff8aa3b6));
+        resetGmButton->setColour(TextButton::buttonOnColourId, juce::Colour(0xff8aa3b6).interpolatedWith(juce::Colours::black, 0.10f));
+        resetGmButton->setToggleState(true, dontSendNotification);
+        resetGmButton->onClick = [this]() { resetGmFromLoadedMidi(); };
+
         remapProgramChangeToggle = addToList(new ToggleButton("Enable Program Change remap"));
         remapProgramChangeToggle->setColour(ToggleButton::textColourId, Colours::white);
         remapProgramChangeToggle->onClick = [this]()
@@ -7863,6 +7871,11 @@ public:
         midiBtnX += kPlayerVoiceEditBtnW + gap;
         importMidiButton->setBounds(midiBtnX, playbackButtonY, kPlayerVoiceEditBtnW, kPlayerVoiceEditBtnH);
         midiBtnX += kPlayerVoiceEditBtnW + gap;
+        if (resetGmButton != nullptr)
+        {
+            resetGmButton->setBounds(midiBtnX, playbackButtonY, kPlayerVoiceEditBtnW, kPlayerVoiceEditBtnH);
+            midiBtnX += kPlayerVoiceEditBtnW + gap;
+        }
 
         int metadataRowY = playbackButtonY + 24;
         {
@@ -8792,6 +8805,9 @@ private:
         if (continueMidiButton != nullptr)
             continueMidiButton->setEnabled(hasLoadedPlayableMidi && !isPlayingFilePlayback && canContinuePlayback);
 
+        if (resetGmButton != nullptr)
+            resetGmButton->setEnabled(hasLoadedPlayableMidi && loadedMidiFile.existsAsFile());
+
         updateProfileButtonsState();
     }
 
@@ -9283,24 +9299,25 @@ private:
         }
     }
 
-    /** Preset channel voice buttons from the last PC per channel and GM names in midigm.json (skips channels with no GM match). */
+    /** Preset channel voice buttons from the first PC per channel and GM names in midigm.json (skips channels with no GM match). */
     void applyGmChannelVoicesFromLoadedMidi()
     {
         const juce::File midigmFile = resolveMidigmInstrumentFile();
         if (!midigmFile.existsAsFile() || programChangeEvents.empty())
             return;
 
-        std::array<int, 17> lastPc {};
-        lastPc.fill(-1);
+        std::array<int, 17> firstPc {};
+        firstPc.fill(-1);
         for (const auto& ev : programChangeEvents)
         {
             const int ch = juce::jlimit(1, 16, ev.channel);
-            lastPc[(size_t) ch] = ev.program;
+            if (firstPc[(size_t) ch] < 0)
+                firstPc[(size_t) ch] = ev.program;
         }
 
         for (int ch = 1; ch <= playerChannelCount; ++ch)
         {
-            const int pc = lastPc[(size_t) ch];
+            const int pc = firstPc[(size_t) ch];
             if (pc < 0 || pc > 127)
                 continue;
 
@@ -9326,6 +9343,12 @@ private:
                 b->setButtonText(voiceName);
             }
         }
+    }
+
+    void reapplyGmChannelPresetFromLoadedMidiSnapshot()
+    {
+        resetAllPlayerChannelInstrumentsToDefaults();
+        applyGmChannelVoicesFromLoadedMidi();
     }
 
     juce::String buildTopMetadataLine() const
@@ -9782,8 +9805,7 @@ private:
         playbackStatusLabel->setText("Loaded: " + file.getFileName()
                 + " (" + juce::String(playbackEngine.getEventCount()) + " events)",
             dontSendNotification);
-        resetAllPlayerChannelInstrumentsToDefaults();
-        applyGmChannelVoicesFromLoadedMidi();
+        reapplyGmChannelPresetFromLoadedMidiSnapshot();
         activeProfileId.clear();
         activeProfileDisplayName.clear();
         activeProfileCreatedUtc.clear();
@@ -9793,6 +9815,28 @@ private:
         updateProfileButtonsState();
         updateTransportButtons();
         return true;
+    }
+
+    void resetGmFromLoadedMidi()
+    {
+        if (!hasLoadedPlayableMidi || !loadedMidiFile.existsAsFile())
+        {
+            playbackStatusLabel->setText("Load a MIDI file before Reset GM.", dontSendNotification);
+            return;
+        }
+
+        if (isPlayingFilePlayback || canContinuePlayback)
+            stopPlayback();
+
+        const bool hadProgramChangeEvents = !programChangeEvents.empty();
+        reapplyGmChannelPresetFromLoadedMidiSnapshot();
+        markPlayerProfileDirty();
+        updateProfileButtonsState();
+        playbackStatusLabel->setText(
+            hadProgramChangeEvents
+                ? "Reset GM applied from loaded MIDI Program Changes."
+                : "Reset GM applied: no Program Change events found (defaults restored).",
+            dontSendNotification);
     }
 
     void startPlayback()
@@ -10129,6 +10173,7 @@ private:
     TextButton* startStopMidiButton = nullptr;
     TextButton* continueMidiButton = nullptr;
     TextButton* importMidiButton = nullptr;
+    TextButton* resetGmButton = nullptr;
     ToggleButton* remapProgramChangeToggle = nullptr;
     ToggleButton* playerStripCcScalingToggle = nullptr;
     Label* transposeLabel = nullptr;

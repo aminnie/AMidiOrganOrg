@@ -213,6 +213,7 @@ On startup, the app also attempts to auto-restore the last used panel and config
 - Playback targets **only MIDI outputs belonging to** the selected Player sound module: file traffic does not reuse the generic button-group route fan-out, and MidiView duplicate mirroring is not applied to MIDI-file playback (debug logs recap routing choices at playback start).
 - **Start playback** requires a loaded MIDI file, a valid Player module selection, **and at least one open MIDI output device** matching that module; otherwise playback is blocked until `Start`/devices/module selection are fixed.
 - **Load MIDI** opens the file picker; **Import MIDI** saves a copy into the profile/MIDI workspace for repeatable use.
+- **Reset GM** re-applies channel voices from the loaded file's Program Change scan using the **first Program Change per channel** (`1..16`), and marks Player profile actions as dirty so `Save Profile` / `Save Profile As` are ready.
 - **Start** / **Stop** toggles transport; **Continue** resumes after stop when playback can continue from the current position from the tempo map engine.
 - **Bar** sets the MIDI **playback start bar** (tooltip: `0` or `1` starts at bar 1). Value is persisted in Player profiles alongside other Player flags.
 - **Key +/-** (**transpose**) shifts played notes **-6…+6** semitones (clamped in saved profiles); out-of-range notes after transpose are dropped.
