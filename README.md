@@ -223,6 +223,7 @@ On startup, the app also attempts to auto-restore the last used panel and config
 - While a file plays, transport text can show **bar / beat / quarter** position derived from the MIDI tempo map (see the status area under the metadata line).
 - **Manage Profiles** opens a dialog to rename, delete, or clean up saved profiles on disk.
 - **Save Profile** uses stronger text contrast while the profile has unsaved edits (dirty).
+- After you **apply** a profile, if **Sound Module** no longer matches the profile you loaded, **Save Profile** shows a confirmation that suggests **Save Profile As** (to avoid overwriting a profile tied to another module). **Continue** still performs the normal overwrite save; **Save Profile As** skips this prompt.
 
 - `Scale file CCs with Player strip` is an optional playback-time merge in the `Player` tab.
 - Merge is active only for channels that are explicitly configured from `Player` (`Ch 1..16` voice button selected at least once).
@@ -234,6 +235,7 @@ On startup, the app also attempts to auto-restore the last used panel and config
 - Non-controller MIDI events continue through the normal playback path unchanged.
 - Player now supports per-song profile workflows:
   - `Apply Profile` selector + `Save Profile`, `Save Profile As`, `Revert Profile`, and `Load Profile+MIDI`.
+  - If **Sound Module** changes after a profile is applied, **Save Profile** may warn: use **Save Profile As** to keep a separate profile, or **Continue** to overwrite the active one (**Save Profile As** is not affected).
   - Profiles are sidecar data (the `.mid` file is not rewritten during normal playback).
   - Profiles capture per-channel voice/effect strips, configured-channel flags, module selection, transpose (-6…+6), tempo override BPM, playback start bar, mute/solo state, and Player remap/merge toggles.
   - `Load Profile+MIDI` uses the selected profile's saved MIDI path, loads that MIDI file into Player, and then applies that exact profile.

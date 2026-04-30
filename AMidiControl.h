@@ -8348,6 +8348,7 @@ private:
         }
 
         applyingPlayerProfileState = false;
+        playerModuleIdxBaselineForActiveProfile = playerModuleIdx;
         markPlayerProfileDirty(false);
         updateProfileButtonsState();
     }
@@ -8469,12 +8470,36 @@ private:
             nullptr);
     }
 
+    /** When active profile Sound Module differs from baseline (last apply/save), nudge Save As; false = cancelled. */
+    bool promptContinueSavingProfileAfterSoundModuleChanged()
+    {
+        return juce::AlertWindow::showOkCancelBox(
+            juce::AlertWindow::WarningIcon,
+            "Sound Module Changed",
+            "The Sound Module differs from when this profile was loaded.\n\n"
+            "Saving will overwrite the existing profile.\n\n"
+            "Consider \"Save Profile As\" if you want a separate profile for the new module.\n\n"
+            "Continue with Save anyway?",
+            "Continue",
+            "Cancel",
+            this,
+            nullptr);
+    }
+
     bool saveCurrentProfile(bool forceSaveAs)
     {
         if (!hasLoadedPlayableMidi || !loadedMidiFile.existsAsFile())
         {
             playbackStatusLabel->setText("Load a MIDI file before saving a profile.", dontSendNotification);
             return false;
+        }
+
+        if (!forceSaveAs && activeProfileId.isNotEmpty()
+            && playerModuleIdxBaselineForActiveProfile >= 0
+            && playerModuleIdx != playerModuleIdxBaselineForActiveProfile)
+        {
+            if (!promptContinueSavingProfileAfterSoundModuleChanged())
+                return false;
         }
 
         juce::String profileId = activeProfileId;
@@ -8507,6 +8532,7 @@ private:
         activeProfileId = profile.profileId;
         activeProfileDisplayName = profile.displayName;
         activeProfileCreatedUtc = profile.createdUtc;
+        playerModuleIdxBaselineForActiveProfile = playerModuleIdx;
         markPlayerProfileDirty(false);
         refreshProfileCombo();
         playbackStatusLabel->setText("Profile saved: " + profile.displayName, dontSendNotification);
@@ -8549,6 +8575,7 @@ private:
             activeProfileId.clear();
             activeProfileDisplayName.clear();
             activeProfileCreatedUtc.clear();
+            playerModuleIdxBaselineForActiveProfile = -1;
             markPlayerProfileDirty(false);
             refreshProfileCombo();
             return;
@@ -9720,6 +9747,7 @@ private:
             activeProfileId.clear();
             activeProfileDisplayName.clear();
             activeProfileCreatedUtc.clear();
+            playerModuleIdxBaselineForActiveProfile = -1;
             markPlayerProfileDirty(false);
             refreshProfileCombo();
             updatePlaybackGroupTitle();
@@ -9807,6 +9835,7 @@ private:
         activeProfileId.clear();
         activeProfileDisplayName.clear();
         activeProfileCreatedUtc.clear();
+        playerModuleIdxBaselineForActiveProfile = -1;
         // Loading a file to play should not imply unsaved profile edits.
         markPlayerProfileDirty(false);
         refreshProfileCombo();
@@ -10191,6 +10220,8 @@ private:
     std::array<bool, playerChannelCount> playerChannelConfigured {};
     int selectedChannelIdx = -1;
     int playerModuleIdx = 0;
+    /** Module index when the active profile was last applied or saved; -1 if no baseline. Used to warn on Save vs Save As. */
+    int playerModuleIdxBaselineForActiveProfile = -1;
     std::unique_ptr<juce::FileChooser> fileChooser;
     MidiFilePlaybackEngine playbackEngine;
     MidiFilePlayerSettings midiPlayerSettings;

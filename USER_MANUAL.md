@@ -408,6 +408,7 @@ Behavior:
 - `CC10` (`Pan`) remains passthrough (not scaled).
 - While playing, UI text lines can show metadata **time/key/tempo**, plus transport **bar / beat / quarter** derived from file position.
 - **Save Profile** label uses higher-contrast styling when edits are not saved (dirty).
+- If **Sound Module** was changed after a profile was applied, **Save Profile** warns and suggests **Save Profile As**; **Continue** saves over the active profile anyway (**Save Profile As** does not show this warning).
 
 Profile workflow:
 

@@ -141,6 +141,7 @@ Contact the developer for additional module support.
 - Player profile workflow:
   - `Apply Profile` dropdown lists saved profiles for the loaded MIDI file.
   - `Save Profile` updates active profile values (emphasizes unsaved edits when dirty).
+  - If **Sound Module** changed since that profile was loaded, `Save Profile` warns—prefer `Save Profile As` for a new entry, or **Continue** to overwrite; `Save Profile As` skips this warning.
   - `Save Profile As` creates a new profile.
   - `Revert Profile` reloads the active profile.
   - `Load Profile+MIDI` loads the selected profile's saved MIDI path, then applies that profile state.
