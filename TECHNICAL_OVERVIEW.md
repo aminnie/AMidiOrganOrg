@@ -320,14 +320,14 @@ Config persistence notes:
 Runtime metadata shown on the Start tab and in the window title uses two compile definitions:
 
 - `AMIDIORGAN_PROJECT_VERSION`: sourced from `project(AMidiOrgan VERSION x.y.z ...)` in `CMakeLists.txt`.
-- `AMIDIORGAN_BUILD_NUMBER`: sourced from `git rev-parse --short=8 HEAD` during CMake configure/generate.
+- `AMIDIORGAN_BUILD_NUMBER`: sourced from the latest commit date at configure time (`git log -1 --format=%cd --date=format-local:%m/%d/%y`); falls back to configure UTC date (`string(TIMESTAMP ... "%m/%d/%y" UTC)`) if Git metadata is unavailable.
 
 Update timing:
 
 - `AMIDIORGAN_PROJECT_VERSION` changes only when the `VERSION` value in `CMakeLists.txt` is edited and rebuilt.
-- `AMIDIORGAN_BUILD_NUMBER` refreshes when CMake configure runs; a plain `cmake --build ...` may reuse a previously configured SHA if no reconfigure is triggered.
+- `AMIDIORGAN_BUILD_NUMBER` refreshes when CMake configure runs; a plain `cmake --build ...` may reuse a previously configured date if no reconfigure is triggered.
 
-To force-refresh the displayed SHA before building:
+To force-refresh the displayed build date before building:
 
 ```powershell
 cmake -S . -B build

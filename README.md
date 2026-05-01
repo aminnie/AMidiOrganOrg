@@ -442,14 +442,14 @@ Start-Process "build/AMidiOrgan_artefacts/Release/AMidiOrgan.exe"
 The app shows two build metadata values:
 
 - `Version` (`AMIDIORGAN_PROJECT_VERSION`) comes from `project(AMidiOrgan VERSION x.y.z ...)` in `CMakeLists.txt`.
-- `Build` (`AMIDIORGAN_BUILD_NUMBER`) comes from `git rev-parse --short=8 HEAD` during CMake configure/generate.
+- `Build` (`AMIDIORGAN_BUILD_NUMBER`) comes from the latest commit date at configure time (`git log -1 --format=%cd --date=format-local:%m/%d/%y`). If Git metadata is unavailable, CMake falls back to configure date (`string(TIMESTAMP ... "%m/%d/%y" UTC)`).
 
 Update behavior:
 
 - `Version` changes only when you edit the `VERSION` value in `CMakeLists.txt`, then rebuild.
-- `Build` SHA updates when CMake configure runs; a plain `cmake --build ...` may reuse a previous configured SHA if reconfigure is not triggered.
+- `Build` date updates when CMake configure runs; a plain `cmake --build ...` may reuse a previous configured date if reconfigure is not triggered.
 
-To force-refresh the displayed SHA before a build:
+To force-refresh the displayed build date before a build:
 
 ```powershell
 cmake -S . -B build

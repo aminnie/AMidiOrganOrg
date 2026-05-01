@@ -39,7 +39,7 @@
 #endif
 
 #ifndef AMIDIORGAN_BUILD_NUMBER
-#define AMIDIORGAN_BUILD_NUMBER "local"
+#define AMIDIORGAN_BUILD_NUMBER "00/00/00"
 #endif
 
 enum class Type2RotaryAction
@@ -10595,9 +10595,9 @@ public:
         addAndMakeVisible(buildInfoLabel);
         buildInfoLabel.setColour(juce::Label::textColourId, juce::Colours::grey);
         buildInfoLabel.setJustificationType(juce::Justification::right);
-        buildInfoLabel.setText("Version " + juce::String(AMIDIORGAN_PROJECT_VERSION)
-            + "  Build " + juce::String(AMIDIORGAN_BUILD_NUMBER), juce::dontSendNotification);
-        buildInfoLabel.setTooltip("Running build: " + juce::String(AMIDIORGAN_BUILD_NUMBER));
+        buildInfoLabel.setText("Build " + juce::String(AMIDIORGAN_BUILD_NUMBER), juce::dontSendNotification);
+        buildInfoLabel.setTooltip("HEAD commit date (or configure date fallback): "
+            + juce::String(AMIDIORGAN_BUILD_NUMBER));
         buildInfoLabel.setVisible(true);
 
         // Preset Device Modules includig index so we start with the same one as last saved
@@ -10768,7 +10768,7 @@ public:
 
         statusLabel.setBounds(1170, margin + 200, 300, 20);
         // Align build info with Exit button left edge and add a little more top spacing.
-        buildInfoLabel.setBounds(1230, margin + 186, 240, 20);
+        buildInfoLabel.setBounds(1220, margin + 186, 240, 20);
 
         updateBannerPlacementFromMidiLists();
 

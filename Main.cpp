@@ -15,7 +15,7 @@
 #endif
 
 #ifndef AMIDIORGAN_BUILD_NUMBER
-#define AMIDIORGAN_BUILD_NUMBER "local"
+#define AMIDIORGAN_BUILD_NUMBER "00/00/00"
 #endif
 
 class Application : public juce::JUCEApplication
@@ -74,8 +74,7 @@ public:
 private:
     static juce::String buildWindowTitle()
     {
-        return "AMidiOrgan v" + juce::String(AMIDIORGAN_PROJECT_VERSION)
-            + " (" + juce::String(AMIDIORGAN_BUILD_NUMBER) + ")";
+        return "AMidiOrgan (Build " + juce::String(AMIDIORGAN_BUILD_NUMBER) + ")";
     }
 
     static void copyMissingDirectoryContents(const juce::File& sourceDir, const juce::File& targetDir)

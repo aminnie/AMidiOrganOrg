@@ -144,18 +144,19 @@ target_include_directories(AMidiOrgan
         "${CMAKE_CURRENT_SOURCE_DIR}"
 )
 
-set(AMIDIORGAN_GIT_SHA "local")
+set(AMIDIORGAN_BUILD_NUMBER "")
 find_package(Git QUIET)
 if(GIT_FOUND)
     execute_process(
-        COMMAND "${GIT_EXECUTABLE}" -C "${CMAKE_CURRENT_SOURCE_DIR}" rev-parse --short=8 HEAD
-        OUTPUT_VARIABLE AMIDIORGAN_GIT_SHA
+        COMMAND "${GIT_EXECUTABLE}" -C "${CMAKE_CURRENT_SOURCE_DIR}"
+            log -1 --format=%cd --date=format-local:%m/%d/%y
+        OUTPUT_VARIABLE AMIDIORGAN_BUILD_NUMBER
         OUTPUT_STRIP_TRAILING_WHITESPACE
         ERROR_QUIET
     )
-    if(AMIDIORGAN_GIT_SHA STREQUAL "")
-        set(AMIDIORGAN_GIT_SHA "local")
-    endif()
+endif()
+if(AMIDIORGAN_BUILD_NUMBER STREQUAL "")
+    string(TIMESTAMP AMIDIORGAN_BUILD_NUMBER "%m/%d/%y" UTC)
 endif()
 
 target_compile_definitions(AMidiOrgan
@@ -164,7 +165,7 @@ target_compile_definitions(AMidiOrgan
         JUCE_WEB_BROWSER=0
         JUCE_USE_CURL=0
         AMIDIORGAN_PROJECT_VERSION="${PROJECT_VERSION}"
-        AMIDIORGAN_BUILD_NUMBER="${AMIDIORGAN_GIT_SHA}"
+        AMIDIORGAN_BUILD_NUMBER="${AMIDIORGAN_BUILD_NUMBER}"
 )
 
 target_link_libraries(AMidiOrgan
