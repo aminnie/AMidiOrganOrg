@@ -7594,7 +7594,7 @@ public:
 
                     selectedChannelIdx = i;
                     registerExplicitVoiceSelection(i);
-                    enableVoiceEditButtons();
+                    updatePlayerVoiceEditShortcutsEnabled();
                     playerChannelConfigured[(size_t) i] = true;
 
                     auto instrument = channelInstruments[(size_t) i];
@@ -7616,6 +7616,8 @@ public:
                 {
                     midiPlayerSettings.mutedChannels[(size_t) (i + 1)] = muteToggle->getToggleState();
                     saveMidiPlayerSettings();
+                    updatePlayerChannelStripEnablementFromMuteState();
+                    updatePlayerVoiceEditShortcutsEnabled();
                     markPlayerProfileDirty();
                 };
 
@@ -7644,6 +7646,7 @@ public:
 
                     sendAllNotesOff();
                     saveMidiPlayerSettings();
+                    updatePlayerVoiceEditShortcutsEnabled();
                     markPlayerProfileDirty();
                 };
         }
@@ -8201,12 +8204,26 @@ private:
         selectedChannelIdx = juce::jlimit(0, playerChannelCount - 1, selectedChannel);
     }
 
-    void enableVoiceEditButtons()
+    /** Dim/disable Ch N strip when M is on; M/S stay interactive for unmute. */
+    void updatePlayerChannelStripEnablementFromMuteState()
     {
+        for (int i = 0; i < playerChannelCount; ++i)
+        {
+            if (auto* b = channelButtons[(size_t) i])
+                b->setEnabled(!midiPlayerSettings.mutedChannels[(size_t) (i + 1)]);
+        }
+    }
+
+    void updatePlayerVoiceEditShortcutsEnabled()
+    {
+        const bool hasSelection = selectedChannelIdx >= 0 && selectedChannelIdx < playerChannelCount;
+        const bool selectedNotMuted = hasSelection
+            && !midiPlayerSettings.mutedChannels[(size_t) (selectedChannelIdx + 1)];
+        const bool enable = selectedNotMuted;
         if (soundsButton != nullptr)
-            soundsButton->setEnabled(true);
+            soundsButton->setEnabled(enable);
         if (effectsButton != nullptr)
-            effectsButton->setEnabled(true);
+            effectsButton->setEnabled(enable);
     }
 
     juce::String makeDefaultProfileDisplayName() const
@@ -8301,6 +8318,8 @@ private:
         setPlayerStartBarRaw(profile.playbackStartBar, false);
         syncMuteSoloTogglesFromSettings();
 
+        const int profileSelectedIdx = juce::jlimit(-1, playerChannelCount - 1, profile.selectedChannelIdx);
+
         for (int idx = 0; idx < playerChannelCount; ++idx)
         {
             const auto& source = profile.channels[(size_t) idx];
@@ -8329,13 +8348,13 @@ private:
             {
                 button->setInstrument(instrument);
                 button->setButtonText(instrument.getVoice());
-                button->setToggleState(selectedChannelIdx == idx, dontSendNotification);
+                button->setToggleState(profileSelectedIdx == idx, dontSendNotification);
             }
         }
 
-        selectedChannelIdx = juce::jlimit(-1, playerChannelCount - 1, profile.selectedChannelIdx);
-        if (selectedChannelIdx >= 0)
-            enableVoiceEditButtons();
+        selectedChannelIdx = profileSelectedIdx;
+        updatePlayerChannelStripEnablementFromMuteState();
+        updatePlayerVoiceEditShortcutsEnabled();
 
         // Force-refresh every Player channel on profile load/revert so hardware state
         // is fully synchronized with the profile, not only the selected channel.
@@ -9370,10 +9389,24 @@ private:
         }
     }
 
+    /** After Reset GM, mute (and strip-disable via mute UI sync) lanes with no programmed strip from MIDI+GM apply. */
+    void applyMuteStateFromPlayerChannelConfiguredAfterGmReset()
+    {
+        for (int i = 0; i < playerChannelCount; ++i)
+        {
+            midiPlayerSettings.mutedChannels[(size_t) (i + 1)] = !playerChannelConfigured[(size_t) i];
+        }
+    }
+
     void reapplyGmChannelPresetFromLoadedMidiSnapshot()
     {
         resetAllPlayerChannelInstrumentsToDefaults();
         applyGmChannelVoicesFromLoadedMidi();
+        applyMuteStateFromPlayerChannelConfiguredAfterGmReset();
+        saveMidiPlayerSettings();
+        syncMuteSoloTogglesFromSettings();
+        updatePlayerChannelStripEnablementFromMuteState();
+        updatePlayerVoiceEditShortcutsEnabled();
     }
 
     juce::String buildTopMetadataLine() const
@@ -9988,6 +10021,8 @@ private:
         remapProgramChangeToggle->setToggleState(midiPlayerSettings.enableProgramChangeRemap, dontSendNotification);
         playerStripCcScalingToggle->setToggleState(midiPlayerSettings.enablePlayerStripCcScaling, dontSendNotification);
         syncMuteSoloTogglesFromSettings();
+        updatePlayerChannelStripEnablementFromMuteState();
+        updatePlayerVoiceEditShortcutsEnabled();
     }
 
     void saveMidiPlayerSettings()
