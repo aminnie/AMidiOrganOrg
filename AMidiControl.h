@@ -9415,6 +9415,31 @@ private:
         updatePlayerVoiceEditShortcutsEnabled();
     }
 
+    /** Replay full strip programming (Bank/PC + effects CCs) for non-muted channels after Reset GM. */
+    void replayPlayerChannelProgrammingForUnmutedChannels()
+    {
+        for (int idx = 0; idx < playerChannelCount; ++idx)
+        {
+            const int midiChannel = idx + 1;
+            if (isPlayerChannelSendBlocked(midiChannel))
+                continue;
+
+            auto instrument = channelInstruments[(size_t) idx];
+            instrument.setChannel(midiChannel);
+            sendProgramSelect(instrument);
+            sendCC(midiChannel, CCVol, instrument.getVol());
+            sendCC(midiChannel, CCExp, instrument.getExp());
+            sendCC(midiChannel, CCRev, instrument.getRev());
+            sendCC(midiChannel, CCCho, instrument.getCho());
+            sendCC(midiChannel, CCMod, instrument.getMod());
+            sendCC(midiChannel, CCTim, instrument.getTim());
+            sendCC(midiChannel, CCAtk, instrument.getAtk());
+            sendCC(midiChannel, CCRel, instrument.getRel());
+            sendCC(midiChannel, CCBri, instrument.getBri());
+            sendCC(midiChannel, CCPan, instrument.getPan());
+        }
+    }
+
     juce::String buildTopMetadataLine() const
     {
         juce::String line = extractNonTimeMetadataText(currentMidiMetadataText);
@@ -9896,6 +9921,7 @@ private:
 
         const bool hadProgramChangeEvents = !programChangeEvents.empty();
         reapplyGmChannelPresetFromLoadedMidiSnapshot();
+        replayPlayerChannelProgrammingForUnmutedChannels();
         markPlayerProfileDirty();
         updateProfileButtonsState();
         playbackStatusLabel->setText(
