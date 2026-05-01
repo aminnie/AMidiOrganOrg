@@ -8771,9 +8771,9 @@ private:
         }
     }
 
-    bool isPlaybackMutedForMessage(const juce::MidiMessage& message) const
+    /** True when Player should suppress sends for this channel due to solo/mute state. */
+    bool isPlayerChannelSendBlocked(int channel) const
     {
-        const int channel = message.getChannel();
         if (channel < 1 || channel > playerChannelCount)
             return false;
 
@@ -8782,6 +8782,12 @@ private:
             return true;
 
         return midiPlayerSettings.mutedChannels[static_cast<size_t>(channel)];
+    }
+
+    bool isPlaybackMutedForMessage(const juce::MidiMessage& message) const
+    {
+        const int channel = message.getChannel();
+        return isPlayerChannelSendBlocked(channel);
     }
 
     int buildVoiceButtonProgramSelectMessages(int channel, juce::MidiMessage* outMessages, int maxMessages)
@@ -10173,6 +10179,9 @@ private:
 
     void sendCC(int midiChannel, int controller, int value)
     {
+        if (isPlayerChannelSendBlocked(midiChannel))
+            return;
+
         auto message = juce::MidiMessage::controllerEvent(midiChannel, controller, value);
         message.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
         mididevices->sendToPlayerModuleOnly(message, playerModuleIdx, false);
@@ -10181,6 +10190,9 @@ private:
     void sendProgramSelect(Instrument instrument)
     {
         const int midiChannel = instrument.getChannel();
+        if (isPlayerChannelSendBlocked(midiChannel))
+            return;
+
         sendCC(midiChannel, CCMSB, instrument.getMSB());
         sendCC(midiChannel, CCLSB, instrument.getLSB());
 
@@ -10192,6 +10204,9 @@ private:
     void sendEffects(Instrument instrument)
     {
         const int midiChannel = instrument.getChannel();
+        if (isPlayerChannelSendBlocked(midiChannel))
+            return;
+
         const int dirty = instrument.getDirty();
         if (dirty & MAPVOL) sendCC(midiChannel, CCVol, instrument.getVol());
         if (dirty & MAPEXP) sendCC(midiChannel, CCExp, instrument.getExp());
