@@ -39,22 +39,25 @@ public:
         }
         filterLabel.setText ("Filter:", juce::dontSendNotification);
         filterLabel.setJustificationType (juce::Justification::centredLeft);
+        filterLabel.setColour (juce::Label::textColourId, juce::Colours::whitesmoke);
         filterEditor.setMultiLine (false);
         filterEditor.setReturnKeyStartsNewLine (false);
         filterEditor.setTextToShowWhenEmpty ("Search profiles...", juce::Colours::grey);
+        filterEditor.setColour (juce::TextEditor::textColourId, juce::Colours::whitesmoke);
+        filterEditor.setColour (juce::TextEditor::backgroundColourId, juce::Colours::black.withAlpha (0.22f));
+        filterEditor.setColour (juce::TextEditor::outlineColourId, juce::Colours::whitesmoke.withAlpha (0.35f));
         filterEditor.onTextChange = [this] { applyFilter(); };
-        // White on light default button is invisible; use a dark face so the labels read clearly.
-        const auto renameDeleteText = juce::Colours::white;
-        const auto renameDeleteFace = juce::Colours::darkgrey;
-        const auto renameDeleteFaceOn = juce::Colours::darkgrey.brighter (0.12f);
-        renameButton.setColour (juce::TextButton::textColourOffId, renameDeleteText);
-        renameButton.setColour (juce::TextButton::textColourOnId, renameDeleteText);
-        renameButton.setColour (juce::TextButton::buttonColourId, renameDeleteFace);
-        renameButton.setColour (juce::TextButton::buttonOnColourId, renameDeleteFaceOn);
-        deleteButton.setColour (juce::TextButton::textColourOffId, renameDeleteText);
-        deleteButton.setColour (juce::TextButton::textColourOnId, renameDeleteText);
-        deleteButton.setColour (juce::TextButton::buttonColourId, renameDeleteFace);
-        deleteButton.setColour (juce::TextButton::buttonOnColourId, renameDeleteFaceOn);
+        list.setColour (juce::ListBox::backgroundColourId, juce::Colours::black.withAlpha (0.18f));
+        const auto buttonText = juce::Colours::whitesmoke;
+        const auto buttonFaceOff = juce::Colours::transparentBlack;
+        const auto buttonFaceOn = juce::Colours::white.withAlpha (0.10f);
+        for (juce::TextButton* b : { &renameButton, &deleteButton, &staleButton, &closeButton })
+        {
+            b->setColour (juce::TextButton::textColourOffId, buttonText);
+            b->setColour (juce::TextButton::textColourOnId, buttonText);
+            b->setColour (juce::TextButton::buttonColourId, buttonFaceOff);
+            b->setColour (juce::TextButton::buttonOnColourId, buttonFaceOn);
+        }
         renameButton.onClick = [this] { doRename (-1); };
         deleteButton.onClick  = [this] { doDelete(); };
         staleButton.onClick   = [this] { doRemoveStale(); };
@@ -315,7 +318,7 @@ public:
                                  juce::String& outActiveDisplay,
                                  juce::String& outActiveCreated,
                                  const std::function<void()>& onMutated) :
-        DocumentWindow (name, juce::Colours::lightgrey, DocumentWindow::closeButton)
+        DocumentWindow (name, juce::Colour (0xff1f242a), DocumentWindow::closeButton)
     {
         setContentOwned (new PlayerProfilesManageContent (
             [this] { closeButtonPressed(); },
@@ -324,8 +327,9 @@ public:
             outActiveDisplay,
             outActiveCreated,
             onMutated), true);
+        setColour (juce::ResizableWindow::backgroundColourId, juce::Colour (0xff1f242a));
         setResizable (true, true);
-        setUsingNativeTitleBar (true);
+        setUsingNativeTitleBar (false);
         setResizeLimits (480, 320, 2000, 2000);
         setSize (600, 420);
         centreWithSize (getWidth(), getHeight());
@@ -360,10 +364,25 @@ public:
         addAndMakeVisible (closeButton);
         filterLabel.setText ("Filter:", juce::dontSendNotification);
         filterLabel.setJustificationType (juce::Justification::centredLeft);
+        filterLabel.setColour (juce::Label::textColourId, juce::Colours::whitesmoke);
         filterEditor.setMultiLine (false);
         filterEditor.setReturnKeyStartsNewLine (false);
         filterEditor.setTextToShowWhenEmpty ("Search profiles...", juce::Colours::grey);
+        filterEditor.setColour (juce::TextEditor::textColourId, juce::Colours::whitesmoke);
+        filterEditor.setColour (juce::TextEditor::backgroundColourId, juce::Colours::black.withAlpha (0.22f));
+        filterEditor.setColour (juce::TextEditor::outlineColourId, juce::Colours::whitesmoke.withAlpha (0.35f));
         filterEditor.onTextChange = [this] { applyFilter(); };
+        list.setColour (juce::ListBox::backgroundColourId, juce::Colours::black.withAlpha (0.18f));
+        const auto buttonText = juce::Colours::whitesmoke;
+        const auto buttonFaceOff = juce::Colours::transparentBlack;
+        const auto buttonFaceOn = juce::Colours::white.withAlpha (0.10f);
+        for (juce::TextButton* b : { &loadButton, &closeButton })
+        {
+            b->setColour (juce::TextButton::textColourOffId, buttonText);
+            b->setColour (juce::TextButton::textColourOnId, buttonText);
+            b->setColour (juce::TextButton::buttonColourId, buttonFaceOff);
+            b->setColour (juce::TextButton::buttonOnColourId, buttonFaceOn);
+        }
         loadButton.onClick = [this] { doLoadSelected(); };
         closeButton.onClick = [this] { if (closeRequest) closeRequest(); };
         setSize (600, 420);
@@ -541,15 +560,16 @@ public:
                               const PlayerSongProfilesIndex& index,
                               const juce::String& activeProfileId,
                               const std::function<void(const juce::String&)>& onLoadRequested) :
-        DocumentWindow (name, juce::Colours::lightgrey, DocumentWindow::closeButton)
+        DocumentWindow (name, juce::Colour (0xff1f242a), DocumentWindow::closeButton)
     {
         setContentOwned (new PlayerProfilesLoadContent (
             [this] { closeButtonPressed(); },
             index,
             activeProfileId,
             onLoadRequested), true);
+        setColour (juce::ResizableWindow::backgroundColourId, juce::Colour (0xff1f242a));
         setResizable (true, true);
-        setUsingNativeTitleBar (true);
+        setUsingNativeTitleBar (false);
         setResizeLimits (480, 320, 2000, 2000);
         setSize (600, 420);
         centreWithSize (getWidth(), getHeight());
