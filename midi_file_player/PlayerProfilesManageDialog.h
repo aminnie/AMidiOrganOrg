@@ -30,11 +30,19 @@ public:
         list.setModel (this);
         list.setRowHeight (26);
         list.setMultipleSelectionEnabled (false);
+        addAndMakeVisible (filterLabel);
+        addAndMakeVisible (filterEditor);
         addAndMakeVisible (list);
         for (juce::TextButton* b : { &renameButton, &deleteButton, &staleButton, &closeButton })
         {
             addAndMakeVisible (b);
         }
+        filterLabel.setText ("Filter:", juce::dontSendNotification);
+        filterLabel.setJustificationType (juce::Justification::centredLeft);
+        filterEditor.setMultiLine (false);
+        filterEditor.setReturnKeyStartsNewLine (false);
+        filterEditor.setTextToShowWhenEmpty ("Search profiles...", juce::Colours::grey);
+        filterEditor.onTextChange = [this] { applyFilter(); };
         // White on light default button is invisible; use a dark face so the labels read clearly.
         const auto renameDeleteText = juce::Colours::white;
         const auto renameDeleteFace = juce::Colours::darkgrey;
@@ -57,12 +65,10 @@ public:
 
     void refreshFromIndex()
     {
-        rowEntries = profileIndex.entries;
-        std::sort (rowEntries.begin(), rowEntries.end(), [](const auto& a, const auto& b)
+        sortedAllEntries = profileIndex.entries;
+        std::sort (sortedAllEntries.begin(), sortedAllEntries.end(), [](const auto& a, const auto& b)
             { return a.updatedUtc > b.updatedUtc; });
-        list.updateContent();
-        list.deselectAllRows();
-        updateButtonState();
+        applyFilter();
     }
 
 private:
@@ -99,7 +105,63 @@ private:
         const int n = (int) rowEntries.size();
         if (n == 0)
             return -1;
-        return list.getSelectedRow();
+        const int selected = list.getSelectedRow();
+        return juce::isPositiveAndBelow (selected, n) ? selected : -1;
+    }
+
+    bool entryMatchesFilter (const PlayerSongProfileIndexEntry& entry, const juce::String& needle) const
+    {
+        if (needle.isEmpty())
+            return true;
+
+        if (entry.displayName.containsIgnoreCase (needle)) return true;
+        if (entry.profileId.containsIgnoreCase (needle)) return true;
+        if (entry.moduleDisplayName.containsIgnoreCase (needle)) return true;
+        if (entry.midiKey.containsIgnoreCase (needle)) return true;
+        if (entry.updatedUtc.containsIgnoreCase (needle)) return true;
+        if (entry.profileFile.containsIgnoreCase (needle)) return true;
+        if (entry.profileFile.isNotEmpty()
+            && juce::File (entry.profileFile).getFileName().containsIgnoreCase (needle)) return true;
+
+        return false;
+    }
+
+    void applyFilter()
+    {
+        juce::String selectedProfileId;
+        const int previousSelection = getValidSelectedIndex();
+        if (juce::isPositiveAndBelow (previousSelection, (int) rowEntries.size()))
+            selectedProfileId = rowEntries[(size_t) previousSelection].profileId;
+
+        rowEntries.clear();
+        const juce::String needle = filterEditor.getText().trim();
+        for (const auto& entry : sortedAllEntries)
+        {
+            if (entryMatchesFilter (entry, needle))
+                rowEntries.push_back (entry);
+        }
+
+        list.updateContent();
+
+        int selectedAfterFilter = -1;
+        if (selectedProfileId.isNotEmpty())
+        {
+            for (int i = 0; i < (int) rowEntries.size(); ++i)
+            {
+                if (rowEntries[(size_t) i].profileId == selectedProfileId)
+                {
+                    selectedAfterFilter = i;
+                    break;
+                }
+            }
+        }
+
+        if (selectedAfterFilter >= 0)
+            list.selectRow (selectedAfterFilter);
+        else
+            list.deselectAllRows();
+
+        updateButtonState();
     }
 
     void updateButtonState()
@@ -203,6 +265,12 @@ private:
     void resized() override
     {
         auto area = getLocalBounds().reduced (8);
+        const int filterH = 26;
+        auto filterRow = area.removeFromTop (filterH);
+        filterLabel.setBounds (filterRow.removeFromLeft (56));
+        filterEditor.setBounds (filterRow.reduced (2, 0));
+        area.removeFromTop (6);
+
         const int buttonH = 30;
         auto bottom = area.removeFromBottom (buttonH + 8);
         bottom.removeFromTop (4);
@@ -219,6 +287,8 @@ private:
     }
 
     std::function<void()> closeRequest;
+    juce::Label filterLabel { "profilesFilterLabel", "Filter:" };
+    juce::TextEditor filterEditor;
     juce::TextButton renameButton { "Rename" };
     juce::TextButton deleteButton { "Delete" };
     juce::TextButton staleButton { "Remove missing files from list" };
@@ -230,6 +300,7 @@ private:
     juce::String& activeDisplay;
     juce::String& activeCreated;
     std::function<void()> onMutated;
+    std::vector<PlayerSongProfileIndexEntry> sortedAllEntries;
     std::vector<PlayerSongProfileIndexEntry> rowEntries;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PlayerProfilesManageContent)
@@ -263,4 +334,228 @@ public:
     void closeButtonPressed() override { delete this; }
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PlayerProfilesManagerWindow)
+};
+
+/** In-window content: filtered profile list + load action for Player->Load MIDI Profile. */
+class PlayerProfilesLoadContent final : public juce::Component,
+                                         private juce::ListBoxModel
+{
+public:
+    PlayerProfilesLoadContent (const std::function<void()>& requestClose,
+                               const PlayerSongProfilesIndex& index,
+                               const juce::String& activeProfileId,
+                               const std::function<void(const juce::String&)>& onLoadRequested) :
+        closeRequest (requestClose),
+        profileIndex (index),
+        activeId (activeProfileId),
+        onLoad (onLoadRequested)
+    {
+        list.setModel (this);
+        list.setRowHeight (26);
+        list.setMultipleSelectionEnabled (false);
+        addAndMakeVisible (filterLabel);
+        addAndMakeVisible (filterEditor);
+        addAndMakeVisible (list);
+        addAndMakeVisible (loadButton);
+        addAndMakeVisible (closeButton);
+        filterLabel.setText ("Filter:", juce::dontSendNotification);
+        filterLabel.setJustificationType (juce::Justification::centredLeft);
+        filterEditor.setMultiLine (false);
+        filterEditor.setReturnKeyStartsNewLine (false);
+        filterEditor.setTextToShowWhenEmpty ("Search profiles...", juce::Colours::grey);
+        filterEditor.onTextChange = [this] { applyFilter(); };
+        loadButton.onClick = [this] { doLoadSelected(); };
+        closeButton.onClick = [this] { if (closeRequest) closeRequest(); };
+        setSize (600, 420);
+        refreshFromIndex();
+    }
+
+    void refreshFromIndex()
+    {
+        sortedAllEntries = profileIndex.entries;
+        std::sort (sortedAllEntries.begin(), sortedAllEntries.end(), [](const auto& a, const auto& b)
+            { return a.updatedUtc > b.updatedUtc; });
+        applyFilter();
+    }
+
+private:
+    int getNumRows() override { return (int) rowEntries.size(); }
+
+    void paintListBoxItem (int row, juce::Graphics& g, int width, int height, bool) override
+    {
+        if (! juce::isPositiveAndBelow (row, (int) rowEntries.size()))
+            return;
+        const auto& e = rowEntries[(size_t) row];
+        juce::String line = e.displayName;
+        if (line.isEmpty())
+            line = e.profileId;
+        if (e.moduleDisplayName.isNotEmpty())
+            line << " [" << e.moduleDisplayName << "]";
+        line << "  |  " << (e.midiKey.isNotEmpty() ? e.midiKey : juce::String ("(no key)"));
+        if (e.updatedUtc.isNotEmpty())
+            line << "  |  " << e.updatedUtc;
+        g.setFont (juce::Font (juce::FontOptions().withHeight (15.0f)));
+        g.setColour (findColour (juce::ListBox::textColourId, true));
+        g.drawFittedText (line, 6, 0, width - 8, height, juce::Justification::centredLeft, 1);
+    }
+
+    void listBoxItemDoubleClicked (int row, const juce::MouseEvent&) override
+    {
+        if (juce::isPositiveAndBelow (row, (int) rowEntries.size()))
+            doLoadSelected();
+    }
+
+    void selectedRowsChanged (int) override { updateButtonState(); }
+
+    int getValidSelectedIndex() const
+    {
+        const int n = (int) rowEntries.size();
+        if (n == 0)
+            return -1;
+        const int selected = list.getSelectedRow();
+        return juce::isPositiveAndBelow (selected, n) ? selected : -1;
+    }
+
+    bool entryMatchesFilter (const PlayerSongProfileIndexEntry& entry, const juce::String& needle) const
+    {
+        if (needle.isEmpty())
+            return true;
+
+        if (entry.displayName.containsIgnoreCase (needle)) return true;
+        if (entry.profileId.containsIgnoreCase (needle)) return true;
+        if (entry.moduleDisplayName.containsIgnoreCase (needle)) return true;
+        if (entry.midiKey.containsIgnoreCase (needle)) return true;
+        if (entry.updatedUtc.containsIgnoreCase (needle)) return true;
+        if (entry.profileFile.containsIgnoreCase (needle)) return true;
+        if (entry.profileFile.isNotEmpty()
+            && juce::File (entry.profileFile).getFileName().containsIgnoreCase (needle)) return true;
+
+        return false;
+    }
+
+    void applyFilter()
+    {
+        juce::String selectedProfileId;
+        const int previousSelection = getValidSelectedIndex();
+        if (juce::isPositiveAndBelow (previousSelection, (int) rowEntries.size()))
+            selectedProfileId = rowEntries[(size_t) previousSelection].profileId;
+
+        rowEntries.clear();
+        const juce::String needle = filterEditor.getText().trim();
+        for (const auto& entry : sortedAllEntries)
+        {
+            if (entryMatchesFilter (entry, needle))
+                rowEntries.push_back (entry);
+        }
+
+        list.updateContent();
+
+        int selectedAfterFilter = -1;
+        if (selectedProfileId.isNotEmpty())
+        {
+            for (int i = 0; i < (int) rowEntries.size(); ++i)
+            {
+                if (rowEntries[(size_t) i].profileId == selectedProfileId)
+                {
+                    selectedAfterFilter = i;
+                    break;
+                }
+            }
+        }
+        else if (activeId.isNotEmpty())
+        {
+            for (int i = 0; i < (int) rowEntries.size(); ++i)
+            {
+                if (rowEntries[(size_t) i].profileId == activeId)
+                {
+                    selectedAfterFilter = i;
+                    break;
+                }
+            }
+        }
+
+        if (selectedAfterFilter >= 0)
+            list.selectRow (selectedAfterFilter);
+        else
+            list.deselectAllRows();
+
+        updateButtonState();
+    }
+
+    void updateButtonState()
+    {
+        loadButton.setEnabled (getValidSelectedIndex() >= 0);
+    }
+
+    void doLoadSelected()
+    {
+        const int r = getValidSelectedIndex();
+        if (! juce::isPositiveAndBelow (r, (int) rowEntries.size()))
+            return;
+
+        if (onLoad != nullptr)
+            onLoad (rowEntries[(size_t) r].profileId);
+        if (closeRequest != nullptr)
+            closeRequest();
+    }
+
+    void resized() override
+    {
+        auto area = getLocalBounds().reduced (8);
+        const int filterH = 26;
+        auto filterRow = area.removeFromTop (filterH);
+        filterLabel.setBounds (filterRow.removeFromLeft (56));
+        filterEditor.setBounds (filterRow.reduced (2, 0));
+        area.removeFromTop (6);
+
+        const int buttonH = 30;
+        auto bottom = area.removeFromBottom (buttonH + 8);
+        bottom.removeFromTop (4);
+        const int pad = 6;
+        auto row = bottom.removeFromTop (buttonH);
+        closeButton.setBounds (row.removeFromRight (100));
+        row.removeFromRight (pad);
+        loadButton.setBounds (row.removeFromRight (100));
+        list.setBounds (area);
+    }
+
+    std::function<void()> closeRequest;
+    const PlayerSongProfilesIndex& profileIndex;
+    juce::String activeId;
+    std::function<void(const juce::String&)> onLoad;
+    juce::Label filterLabel { "profilesFilterLabel", "Filter:" };
+    juce::TextEditor filterEditor;
+    juce::TextButton loadButton { "Load" };
+    juce::TextButton closeButton { "Close" };
+    juce::ListBox list { "PlayerProfilesLoad" };
+    std::vector<PlayerSongProfileIndexEntry> sortedAllEntries;
+    std::vector<PlayerSongProfileIndexEntry> rowEntries;
+
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PlayerProfilesLoadContent)
+};
+
+class PlayerProfilesLoadWindow final : public juce::DocumentWindow
+{
+public:
+    PlayerProfilesLoadWindow (const juce::String& name,
+                              const PlayerSongProfilesIndex& index,
+                              const juce::String& activeProfileId,
+                              const std::function<void(const juce::String&)>& onLoadRequested) :
+        DocumentWindow (name, juce::Colours::lightgrey, DocumentWindow::closeButton)
+    {
+        setContentOwned (new PlayerProfilesLoadContent (
+            [this] { closeButtonPressed(); },
+            index,
+            activeProfileId,
+            onLoadRequested), true);
+        setResizable (true, true);
+        setUsingNativeTitleBar (true);
+        setResizeLimits (480, 320, 2000, 2000);
+        setSize (600, 420);
+        centreWithSize (getWidth(), getHeight());
+    }
+
+    void closeButtonPressed() override { delete this; }
+
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PlayerProfilesLoadWindow)
 };

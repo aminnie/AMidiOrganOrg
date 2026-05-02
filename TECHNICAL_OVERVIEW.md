@@ -97,7 +97,7 @@ Primary implementation files:
   - Per-strip **mute** bitmask + exclusivity **`solo`** gating handled in `PlayerPage::isPlaybackMutedForMessage(...)` solo toggles enqueue `sendAllNotesOff()` (All Notes Off + All Sound Off per channel) through the Player-only send path before persisting mute/solo data.
   - Player playback mute gates are **orthogonal** to live button-group mute state (explicit decouple from Upper/Lower/Bass mute pipeline).
   - ValueTree-backed song profiles persist transpose, tempo override, playback start bar, mute/solo, remap/CC-merge booleans module id, strips, UI metadata
-  - `Manage Profiles…` launcher edits sidecar catalogue + **`Load Profile+MIDI`** (button label casing) restores referenced `.mid`
+  - `Manage Profiles…` launcher edits sidecar catalogue + **`Load MIDI Profile`** restores referenced `.mid`; both list dialogs support live text filtering
   - Profile index + last-used mapping for auto-load on MIDI identity key
 - **Monitor**
   - Dedicated **Incoming** (`midiIn`) and **Outgoing** (`midiOut`) text editors capped at **`kMonitorLineLimit = 50`** lines each; hitting the cap calls `stopMonitoringDueToLineLimit()` which lowers `monitorEnabled` and renders the Enable toggle **red/off** while `monitorStoppedForLineLimit` latch is set (`applyMonitorEnableButtonColours`).
@@ -126,7 +126,7 @@ Primary implementation files:
   - query profile index for matching entries
   - apply last-used profile when available
   - preserve current state when no profile exists
-- Player profile-first load order (`Load Profile+MIDI` button):
+- Player profile-first load order (`Load MIDI Profile` button):
   - read selected profile from index/storage
   - resolve `midiRef.originalPath` and validate file existence
   - load MIDI file through normal `loadMidiFile(...)` path

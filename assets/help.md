@@ -144,8 +144,9 @@ Contact the developer for additional module support.
   - If **Sound Module** changed since that profile was loaded, `Save Profile` warns—prefer `Save Profile As` for a new entry, or **Continue** to overwrite; `Save Profile As` skips this warning.
   - `Save Profile As` creates a new profile.
   - `Revert Profile` reloads the active profile.
-  - `Load Profile+MIDI` loads the selected profile's saved MIDI path, then applies that profile state.
+  - `Load MIDI Profile` loads the selected profile's saved MIDI path, then applies that profile state.
   - **Manage Profiles…** trims/renames list entries offline.
+  - `Load MIDI Profile` and **Manage Profiles…** include a live text filter for quickly narrowing the profile list.
   - Dirty profile switches prompt to save/discard/cancel as needed.
 - Profiles are saved as sidecar files under `Documents/AMidiOrgan/configs/player_profiles/` and do not rewrite the source `.mid` file.
 - If a profile points to a missing MIDI file, Player reports this in status and leaves the current state unchanged.

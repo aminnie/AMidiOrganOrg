@@ -391,7 +391,7 @@ How to use:
 3. Select one or more **Ch 1..16** strips and edit voice/effects (or use **Sounds** / **Effects** shortcut buttons for the active strip).
 4. Optional: enable `Enable Program Change remap` and/or `Scale file CCs with Player strip`.
 5. Optional: set **Bar** (playback start bar; `0` or `1` starts at bar 1), **Key +/-** (transpose `-6`..`+6` semitones), **Tempo** (`0` = follow file tempo map; otherwise BPM override).
-6. Optional: select or create a profile (`Apply Profile`, `Save Profile`, `Save Profile As`, `Revert Profile`, `Load Profile+MIDI`, **Manage Profiles**).
+6. Optional: select or create a profile (`Apply Profile`, `Save Profile`, `Save Profile As`, `Revert Profile`, `Load MIDI Profile`, **Manage Profiles**).
 7. Press **Start** (shows **Stop** while playing), or press **Player Start/Stop** (**`p`** default). After **Stop**, use **Continue** when the transport retains a cue point for resumption.
 
 Behavior:
@@ -415,8 +415,9 @@ Profile workflow:
 - `Save Profile` updates the active profile (prompts appear when switching away dirty).
 - `Save Profile As` creates a new profile entry.
 - `Revert Profile` reloads the active profile from disk.
-- `Load Profile+MIDI` loads the MIDI path stored in that profile then applies profile state after load.
+- `Load MIDI Profile` loads the MIDI path stored in that profile then applies profile state after load.
 - **Manage Profiles** opens maintenance (rename/remove profile entries backed by disk).
+- `Load MIDI Profile` and **Manage Profiles** support a live text filter for quickly narrowing profile lists.
 - Profiles persist transpose, tempo override (`0`=file), playback start bar, mute/solo, remap/CC-merge switches, strips, module id, etc.
 - Profiles are sidecar files (your `.mid` is not rewritten during normal playback).
 - If a profile references a missing MIDI file, Player surfaces an error in status and keeps the loaded session unchanged.

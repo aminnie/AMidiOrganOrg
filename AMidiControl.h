@@ -7364,7 +7364,7 @@ public:
         revertProfileButton->setColour(TextButton::buttonOnColourId, juce::Colours::lightgrey);
         revertProfileButton->onClick = [this]() { revertCurrentProfile(); };
 
-        loadMidiFromProfileButton = addToList(new TextButton("Load Profile+MIDI"));
+        loadMidiFromProfileButton = addToList(new TextButton("Load MIDI Profile"));
         loadMidiFromProfileButton->setColour(TextButton::textColourOffId, Colours::black);
         loadMidiFromProfileButton->setColour(TextButton::textColourOnId, Colours::black);
         loadMidiFromProfileButton->setColour(TextButton::buttonColourId, juce::Colours::lightgrey);
@@ -8675,31 +8675,30 @@ private:
 
     void showLoadMidiFromProfileMenu()
     {
+        if (playerProfilesLoadWindow != nullptr)
+        {
+            playerProfilesLoadWindow->toFront (true);
+            return;
+        }
+
+        juce::String err;
+        (void) PlayerSongProfileStore::loadIndex (playerProfilesIndex, err);
+
         if (playerProfilesIndex.entries.empty())
         {
             playbackStatusLabel->setText("No saved Player profiles found.", dontSendNotification);
             return;
         }
 
-        PopupMenu menu;
-        int itemId = 1;
-        for (const auto& entry : playerProfilesIndex.entries)
-        {
-            auto label = entry.displayName;
-            if (entry.moduleDisplayName.isNotEmpty())
-                label << " [" << entry.moduleDisplayName << "]";
-            menu.addItem(itemId++, label, true, entry.profileId == activeProfileId);
-        }
-
-        menu.showMenuAsync(PopupMenu::Options{}.withTargetComponent(loadMidiFromProfileButton),
-            [this](int result)
+        playerProfilesLoadWindow = new PlayerProfilesLoadWindow(
+            "Load MIDI Profile",
+            playerProfilesIndex,
+            activeProfileId,
+            [this](const juce::String& profileId)
             {
-                if (result <= 0 || result > (int) playerProfilesIndex.entries.size())
-                    return;
-
-                const auto profileId = playerProfilesIndex.entries[(size_t) (result - 1)].profileId;
                 loadMidiFromProfileId(profileId);
             });
+        playerProfilesLoadWindow->setVisible (true);
     }
 
     void timerCallback() override
@@ -10267,6 +10266,7 @@ private:
     TextButton* loadMidiFromProfileButton = nullptr;
     TextButton* manageProfilesButton = nullptr;
     juce::Component::SafePointer<PlayerProfilesManagerWindow> playerProfilesManagerWindow;
+    juce::Component::SafePointer<PlayerProfilesLoadWindow> playerProfilesLoadWindow;
     GroupComponent* channelsGroup = nullptr;
     GroupComponent* voiceEditsGroup = nullptr;
     GroupComponent* playbackGroup = nullptr;

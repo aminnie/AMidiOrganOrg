@@ -234,11 +234,12 @@ On startup, the app also attempts to auto-restore the last used panel and config
 - `CC10` (`Pan`) is intentionally passed through unchanged during this merge mode to avoid incorrect left/right behavior from naive 0..127 scaling around pan center.
 - Non-controller MIDI events continue through the normal playback path unchanged.
 - Player now supports per-song profile workflows:
-  - `Apply Profile` selector + `Save Profile`, `Save Profile As`, `Revert Profile`, and `Load Profile+MIDI`.
+  - `Apply Profile` selector + `Save Profile`, `Save Profile As`, `Revert Profile`, and `Load MIDI Profile`.
+  - `Load MIDI Profile` and **Manage Profiles** now include a live text filter to narrow long profile lists while typing.
   - If **Sound Module** changes after a profile is applied, **Save Profile** may warn: use **Save Profile As** to keep a separate profile, or **Continue** to overwrite the active one (**Save Profile As** is not affected).
   - Profiles are sidecar data (the `.mid` file is not rewritten during normal playback).
   - Profiles capture per-channel voice/effect strips, configured-channel flags, module selection, transpose (-6…+6), tempo override BPM, playback start bar, mute/solo state, and Player remap/merge toggles.
-  - `Load Profile+MIDI` uses the selected profile's saved MIDI path, loads that MIDI file into Player, and then applies that exact profile.
+  - `Load MIDI Profile` uses the selected profile's saved MIDI path, loads that MIDI file into Player, and then applies that exact profile.
   - Missing/invalid MIDI path in a profile is reported in Player status and the current session is left unchanged.
   - Profile files are stored under `Documents/AMidiOrgan/configs/player_profiles/`.
   - Profile index and last-used mapping are stored in `Documents/AMidiOrgan/configs/player_profiles_index.json`.
