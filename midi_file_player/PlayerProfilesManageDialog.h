@@ -47,7 +47,7 @@ public:
         filterEditor.setColour (juce::TextEditor::backgroundColourId, juce::Colours::black.withAlpha (0.22f));
         filterEditor.setColour (juce::TextEditor::outlineColourId, juce::Colours::whitesmoke.withAlpha (0.35f));
         filterEditor.onTextChange = [this] { applyFilter(); };
-        list.setColour (juce::ListBox::backgroundColourId, juce::Colours::black.withAlpha (0.18f));
+        list.setColour (juce::ListBox::backgroundColourId, juce::Colour (0xff1f242a));
         const auto buttonText = juce::Colours::whitesmoke;
         const auto buttonFaceOff = juce::Colours::transparentBlack;
         const auto buttonFaceOn = juce::Colours::white.withAlpha (0.10f);
@@ -77,10 +77,15 @@ public:
 private:
     int getNumRows() override { return (int) rowEntries.size(); }
 
-    void paintListBoxItem (int row, juce::Graphics& g, int width, int height, bool) override
+    void paintListBoxItem (int row, juce::Graphics& g, int width, int height, bool rowIsSelected) override
     {
         if (! juce::isPositiveAndBelow (row, (int) rowEntries.size()))
             return;
+        const auto textColour = list.findColour (juce::ListBox::textColourId, true);
+        const auto bgColour   = list.findColour (juce::ListBox::backgroundColourId, true);
+        if (rowIsSelected)
+            g.fillAll (textColour.interpolatedWith (bgColour, 0.5f));
+
         const auto& e = rowEntries[(size_t) row];
         juce::String line = e.displayName;
         if (line.isEmpty())
@@ -91,7 +96,7 @@ private:
         if (e.updatedUtc.isNotEmpty())
             line << "  |  " << e.updatedUtc;
         g.setFont (juce::Font (juce::FontOptions().withHeight (15.0f)));
-        g.setColour (findColour (juce::ListBox::textColourId, true));
+        g.setColour (textColour);
         g.drawFittedText (line, 6, 0, width - 8, height, juce::Justification::centredLeft, 1);
     }
 
@@ -372,7 +377,7 @@ public:
         filterEditor.setColour (juce::TextEditor::backgroundColourId, juce::Colours::black.withAlpha (0.22f));
         filterEditor.setColour (juce::TextEditor::outlineColourId, juce::Colours::whitesmoke.withAlpha (0.35f));
         filterEditor.onTextChange = [this] { applyFilter(); };
-        list.setColour (juce::ListBox::backgroundColourId, juce::Colours::black.withAlpha (0.18f));
+        list.setColour (juce::ListBox::backgroundColourId, juce::Colour (0xff1f242a));
         const auto buttonText = juce::Colours::whitesmoke;
         const auto buttonFaceOff = juce::Colours::transparentBlack;
         const auto buttonFaceOn = juce::Colours::white.withAlpha (0.10f);
@@ -400,10 +405,15 @@ public:
 private:
     int getNumRows() override { return (int) rowEntries.size(); }
 
-    void paintListBoxItem (int row, juce::Graphics& g, int width, int height, bool) override
+    void paintListBoxItem (int row, juce::Graphics& g, int width, int height, bool rowIsSelected) override
     {
         if (! juce::isPositiveAndBelow (row, (int) rowEntries.size()))
             return;
+        const auto textColour = list.findColour (juce::ListBox::textColourId, true);
+        const auto bgColour   = list.findColour (juce::ListBox::backgroundColourId, true);
+        if (rowIsSelected)
+            g.fillAll (textColour.interpolatedWith (bgColour, 0.5f));
+
         const auto& e = rowEntries[(size_t) row];
         juce::String line = e.displayName;
         if (line.isEmpty())
@@ -414,7 +424,7 @@ private:
         if (e.updatedUtc.isNotEmpty())
             line << "  |  " << e.updatedUtc;
         g.setFont (juce::Font (juce::FontOptions().withHeight (15.0f)));
-        g.setColour (findColour (juce::ListBox::textColourId, true));
+        g.setColour (textColour);
         g.drawFittedText (line, 6, 0, width - 8, height, juce::Justification::centredLeft, 1);
     }
 
