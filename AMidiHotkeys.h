@@ -41,7 +41,7 @@ public:
         const float textEdgeGap = 4.0f;
         auto cs = 5.0f;
 
-        juce::Font f(textH);
+        juce::Font f(juce::FontOptions().withHeight(textH));
         juce::Path p;
         auto x = indent;
         auto y = f.getAscent() - 3.0f;

@@ -183,3 +183,48 @@ Guiding decision:
 - [ ] Defer `KeyboardPanelPage` and `ConfigPage` until the first three pages prove the approach is maintainable.
 - [ ] Treat the milestone as successful only if both `1480 x 320` and `2560 x 720` feel intentional without blurry scaling or page-specific hacks.
 - [ ] Re-evaluate scope before continuing into `KeyboardPanelPage`.
+
+## Code Review Recommendations (May 2026)
+
+### Priority 1 (High - runtime safety/perf)
+- [x] Review `MidiStartPage::handleIncomingMidiMessage` lock scope in `AMidiControl.h`:
+  - Avoid holding `midiMonitorLock` during `mididevices->sendToOutputs(message)` to reduce MIDI-thread latency risk.
+  - Confirm whether this callback path is still active or legacy; remove/disable if unused.
+
+- [x] Harden `MidiDevices::getMidiDevice()` in `AMidiDevices.h`:
+  - Add bounds-safe access pattern (guard and return `nullptr`/empty ptr for invalid indices).
+  - Keep existing callers unchanged but make the API safe for future use.
+
+### Priority 2 (Medium - warning hygiene / maintainability)
+- [x] Remove current compiler warnings:
+  - Replace deprecated `juce::Font f(textH);` usage in `AMidiHotkeys.h` and `AMidiControl.h` with `FontOptions`-based construction.
+  - Remove unused `rbuttons` local in `AMidiControl.h` preset layout code.
+
+### Priority 3 (Validation)
+- [x] Add/extend regression checks after the above:
+  - MIDI input callback latency/smoke test (no regressions in routing/monitor).
+  - Device-list access under plug/unplug churn.
+  - Standard Debug build warning check (expect zero warnings in touched units).
+
+## Second-Pass Review (MIDI routing + Player mute/solo gate, May 2026)
+
+### Priority 1 (High - behavior correctness)
+- [x] Clarify and align `Reset GM` replay semantics with solo mode:
+  - Current replay path uses `isPlayerChannelSendBlocked(...)`, which blocks both muted channels and non-solo channels when solo is active.
+  - This can conflict with the stated intent "replay all MIDI PC/CC commands for non-muted channels" if solo is active.
+  - Decided and implemented `mute-only for replay`: `Reset GM` replay now targets all non-muted channels regardless of solo selection; add regression coverage next.
+
+### Priority 2 (Medium - targeted regression tests)
+- [x] Add tests for Player-path programming gate behavior (not only device-layer mute bypass):
+  - Assert `sendProgramSelect`/`sendCC`/`sendEffects` suppression for muted channels.
+  - Assert same paths while solo is active (non-solo channels blocked, solo channel allowed), if that remains expected behavior.
+- [x] Add a focused `Reset GM` replay test:
+  - Ensure replay emits Bank/PC + full effect CC set for eligible channels.
+  - Cover both with and without solo active based on agreed semantics.
+- [x] Add coverage for Player safety messages:
+  - Verify Player `All Notes Off` / `All Sound Off` still send even when channels are muted.
+
+### Priority 3 (Observability / diagnostics)
+- [x] Add lightweight debug logging (guarded/limited) around replay eligibility decisions:
+  - channel number, muted state, solo state, and "sent vs skipped" reason.
+  - Useful to diagnose field reports where monitor output appears inconsistent with UI mute/solo state.

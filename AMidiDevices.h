@@ -159,7 +159,10 @@ public:
 
     ReferenceCountedObjectPtr<MidiDeviceListEntry> getMidiDevice(int index, bool isInput) const noexcept
     {
-        return isInput ? midiInputs[index] : midiOutputs[index];
+        const auto& devices = isInput ? midiInputs : midiOutputs;
+        if (!juce::isPositiveAndBelow(index, devices.size()))
+            return nullptr;
+        return devices[index];
     }
 
     bool openDevice(bool isInput, int index)

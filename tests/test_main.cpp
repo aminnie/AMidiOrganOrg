@@ -1623,6 +1623,81 @@ namespace
         return true;
     }
 
+    bool runMidiDeviceListChurnAccessSafety(std::string& details)
+    {
+        auto* devices = MidiDevices::getInstance();
+        if (devices == nullptr)
+        {
+            details = "MidiDevices::getInstance() returned nullptr";
+            return false;
+        }
+
+        const auto oldInputs = devices->midiInputs;
+        const auto oldOutputs = devices->midiOutputs;
+        const int oldMidiViewIdx = devices->midiviewidx;
+
+        for (int iteration = 0; iteration < 40; ++iteration)
+        {
+            devices->midiInputs.clear();
+            devices->midiOutputs.clear();
+            devices->midiviewidx = 255;
+
+            const int entryCount = 1 + (iteration % 3);
+            for (int i = 0; i < entryCount; ++i)
+            {
+                MidiDeviceInfo inInfo;
+                inInfo.identifier = "churn-in-" + juce::String(iteration) + "-" + juce::String(i);
+                inInfo.name = "Churn Input " + juce::String(i);
+                devices->midiInputs.add(new MidiDeviceListEntry(inInfo));
+
+                MidiDeviceInfo outInfo;
+                outInfo.identifier = "churn-out-" + juce::String(iteration) + "-" + juce::String(i);
+                outInfo.name = "Churn Output " + juce::String(i);
+                devices->midiOutputs.add(new MidiDeviceListEntry(outInfo));
+            }
+
+            for (int i = 0; i < entryCount; ++i)
+            {
+                if (!expectTrue(devices->getMidiDevice(i, true) != nullptr,
+                                "churn valid input index returns device",
+                                details)
+                    || !expectTrue(devices->getMidiDevice(i, false) != nullptr,
+                                   "churn valid output index returns device",
+                                   details))
+                {
+                    devices->midiInputs = oldInputs;
+                    devices->midiOutputs = oldOutputs;
+                    devices->midiviewidx = oldMidiViewIdx;
+                    return false;
+                }
+            }
+
+            if (!expectTrue(devices->getMidiDevice(-1, true) == nullptr,
+                            "churn negative input index returns null",
+                            details)
+                || !expectTrue(devices->getMidiDevice(entryCount, true) == nullptr,
+                               "churn out-of-range input index returns null",
+                               details)
+                || !expectTrue(devices->getMidiDevice(-1, false) == nullptr,
+                               "churn negative output index returns null",
+                               details)
+                || !expectTrue(devices->getMidiDevice(entryCount, false) == nullptr,
+                               "churn out-of-range output index returns null",
+                               details))
+            {
+                devices->midiInputs = oldInputs;
+                devices->midiOutputs = oldOutputs;
+                devices->midiviewidx = oldMidiViewIdx;
+                return false;
+            }
+        }
+
+        devices->midiInputs = oldInputs;
+        devices->midiOutputs = oldOutputs;
+        devices->midiviewidx = oldMidiViewIdx;
+        return true;
+    }
+
     bool runResetAllControllersEmission(std::string& details)
     {
         auto* devices = MidiDevices::getInstance();
@@ -2542,6 +2617,23 @@ namespace
             }
         }
 
+        // Burst smoke: incoming callback + monitor/routing should remain stable under rapid traffic.
+        constexpr int burstCount = 256;
+        for (int i = 0; i < burstCount; ++i)
+        {
+            const auto burstCc = MidiMessage::controllerEvent(3, CCMod, i % 128);
+            devices->handleIncomingMidiMessage(nullptr, burstCc);
+        }
+
+        if (!expectEqual(static_cast<int>(inboundMessages.size()), 4 + burstCount, "incoming monitor burst count", details)
+            || !expectEqual(static_cast<int>(sentMessages.size()), 1 + burstCount, "routed burst output count", details))
+        {
+            devices->setIncomingMidiMonitor({});
+            devices->testSendHook = nullptr;
+            restoreAppState(snapshot);
+            return false;
+        }
+
         devices->setIncomingMidiMonitor({});
         devices->testSendHook = nullptr;
         restoreAppState(snapshot);
@@ -2593,6 +2685,166 @@ namespace
         }
 
         devices->testSendHook = nullptr;
+        return true;
+    }
+
+    bool runPlayerChannelGateHelpers(std::string& details)
+    {
+        std::array<bool, 17> mutedChannels {};
+        mutedChannels.fill(false);
+        mutedChannels[(size_t) 5] = true;
+
+        if (!expectEqual(PlayerPage::isPlayerChannelBlockedForSend(5, 16, 0, mutedChannels) ? 1 : 0,
+                         1,
+                         "muted channel blocked with no solo",
+                         details)
+            || !expectEqual(PlayerPage::isPlayerChannelBlockedForSend(4, 16, 0, mutedChannels) ? 1 : 0,
+                            0,
+                            "unmuted channel allowed with no solo",
+                            details))
+        {
+            return false;
+        }
+
+        if (!expectEqual(PlayerPage::isPlayerChannelBlockedForSend(2, 16, 3, mutedChannels) ? 1 : 0,
+                         1,
+                         "non-solo channel blocked when solo is active",
+                         details)
+            || !expectEqual(PlayerPage::isPlayerChannelBlockedForSend(3, 16, 3, mutedChannels) ? 1 : 0,
+                            0,
+                            "solo channel allowed when unmuted",
+                            details))
+        {
+            return false;
+        }
+
+        mutedChannels[(size_t) 3] = true;
+        if (!expectEqual(PlayerPage::isPlayerChannelBlockedForSend(3, 16, 3, mutedChannels) ? 1 : 0,
+                         1,
+                         "solo channel still blocked if muted",
+                         details))
+        {
+            return false;
+        }
+
+        mutedChannels[(size_t) 3] = false;
+        if (!expectEqual(PlayerPage::shouldReplayPlayerChannelProgramming(2, 16, mutedChannels) ? 1 : 0,
+                         1,
+                         "replay helper allows unmuted channel",
+                         details)
+            || !expectEqual(PlayerPage::shouldReplayPlayerChannelProgramming(5, 16, mutedChannels) ? 1 : 0,
+                            0,
+                            "replay helper skips muted channel",
+                            details))
+        {
+            return false;
+        }
+
+        // Replay eligibility is mute-only and intentionally ignores solo selection.
+        if (!expectEqual(PlayerPage::shouldReplayPlayerChannelProgramming(2, 16, mutedChannels) ? 1 : 0,
+                         1,
+                         "replay helper remains allowed for unmuted non-solo channels",
+                         details))
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    bool runPlayerSafetyControllersBypassMuteGate(std::string& details)
+    {
+        auto* devices = MidiDevices::getInstance();
+        if (devices == nullptr)
+        {
+            details = "MidiDevices::getInstance() returned nullptr";
+            return false;
+        }
+
+        devices->clearMidiIOMap();
+        devices->setOutputChannelMuted(3, true);
+
+        std::vector<MidiMessage> sentMessages;
+        devices->testSendHook = [&sentMessages](const MidiMessage& message)
+        {
+            sentMessages.push_back(message);
+        };
+
+        devices->sendToPlayerModuleOnly(MidiMessage::noteOn(3, 60, (juce::uint8) 100), 0, false);
+        devices->sendToPlayerModuleOnly(MidiMessage::allNotesOff(3), 0, false);
+        devices->sendToPlayerModuleOnly(MidiMessage::allSoundOff(3), 0, false);
+        devices->testSendHook = nullptr;
+        devices->setOutputChannelMuted(3, false);
+
+        if (!expectEqual(static_cast<int>(sentMessages.size()),
+                         2,
+                         "player safety controllers send even when note path is muted",
+                         details))
+        {
+            return false;
+        }
+
+        if (!expectEqual(sentMessages[0].getControllerNumber(),
+                         123,
+                         "all-notes-off controller number",
+                         details)
+            || !expectEqual(sentMessages[1].getControllerNumber(),
+                            120,
+                            "all-sound-off controller number",
+                            details))
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    bool runPlayerReplayProgrammingMessageBuild(std::string& details)
+    {
+        Instrument instrument;
+        instrument.setMSB(1);
+        instrument.setLSB(2);
+        instrument.setFont(40);
+        instrument.setVol(100);
+        instrument.setExp(90);
+        instrument.setRev(80);
+        instrument.setCho(70);
+        instrument.setMod(60);
+        instrument.setTim(50);
+        instrument.setAtk(40);
+        instrument.setRel(30);
+        instrument.setBri(20);
+        instrument.setPan(10);
+
+        juce::MidiMessage replayMessages[13];
+        const int count = PlayerPage::buildReplayProgrammingMessagesForChannel(instrument,
+                                                                                4,
+                                                                                replayMessages,
+                                                                                (int) std::size(replayMessages));
+        if (!expectEqual(count, 13, "replay build emits bank/program plus full effects set", details))
+            return false;
+
+        if (!expectEqual(replayMessages[0].getControllerNumber(), CCMSB, "replay message 0 is CC MSB", details)
+            || !expectEqual(replayMessages[1].getControllerNumber(), CCLSB, "replay message 1 is CC LSB", details)
+            || !expectEqual(replayMessages[2].isProgramChange() ? 1 : 0, 1, "replay message 2 is Program Change", details)
+            || !expectEqual(replayMessages[2].getProgramChangeNumber(), 40, "replay Program Change value", details))
+        {
+            return false;
+        }
+
+        const int expectedControllers[] = { CCVol, CCExp, CCRev, CCCho, CCMod, CCTim, CCAtk, CCRel, CCBri, CCPan };
+        const int expectedValues[] = { 100, 90, 80, 70, 60, 50, 40, 30, 20, 10 };
+        for (int i = 0; i < 10; ++i)
+        {
+            const auto& msg = replayMessages[(size_t) (3 + i)];
+            if (!expectEqual(msg.getControllerNumber(), expectedControllers[i], "replay effect controller order", details)
+                || !expectEqual(msg.getControllerValue(), expectedValues[i], "replay effect controller value", details)
+                || !expectEqual(msg.getChannel(), 4, "replay message keeps selected channel", details))
+            {
+                return false;
+            }
+        }
+
         return true;
     }
 
@@ -3460,6 +3712,11 @@ int main()
 
     {
         std::string details;
+        results.push_back({ "MidiDevices getMidiDevice remains safe across list churn", runMidiDeviceListChurnAccessSafety(details), details });
+    }
+
+    {
+        std::string details;
         results.push_back({ "MidiDevices reset sends full channel controller sweep", runResetAllControllersEmission(details), details });
     }
 
@@ -3521,6 +3778,21 @@ int main()
     {
         std::string details;
         results.push_back({ "Output mute gate bypass allows Player-path notes while preserving default mute gate", runOutputMuteGateBypassForPlayerPath(details), details });
+    }
+
+    {
+        std::string details;
+        results.push_back({ "Player channel gating and replay eligibility helpers respect mute/solo policy", runPlayerChannelGateHelpers(details), details });
+    }
+
+    {
+        std::string details;
+        results.push_back({ "Player safety controller messages bypass muted note gate", runPlayerSafetyControllersBypassMuteGate(details), details });
+    }
+
+    {
+        std::string details;
+        results.push_back({ "Player replay programming builder emits bank/program/full effects sequence", runPlayerReplayProgrammingMessageBuild(details), details });
     }
 
     {

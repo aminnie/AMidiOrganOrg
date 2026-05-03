@@ -129,7 +129,7 @@ public:
         const float textEdgeGap = 4.0f;
         auto cs = 5.0f;
 
-        juce::Font f(textH);
+        juce::Font f(juce::FontOptions().withHeight(textH));
 
         juce::Path p;
         auto x = indent;
@@ -5353,7 +5353,6 @@ struct KeyboardPanelPage final : public Component,
             ygroup = 190;
 
             const int cbuttons = numberdisplaypresets + 3; // Set + Manual + six numbered presets + Next
-            int rbuttons = 1;
             int bgroupid = 110;
 
             int g10width = mgroup + bwidth * cbuttons + mgroup;
@@ -7734,6 +7733,65 @@ public:
         return false;
     }
 
+    static bool isPlayerChannelBlockedForSend(int channel,
+                                              int channelCount,
+                                              int soloChannel,
+                                              const std::array<bool, 17>& mutedChannels)
+    {
+        if (channel < 1 || channel > channelCount)
+            return false;
+
+        const int clampedSolo = juce::jlimit(0, channelCount, soloChannel);
+        if (clampedSolo > 0 && channel != clampedSolo)
+            return true;
+
+        return mutedChannels[(size_t) channel];
+    }
+
+    static bool shouldReplayPlayerChannelProgramming(int channel,
+                                                     int channelCount,
+                                                     const std::array<bool, 17>& mutedChannels)
+    {
+        if (channel < 1 || channel > channelCount)
+            return false;
+        return !mutedChannels[(size_t) channel];
+    }
+
+    static int buildReplayProgrammingMessagesForChannel(Instrument instrument,
+                                                        int midiChannel,
+                                                        juce::MidiMessage* outMessages,
+                                                        int maxMessages)
+    {
+        if (outMessages == nullptr || maxMessages <= 0)
+            return 0;
+        if (midiChannel < 1 || midiChannel > 16)
+            return 0;
+
+        int count = 0;
+        auto appendCc = [&](int controller, int value)
+        {
+            if (count < maxMessages)
+                outMessages[count++] = juce::MidiMessage::controllerEvent(midiChannel, controller, value);
+        };
+
+        appendCc(CCMSB, instrument.getMSB());
+        appendCc(CCLSB, instrument.getLSB());
+        if (count < maxMessages)
+            outMessages[count++] = juce::MidiMessage::programChange(midiChannel, instrument.getFont());
+
+        appendCc(CCVol, instrument.getVol());
+        appendCc(CCExp, instrument.getExp());
+        appendCc(CCRev, instrument.getRev());
+        appendCc(CCCho, instrument.getCho());
+        appendCc(CCMod, instrument.getMod());
+        appendCc(CCTim, instrument.getTim());
+        appendCc(CCAtk, instrument.getAtk());
+        appendCc(CCRel, instrument.getRel());
+        appendCc(CCBri, instrument.getBri());
+        appendCc(CCPan, instrument.getPan());
+        return count;
+    }
+
     void resized() override
     {
         const int margin = 10;
@@ -8773,14 +8831,10 @@ private:
     /** True when Player should suppress sends for this channel due to solo/mute state. */
     bool isPlayerChannelSendBlocked(int channel) const
     {
-        if (channel < 1 || channel > playerChannelCount)
-            return false;
-
-        const int soloChannel = juce::jlimit(0, playerChannelCount, midiPlayerSettings.soloChannel);
-        if (soloChannel > 0 && channel != soloChannel)
-            return true;
-
-        return midiPlayerSettings.mutedChannels[static_cast<size_t>(channel)];
+        return isPlayerChannelBlockedForSend(channel,
+                                             playerChannelCount,
+                                             midiPlayerSettings.soloChannel,
+                                             midiPlayerSettings.mutedChannels);
     }
 
     bool isPlaybackMutedForMessage(const juce::MidiMessage& message) const
@@ -9417,25 +9471,39 @@ private:
     /** Replay full strip programming (Bank/PC + effects CCs) for non-muted channels after Reset GM. */
     void replayPlayerChannelProgrammingForUnmutedChannels()
     {
+        static constexpr bool kLogReplayEligibilityDecisions = false;
+        const int soloChannel = juce::jlimit(0, playerChannelCount, midiPlayerSettings.soloChannel);
+
         for (int idx = 0; idx < playerChannelCount; ++idx)
         {
             const int midiChannel = idx + 1;
-            if (isPlayerChannelSendBlocked(midiChannel))
+            const bool channelMuted = midiPlayerSettings.mutedChannels[(size_t) midiChannel];
+            const bool shouldReplay = shouldReplayPlayerChannelProgramming(midiChannel,
+                                                                            playerChannelCount,
+                                                                            midiPlayerSettings.mutedChannels);
+
+            if (kLogReplayEligibilityDecisions)
+            {
+                juce::Logger::writeToLog("*** Player replay eligibility: ch=" + juce::String(midiChannel)
+                    + " muted=" + juce::String(channelMuted ? "yes" : "no")
+                    + " solo=" + juce::String(soloChannel)
+                    + " decision=" + juce::String(shouldReplay ? "sent" : "skipped-muted"));
+            }
+
+            if (!shouldReplay)
                 continue;
 
             auto instrument = channelInstruments[(size_t) idx];
-            instrument.setChannel(midiChannel);
-            sendProgramSelect(instrument);
-            sendCC(midiChannel, CCVol, instrument.getVol());
-            sendCC(midiChannel, CCExp, instrument.getExp());
-            sendCC(midiChannel, CCRev, instrument.getRev());
-            sendCC(midiChannel, CCCho, instrument.getCho());
-            sendCC(midiChannel, CCMod, instrument.getMod());
-            sendCC(midiChannel, CCTim, instrument.getTim());
-            sendCC(midiChannel, CCAtk, instrument.getAtk());
-            sendCC(midiChannel, CCRel, instrument.getRel());
-            sendCC(midiChannel, CCBri, instrument.getBri());
-            sendCC(midiChannel, CCPan, instrument.getPan());
+            juce::MidiMessage replayMessages[13];
+            const int replayCount = buildReplayProgrammingMessagesForChannel(instrument,
+                                                                             midiChannel,
+                                                                             replayMessages,
+                                                                             (int) std::size(replayMessages));
+            for (int i = 0; i < replayCount; ++i)
+            {
+                replayMessages[(size_t) i].setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
+                mididevices->sendToPlayerModuleOnly(replayMessages[(size_t) i], playerModuleIdx, false);
+            }
         }
     }
 
@@ -11948,12 +12016,14 @@ private:
     void handleIncomingMidiMessage(MidiInput*, const MidiMessage& message) override
     {
         // This is called on the MIDI thread
-        const ScopedLock sl(midiMonitorLock);
-        incomingMessages.add(message);
+        {
+            const ScopedLock sl(midiMonitorLock);
+            incomingMessages.add(message);
+        }
         triggerAsyncUpdate();
 
-        //--- To do Jippo
-        mididevices->sendToOutputs(message);
+        if (mididevices != nullptr)
+            mididevices->sendToOutputs(message);
     }
 
     void handleAsyncUpdate() override
