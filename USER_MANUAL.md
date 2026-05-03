@@ -367,7 +367,7 @@ Rules:
 - Saved hotkeys persist to `Documents/AMidiOrgan/configs/hotkeys.json`.
 - Preset hotkeys currently cover `Manual`, `Preset 1..6`, and `Next`; dedicated keys for `Preset 7..12` are not defined.
 
-Default includes `Monitor` tab hotkey (`M`), **Player Start / Stop** (`p`), and `Next preset` (`7`).
+Default includes **Player tab** (`L`), `Monitor` tab hotkey (`M`), **Player Start / Stop** (`p`), and `Next preset` (`7`).
 
 Expected result:
 

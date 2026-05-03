@@ -374,6 +374,7 @@ When the main window has focus:
 | Manual preset            | `0`       |
 | Next preset              | `7`       |
 | Upper / Lower / Bass tab | A / S / D |
+| Player tab               | `L`       |
 | Sounds tab               | Z         |
 | Effects tab              | X         |
 | Monitor tab              | M         |

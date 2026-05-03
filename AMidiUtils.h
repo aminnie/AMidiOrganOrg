@@ -1070,6 +1070,7 @@ enum KeyPressCommandIDs {
     btnTabUpper = 1,
     btnTabLower = 2,
     btnTabBass = 3,
+    btnTabPlayer = 25,
     btnTabSounds = 4,
     btnTabEffects = 5,
     btnTabMonitor = 6,
@@ -1088,12 +1089,13 @@ enum KeyPressCommandIDs {
     btnPlayerStartStop = 24
 };
 
-constexpr int kNumHotkeyCommands = 19;
+constexpr int kNumHotkeyCommands = 20;
 
 inline constexpr std::array<KeyPressCommandIDs, kNumHotkeyCommands> kHotkeyCommandOrder = {
     KeyPressCommandIDs::btnTabUpper,
     KeyPressCommandIDs::btnTabLower,
     KeyPressCommandIDs::btnTabBass,
+    KeyPressCommandIDs::btnTabPlayer,
     KeyPressCommandIDs::btnTabSounds,
     KeyPressCommandIDs::btnTabEffects,
     KeyPressCommandIDs::btnTabMonitor,
@@ -1137,22 +1139,23 @@ inline HotkeyBindings HotkeyBindings::withDefaults()
     b.keys[0] = L'a';
     b.keys[1] = L's';
     b.keys[2] = L'd';
-    b.keys[3] = L'z';
-    b.keys[4] = L'x';
-    b.keys[5] = L'm';
-    b.keys[6] = L'0';
-    b.keys[7] = L'1';
-    b.keys[8] = L'2';
-    b.keys[9] = L'3';
-    b.keys[10] = L'4';
-    b.keys[11] = L'5';
-    b.keys[12] = L'6';
-    b.keys[13] = L'7';
-    b.keys[14] = L'f';
-    b.keys[15] = L'b';
-    b.keys[16] = L'g';
-    b.keys[17] = L'n';
-    b.keys[18] = L'p';
+    b.keys[3] = L'l';
+    b.keys[4] = L'z';
+    b.keys[5] = L'x';
+    b.keys[6] = L'm';
+    b.keys[7] = L'0';
+    b.keys[8] = L'1';
+    b.keys[9] = L'2';
+    b.keys[10] = L'3';
+    b.keys[11] = L'4';
+    b.keys[12] = L'5';
+    b.keys[13] = L'6';
+    b.keys[14] = L'7';
+    b.keys[15] = L'f';
+    b.keys[16] = L'b';
+    b.keys[17] = L'g';
+    b.keys[18] = L'n';
+    b.keys[19] = L'p';
     return b;
 }
 
@@ -1191,6 +1194,7 @@ public:
             KeyPressCommandIDs::btnTabUpper,
             KeyPressCommandIDs::btnTabLower,
             KeyPressCommandIDs::btnTabBass,
+            KeyPressCommandIDs::btnTabPlayer,
             KeyPressCommandIDs::btnTabSounds,
             KeyPressCommandIDs::btnTabEffects,
             KeyPressCommandIDs::btnTabMonitor,
@@ -1230,6 +1234,9 @@ public:
                 break;
             case KeyPressCommandIDs::btnTabBass:
                 addShortcutInfo("Bass tab", "Show Bass & Drums keyboard");
+                break;
+            case KeyPressCommandIDs::btnTabPlayer:
+                addShortcutInfo("Player tab", "Show Player tab");
                 break;
             case KeyPressCommandIDs::btnTabSounds:
                 addShortcutInfo("Sounds tab", "Show Sounds tab");
@@ -1298,6 +1305,10 @@ public:
                 break;
             case KeyPressCommandIDs::btnTabBass:
                 if (onTabBass) onTabBass();
+                else return false;
+                break;
+            case KeyPressCommandIDs::btnTabPlayer:
+                if (onTabPlayer) onTabPlayer();
                 else return false;
                 break;
             case KeyPressCommandIDs::btnTabSounds:
@@ -1378,6 +1389,7 @@ public:
     std::function<void()> onTabUpper;
     std::function<void()> onTabLower;
     std::function<void()> onTabBass;
+    std::function<void()> onTabPlayer;
     std::function<void()> onTabSounds;
     std::function<void()> onTabEffects;
     std::function<void()> onTabMonitor;

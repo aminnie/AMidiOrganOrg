@@ -111,12 +111,12 @@ Contact the developer for additional module support.
 
 ### Hotkeys
 
-- Lets you assign keyboard shortcuts for tabs, presets, rotary controls, **and Player Start / Stop**.
+- Lets you assign keyboard shortcuts for tabs (including **Player**), presets, rotary controls, **and Player Start / Stop**.
 - Available values are `A-Z`, `0-9`, and `(None)`.
 - `Save` applies the current shortcut map and writes it to disk.
 - `Cancel` restores the last applied shortcut map.
 - Duplicate non-empty shortcuts are blocked.
-- Defaults include **Player Start / Stop** on **`p`**.
+- Defaults include **Player tab** on **`l`** (letter L) and **Player Start / Stop** on **`p`**.
 
 ### Monitor
 
@@ -217,6 +217,7 @@ When the main window has focus, the default shortcuts are:
 | Upper tab | `A` |
 | Lower tab | `S` |
 | Bass tab | `D` |
+| Player tab | `L` |
 | Sounds tab | `Z` |
 | Effects tab | `X` |
 | Monitor tab | `M` |

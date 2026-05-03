@@ -82,7 +82,7 @@ Primary implementation files:
 - **Hotkeys**
   - User-editable key mapping persisted to `hotkeys.json`
   - Duplicate key conflict prevention
-  - Includes Monitor tab hotkey command plus **Player Start/Stop** (default **`p`** in `HotkeyBindings::withDefaults`)
+  - Includes **Player tab**, Monitor tab hotkey commands, plus **Player Start/Stop** (defaults **`l`** Player tab / **`p`** Player transport in `HotkeyBindings::withDefaults`)
   - Preset hotkeys currently cover `Manual`, `Preset 1..6`, and `Next` (no dedicated `Preset 7..12` hotkeys yet)
 - **Player**
   - MIDI-file playback (`MidiFilePlaybackEngine`) with timed event dispatch from file timestamps

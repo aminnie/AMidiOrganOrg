@@ -319,6 +319,7 @@ namespace hotkeyUiDetail
         "Upper tab",
         "Lower tab",
         "Bass tab",
+        "Player tab",
         "Sounds tab",
         "Effects tab",
         "Monitor tab",
