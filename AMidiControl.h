@@ -8246,7 +8246,7 @@ private:
     void commitStartBarFromEditor()
     {
         const int requested = (barInput != nullptr) ? barInput->getText().trim().getIntValue() : 0;
-        setPlayerStartBarRaw(requested, true);
+        setPlayerStartBarRaw(requested, false);
     }
 
     void toggleStartStopPlayback()
@@ -8327,7 +8327,6 @@ private:
         profile.enablePlayerStripCcScaling = midiPlayerSettings.enablePlayerStripCcScaling;
         profile.transposeSemitones = playerTransposeSemitones;
         profile.playbackTempoBpmOverride = playerTempoOverrideBpm;
-        profile.playbackStartBar = playerStartBarRaw;
         profile.soloChannel = midiPlayerSettings.soloChannel;
         profile.mutedChannels = midiPlayerSettings.mutedChannels;
         profile.selectedChannelIdx = selectedChannelIdx;
@@ -8373,7 +8372,7 @@ private:
         playerStripCcScalingToggle->setToggleState(midiPlayerSettings.enablePlayerStripCcScaling, dontSendNotification);
         setPlayerTransposeSemitones(profile.transposeSemitones, false);
         setPlayerTempoOverrideBpm(profile.playbackTempoBpmOverride, false);
-        setPlayerStartBarRaw(profile.playbackStartBar, false);
+        setPlayerStartBarRaw(0, false);
         syncMuteSoloTogglesFromSettings();
 
         const int profileSelectedIdx = juce::jlimit(-1, playerChannelCount - 1, profile.selectedChannelIdx);

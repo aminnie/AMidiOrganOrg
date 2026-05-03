@@ -92,11 +92,11 @@ Primary implementation files:
   - Program/Bank replacement on configured channels (`MSB`, `LSB`, `PC`), prior to CC merge + generic PC remap traversal
   - Optional Program Change lookup remap (`ProgramChangeRemapper`)
   - Optional CC merge against Player strip trims via `PlayerStripCcMerge::mergeControllerWithStripIfApplicable` when `midiPlayerSettings.enablePlayerStripCcScaling` is enabled
-  - Transpose `-6…+6` semitones (note helper drops out-of-range after shift), BPM override remap (`0` keeps file tempo), playback start bar surfaced on UI/tooltip
+  - Transpose `-6…+6` semitones (note helper drops out-of-range after shift), BPM override remap (`0` keeps file tempo), playback start bar on Player UI/session only (not stored in profiles)
   - Start/Continue transport pair with `MidiFilePlaybackEngine`-backed cue position; **`Continue`** gated when no continuation state exists.
   - Per-strip **mute** bitmask + exclusivity **`solo`** gating handled in `PlayerPage::isPlaybackMutedForMessage(...)` solo toggles enqueue `sendAllNotesOff()` (All Notes Off + All Sound Off per channel) through the Player-only send path before persisting mute/solo data.
   - Player playback mute gates are **orthogonal** to live button-group mute state (explicit decouple from Upper/Lower/Bass mute pipeline).
-  - ValueTree-backed song profiles persist transpose, tempo override, playback start bar, mute/solo, remap/CC-merge booleans module id, strips, UI metadata
+  - ValueTree-backed song profiles persist transpose, tempo override, mute/solo, remap/CC-merge booleans module id, strips, UI metadata
   - `Manage Profiles…` launcher edits sidecar catalogue + **`Load MIDI Profile`** restores referenced `.mid`; both list dialogs support live text filtering
   - Profile index + last-used mapping for auto-load on MIDI identity key
 - **Monitor**
@@ -282,7 +282,7 @@ Config persistence notes:
 - Config root also persists `presetMidiPcInputChannel` and `presetMidiPcValue` for external Program Change preset-next triggering.
 - Config root also persists `uiProfileId` for fixed-size profile selection.
 - MIDI-file settings persist `enablePlayerStripCcScaling` (default `false` when missing for backward compatibility).
-- Player profile schema root: `playerSongProfile` with `midiRef`, `moduleRef`, `playerFlags`, `channels`, and optional `uiState`; flags include transpose (`-6..6`), tempo override (`playbackTempoBpmOverride`), playback start bar, solo/mute bitmask, remap/CC-merge toggles.
+- Player profile schema root: `playerSongProfile` with `midiRef`, `moduleRef`, `playerFlags`, `channels`, and optional `uiState`; flags include transpose (`-6..6`), tempo override (`playbackTempoBpmOverride`), solo/mute bitmask, remap/CC-merge toggles. Legacy `playbackStartBar` in older saves is ignored; Bar is UI/session-only.
 - Player profile schema version starts at `1`; missing/new properties follow defensive defaults for backward compatibility.
 - Each `group` child also persists SysEx-through settings:
   - `sysexThrough` (bool, default `false`)

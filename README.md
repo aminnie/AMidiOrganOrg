@@ -215,7 +215,7 @@ On startup, the app also attempts to auto-restore the last used panel and config
 - **Load MIDI** opens the file picker; **Import MIDI** saves a copy into the profile/MIDI workspace for repeatable use.
 - **Reset GM** re-applies channel voices from the loaded file's Program Change scan using the **first Program Change per channel** (`1..16`), and marks Player profile actions as dirty so `Save Profile` / `Save Profile As` are ready.
 - **Start** / **Stop** toggles transport; **Continue** resumes after stop when playback can continue from the current position from the tempo map engine.
-- **Bar** sets the MIDI **playback start bar** (tooltip: `0` or `1` starts at bar 1). Value is persisted in Player profiles alongside other Player flags.
+- **Bar** sets the MIDI **playback start bar** for the current Player session only (tooltip: `0` or `1` starts at bar 1); applying or reloading a profile resets Bar to **`0`** and Player profiles do **not** store this value.
 - **Key +/-** (**transpose**) shifts played notes **-6…+6** semitones (clamped in saved profiles); out-of-range notes after transpose are dropped.
 - **Tempo** accepts a **BPM override**; **`0`** means follow the MIDI file tempo map (`Tempo override BPM`, tooltip).
 - Strip **M** (mute per channel during playback) and **S** (solo one channel; other channels are gated in the Player path). Toggling solo sends **All Notes Off** and **All Sound Off** on all 16 channels via the Player module routing to clear stuck notes when changing the soloed channel.
@@ -238,7 +238,7 @@ On startup, the app also attempts to auto-restore the last used panel and config
   - `Load MIDI Profile` and **Manage Profiles** now include a live text filter to narrow long profile lists while typing.
   - If **Sound Module** changes after a profile is applied, **Save Profile** may warn: use **Save Profile As** to keep a separate profile, or **Continue** to overwrite the active one (**Save Profile As** is not affected).
   - Profiles are sidecar data (the `.mid` file is not rewritten during normal playback).
-  - Profiles capture per-channel voice/effect strips, configured-channel flags, module selection, transpose (-6…+6), tempo override BPM, playback start bar, mute/solo state, and Player remap/merge toggles.
+  - Profiles capture per-channel voice/effect strips, configured-channel flags, module selection, transpose (-6…+6), tempo override BPM, mute/solo state, and Player remap/merge toggles.
   - `Load MIDI Profile` uses the selected profile's saved MIDI path, loads that MIDI file into Player, and then applies that exact profile.
   - Missing/invalid MIDI path in a profile is reported in Player status and the current session is left unchanged.
   - Profile files are stored under `Documents/AMidiOrgan/configs/player_profiles/`.

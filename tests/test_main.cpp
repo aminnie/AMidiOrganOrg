@@ -454,7 +454,6 @@ namespace
         profile.enablePlayerStripCcScaling = true;
         profile.transposeSemitones = -3;
         profile.playbackTempoBpmOverride = 136;
-        profile.playbackStartBar = 24;
         profile.soloChannel = 3;
         profile.mutedChannels[(size_t) 5] = true;
         profile.channels[0].midiChannel = 1;
@@ -480,7 +479,6 @@ namespace
             || !expectEqual(decoded.soloChannel, profile.soloChannel, "soloChannel roundtrip", details)
             || !expectEqual(decoded.transposeSemitones, profile.transposeSemitones, "transposeSemitones roundtrip", details)
             || !expectEqual(decoded.playbackTempoBpmOverride, profile.playbackTempoBpmOverride, "playbackTempoBpmOverride roundtrip", details)
-            || !expectEqual(decoded.playbackStartBar, profile.playbackStartBar, "playbackStartBar roundtrip", details)
             || !expectEqual(decoded.channels[0].program, profile.channels[0].program, "program roundtrip", details)
             || !expectEqual(decoded.channels[0].vol, profile.channels[0].vol, "vol roundtrip", details)
             || !expectEqual(decoded.channels[0].effectsDirty, profile.channels[0].effectsDirty, "effectsDirty roundtrip", details))
