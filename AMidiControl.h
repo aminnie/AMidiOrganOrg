@@ -7512,6 +7512,20 @@ public:
         barInput->onReturnKey = [this]() { commitStartBarFromEditor(); };
         barInput->onFocusLost = [this]() { commitStartBarFromEditor(); };
 
+        playAlongLabel = addToList(new Label("player.playalong.label", "P/Along"));
+        playAlongLabel->setColour(Label::textColourId, Colours::white);
+        playAlongLabel->setJustificationType(Justification::centredLeft);
+
+        playAlongToggle = addToList(new ToggleButton());
+        playAlongToggle->setButtonText({});
+        playAlongToggle->setColour(ToggleButton::textColourId, Colours::white);
+        playAlongToggle->setTooltip("Ignore Player mute flags and continue sending playback/programming MIDI for muted channels.");
+        playAlongToggle->setToggleState(false, dontSendNotification);
+        playAlongToggle->onClick = [this]()
+            {
+                playerPlayAlong = playAlongToggle->getToggleState();
+            };
+
         tempoLabel = addToList(new Label("player.tempo.label", "Tempo"));
         tempoLabel->setColour(Label::textColourId, Colours::white);
         tempoLabel->setJustificationType(Justification::centredLeft);
@@ -7736,7 +7750,8 @@ public:
     static bool isPlayerChannelBlockedForSend(int channel,
                                               int channelCount,
                                               int soloChannel,
-                                              const std::array<bool, 17>& mutedChannels)
+                                              const std::array<bool, 17>& mutedChannels,
+                                              bool ignoreMuteForPlayAlong = false)
     {
         if (channel < 1 || channel > channelCount)
             return false;
@@ -7745,15 +7760,21 @@ public:
         if (clampedSolo > 0 && channel != clampedSolo)
             return true;
 
+        if (ignoreMuteForPlayAlong)
+            return false;
+
         return mutedChannels[(size_t) channel];
     }
 
     static bool shouldReplayPlayerChannelProgramming(int channel,
                                                      int channelCount,
-                                                     const std::array<bool, 17>& mutedChannels)
+                                                     const std::array<bool, 17>& mutedChannels,
+                                                     bool ignoreMuteForPlayAlong = false)
     {
         if (channel < 1 || channel > channelCount)
             return false;
+        if (ignoreMuteForPlayAlong)
+            return true;
         return !mutedChannels[(size_t) channel];
     }
 
@@ -7999,6 +8020,27 @@ public:
                         playbackButtonY,
                         barInputW,
                         toggleH);
+                // P/Along: label fills from Bar column left edge to checkbox; checkbox flush-right with Bar field.
+                const int playAlongY = playbackButtonY + toggleH + toggleStackGap;
+                constexpr int playAlongToggleW = 24;
+                constexpr int playAlongLabelGap = 6;
+                const int playAlongToggleX = (barInput != nullptr)
+                    ? (barInput->getRight() - playAlongToggleW)
+                    : 0;
+                if (playAlongLabel != nullptr && barLabel != nullptr && barInput != nullptr)
+                {
+                    const int labelX = barLabel->getX();
+                    const int labelW = juce::jmax(
+                        barLabelW,
+                        playAlongToggleX - playAlongLabelGap - labelX);
+                    playAlongLabel->setBounds(labelX, playAlongY, labelW, toggleH);
+                }
+                if (playAlongToggle != nullptr && barInput != nullptr)
+                    playAlongToggle->setBounds(
+                        playAlongToggleX,
+                        playAlongY,
+                        playAlongToggleW,
+                        toggleH);
                 if (tempoLabel != nullptr)
                     tempoLabel->setBounds(
                         transposeX,
@@ -8025,8 +8067,14 @@ public:
                 // Bounds are assigned in the transposeLabel block to keep label+editor aligned.
             }
 
+            const int tempoBottom = tempoInput != nullptr
+                ? tempoInput->getBottom()
+                : playerStripCcScalingToggle->getBottom();
+            const int playAlongBottom = playAlongToggle != nullptr
+                ? playAlongToggle->getBottom()
+                : playerStripCcScalingToggle->getBottom();
             metadataRowY = juce::jmax(playerStripCcScalingToggle->getBottom(),
-                                      tempoInput != nullptr ? tempoInput->getBottom() : playerStripCcScalingToggle->getBottom()) + 2;
+                                      juce::jmax(tempoBottom, playAlongBottom)) + 2;
         }
 
         {
@@ -8833,7 +8881,8 @@ private:
         return isPlayerChannelBlockedForSend(channel,
                                              playerChannelCount,
                                              midiPlayerSettings.soloChannel,
-                                             midiPlayerSettings.mutedChannels);
+                                             midiPlayerSettings.mutedChannels,
+                                             playerPlayAlong);
     }
 
     bool isPlaybackMutedForMessage(const juce::MidiMessage& message) const
@@ -9479,7 +9528,8 @@ private:
             const bool channelMuted = midiPlayerSettings.mutedChannels[(size_t) midiChannel];
             const bool shouldReplay = shouldReplayPlayerChannelProgramming(midiChannel,
                                                                             playerChannelCount,
-                                                                            midiPlayerSettings.mutedChannels);
+                                                                            midiPlayerSettings.mutedChannels,
+                                                                            playerPlayAlong);
 
             if (kLogReplayEligibilityDecisions)
             {
@@ -10346,6 +10396,8 @@ private:
     TextButton* resetGmButton = nullptr;
     ToggleButton* remapProgramChangeToggle = nullptr;
     ToggleButton* playerStripCcScalingToggle = nullptr;
+    Label* playAlongLabel = nullptr;
+    ToggleButton* playAlongToggle = nullptr;
     Label* transposeLabel = nullptr;
     TextEditor* transposeInput = nullptr;
     Label* barLabel = nullptr;
@@ -10395,6 +10447,7 @@ private:
     int playerTransposeSemitones = 0;
     int playerTempoOverrideBpm = 0;
     int playerStartBarRaw = 0;
+    bool playerPlayAlong = false;
     bool playerProfileDirty = false;
     bool suppressProfileComboCallback = false;
     bool applyingPlayerProfileState = false;

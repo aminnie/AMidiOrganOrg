@@ -2704,6 +2704,14 @@ namespace
             return false;
         }
 
+        if (!expectEqual(PlayerPage::isPlayerChannelBlockedForSend(5, 16, 0, mutedChannels, true) ? 1 : 0,
+                         0,
+                         "play-along ignores mute for blocked-send helper",
+                         details))
+        {
+            return false;
+        }
+
         if (!expectEqual(PlayerPage::isPlayerChannelBlockedForSend(2, 16, 3, mutedChannels) ? 1 : 0,
                          1,
                          "non-solo channel blocked when solo is active",
@@ -2734,6 +2742,14 @@ namespace
                             0,
                             "replay helper skips muted channel",
                             details))
+        {
+            return false;
+        }
+
+        if (!expectEqual(PlayerPage::shouldReplayPlayerChannelProgramming(5, 16, mutedChannels, true) ? 1 : 0,
+                         1,
+                         "play-along enables replay for muted channel",
+                         details))
         {
             return false;
         }

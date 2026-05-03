@@ -216,9 +216,10 @@ On startup, the app also attempts to auto-restore the last used panel and config
 - **Reset GM** re-applies channel voices from the loaded file's Program Change scan using the **first Program Change per channel** (`1..16`), and marks Player profile actions as dirty so `Save Profile` / `Save Profile As` are ready.
 - **Start** / **Stop** toggles transport; **Continue** resumes after stop when playback can continue from the current position from the tempo map engine.
 - **Bar** sets the MIDI **playback start bar** for the current Player session only (tooltip: `0` or `1` starts at bar 1); applying or reloading a profile resets Bar to **`0`** and Player profiles do **not** store this value.
+- **P/Along** (Play Along) is a session-only toggle (default OFF) directly below Bar; when ON, Player mute checkboxes no longer block outbound Player MIDI on those channels.
 - **Key +/-** (**transpose**) shifts played notes **-6…+6** semitones (clamped in saved profiles); out-of-range notes after transpose are dropped.
 - **Tempo** accepts a **BPM override**; **`0`** means follow the MIDI file tempo map (`Tempo override BPM`, tooltip).
-- Strip **M** (mute per channel during playback) and **S** (solo one channel; other channels are gated in the Player path). Toggling solo sends **All Notes Off** and **All Sound Off** on all 16 channels via the Player module routing to clear stuck notes when changing the soloed channel.
+- Strip **M** (mute per channel during playback) and **S** (solo one channel; other channels are gated in the Player path). With **P/Along** ON, mute is ignored for Player outbound sends while solo behavior remains unchanged. Toggling solo sends **All Notes Off** and **All Sound Off** on all 16 channels via the Player module routing to clear stuck notes when changing the soloed channel.
 - **Player** strip mute/solo is specific to MIDI-file playback and is **not** tied to Upper/Lower/Bass group mutes on the live panel.
 - While a file plays, transport text can show **bar / beat / quarter** position derived from the MIDI tempo map (see the status area under the metadata line).
 - **Manage Profiles** opens a dialog to rename, delete, or clean up saved profiles on disk.
