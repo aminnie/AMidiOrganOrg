@@ -3,6 +3,17 @@
 ## Environment Note
 - JUCE is locally installed at `c:\JUCE` and should be used for later compile/verification passes.
 
+## macOS file access / TCC prompts (user + release follow-up)
+
+The app uses `~/Documents/AMidiOrgan/` for configs, panels, and related data. macOS may prompt for **Documents** (and again when opening `.mid` files from **Desktop**, **Downloads**, **iCloud**, or external volumes).
+
+### User-facing documentation (optional)
+- [ ] Add a short **macOS permissions** subsection to `README.md` or `USER_MANUAL.md`: allow prompts for Documents; check **System Settings → Privacy & Security → Files and Folders**; note that MIDI files opened from protected locations may trigger additional prompts; **Full Disk Access** only as a last resort.
+- [ ] Mention that repeated prompts on every local **Debug rebuild** can happen because the executable identity/path changes until the app is a stable **signed** install (e.g. `/Applications`).
+
+### Distribution / signing (developers)
+- [ ] For fewer permission surprises in the field: **Developer ID sign + notarize** with a stable **bundle identifier** so TCC decisions bind to one product identity.
+
 ## Current Status Snapshot (Mar 2026)
 - [x] Cross-platform CMake scaffold is in place and builds on Windows.
 - [x] CI added (`.github/workflows/ci.yml`) for Windows + macOS configure/build/test.
