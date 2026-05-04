@@ -13979,12 +13979,12 @@ public:
         wireDefaultEffectsNumberField(txtPresetMidiPcValue, &appState.presetMidiPcValue, 0, 127);
 
         addAndMakeVisible(resetButton);
-        resetButton.setButtonText("MIDI Reset");
+        resetButton.setButtonText("MIDI Panic");
         resetButton.setColour(TextButton::textColourOffId, Colours::white);
         resetButton.setColour(TextButton::textColourOnId, Colours::white);
         resetButton.setColour(TextButton::buttonColourId, Colours::black.darker());
         resetButton.setColour(TextButton::buttonOnColourId, Colours::black.brighter());
-        resetButton.setBounds(1350, 24, 80, 30);
+        resetButton.setBounds(1333, 24, 96, 30);
 
         resetButton.onClick = [=]() {
 

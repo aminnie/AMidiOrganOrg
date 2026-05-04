@@ -92,7 +92,7 @@ Contact the developer for additional module support.
   - MIDI In / Out channel
   - octave shift
   - solo split point for Upper / Lower
-- `MIDI Reset` sends a controller reset on all 16 channels.
+- `MIDI Panic` sends a controller reset on all 16 channels (all-notes-off / MIDI panic style housekeeping).
 - `MIDI In Passthru` is a global input-channel filter, not a per-device or per-output setting.
 - When it is **ON**, all incoming MIDI channels are allowed through.
 - When it is **OFF**, only MIDI input channels assigned to button groups are allowed through; other incoming channels are blocked.
