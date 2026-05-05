@@ -7525,6 +7525,8 @@ public:
             {
                 const bool wasOn = playerPlayAlong;
                 playerPlayAlong = playAlongToggle->getToggleState();
+                if (!wasOn && playerPlayAlong)
+                    replayPlayerChannelProgrammingForMutedChannels();
                 if (wasOn && !playerPlayAlong)
                     sendAllNotesOff();
             };
@@ -9561,6 +9563,29 @@ private:
             }
 
             if (!shouldReplay)
+                continue;
+
+            auto instrument = channelInstruments[(size_t) idx];
+            juce::MidiMessage replayMessages[13];
+            const int replayCount = buildReplayProgrammingMessagesForChannel(instrument,
+                                                                             midiChannel,
+                                                                             replayMessages,
+                                                                             (int) std::size(replayMessages));
+            for (int i = 0; i < replayCount; ++i)
+            {
+                replayMessages[(size_t) i].setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
+                mididevices->sendToPlayerModuleOnly(replayMessages[(size_t) i], playerModuleIdx, false);
+            }
+        }
+    }
+
+    /** Replay full strip programming (Bank/PC + effects CCs) for muted channels when Play Along turns ON. */
+    void replayPlayerChannelProgrammingForMutedChannels()
+    {
+        for (int idx = 0; idx < playerChannelCount; ++idx)
+        {
+            const int midiChannel = idx + 1;
+            if (!midiPlayerSettings.mutedChannels[(size_t) midiChannel])
                 continue;
 
             auto instrument = channelInstruments[(size_t) idx];
