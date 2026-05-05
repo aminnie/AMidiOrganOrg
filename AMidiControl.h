@@ -7523,7 +7523,10 @@ public:
         playAlongToggle->setToggleState(false, dontSendNotification);
         playAlongToggle->onClick = [this]()
             {
+                const bool wasOn = playerPlayAlong;
                 playerPlayAlong = playAlongToggle->getToggleState();
+                if (wasOn && !playerPlayAlong)
+                    sendAllNotesOff();
             };
 
         tempoLabel = addToList(new Label("player.tempo.label", "Tempo"));
