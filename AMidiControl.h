@@ -8272,6 +8272,20 @@ private:
         setPlayerTempoOverrideBpm(requested, true);
     }
 
+    void refreshPlayerBarFieldReadOnly()
+    {
+        if (barInput == nullptr)
+            return;
+
+        const bool lockUntilStart = hasLoadedPlayableMidi
+            && loadedMidiFile.existsAsFile()
+            && !playerBarStartFieldUnlocked;
+        barInput->setReadOnly(lockUntilStart);
+        barInput->setTooltip(lockUntilStart
+            ? "Playback start bar. Press Start once to enable editing. 0 or 1 starts at bar 1."
+            : "Playback start bar. 0 or 1 starts at bar 1.");
+    }
+
     void setPlayerStartBarRaw(int value, bool markDirty)
     {
         const int clamped = clampStartBarInputRaw(value);
@@ -8472,8 +8486,10 @@ private:
         }
 
         applyingPlayerProfileState = false;
+        playerBarStartFieldUnlocked = false;
         playerModuleIdxBaselineForActiveProfile = playerModuleIdx;
         markPlayerProfileDirty(false);
+        refreshPlayerBarFieldReadOnly();
         updateProfileButtonsState();
     }
 
@@ -8936,6 +8952,8 @@ private:
 
     void updateTransportButtons()
     {
+        refreshPlayerBarFieldReadOnly();
+
         if (startStopMidiButton != nullptr)
         {
             startStopMidiButton->setEnabled(hasLoadedPlayableMidi);
@@ -10020,6 +10038,8 @@ private:
         markPlayerProfileDirty(false);
         refreshProfileCombo();
         updateProfileButtonsState();
+        playerBarStartFieldUnlocked = false;
+        refreshPlayerBarFieldReadOnly();
         updateTransportButtons();
         return true;
     }
@@ -10077,6 +10097,7 @@ private:
         playbackElapsedBeforeResumeSec = 0.0;
         canContinuePlayback = false;
         isPlayingFilePlayback = true;
+        playerBarStartFieldUnlocked = true;
         startTimer(1);
         refreshMidiTransportLabel(playbackTimelineAnchorSec);
         logPlayerOutputRoutingSummaryAtPlaybackStart();
@@ -10447,6 +10468,7 @@ private:
     int playerTransposeSemitones = 0;
     int playerTempoOverrideBpm = 0;
     int playerStartBarRaw = 0;
+    bool playerBarStartFieldUnlocked = false;
     bool playerPlayAlong = false;
     bool playerProfileDirty = false;
     bool suppressProfileComboCallback = false;

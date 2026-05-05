@@ -390,7 +390,7 @@ How to use:
 2. Choose the **Sound Module** target for file playback.
 3. Select one or more **Ch 1..16** strips and edit voice/effects (or use **Sounds** / **Effects** shortcut buttons for the active strip).
 4. Optional: enable `Enable Program Change remap` and/or `Scale file CCs with Player strip`.
-5. Optional: set **Bar** (playback start bar for this session only; resets when you apply or reload a profile; `0` or `1` starts at bar 1), **P/Along** (Play Along, default OFF; session-only and not saved in profiles), **Key +/-** (transpose `-6`..`+6` semitones), **Tempo** (`0` = follow file tempo map; otherwise BPM override).
+5. Optional: set **Bar** (playback start bar for this session only; after loading MIDI or applying/reloading a profile, Bar is read-only until the next successful **Start**; resets when you apply or reload a profile; `0` or `1` starts at bar 1), **P/Along** (Play Along, default OFF; session-only and not saved in profiles), **Key +/-** (transpose `-6`..`+6` semitones), **Tempo** (`0` = follow file tempo map; otherwise BPM override).
 6. Optional: select or create a profile (`Apply Profile`, `Save Profile`, `Save Profile As`, `Revert Profile`, `Load MIDI Profile`, **Manage Profiles**).
 7. Press **Start** (shows **Stop** while playing), or press **Player Start/Stop** (**`p`** default). After **Stop**, use **Continue** when the transport retains a cue point for resumption.
 
