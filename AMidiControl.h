@@ -1642,7 +1642,7 @@ public:
         addLabelAndSetStyle(lblsgrouptxt, false);
         lblsgrouptxt.setBounds(margin, margin + 60, 160, 50);
 
-        lblsvoice.setText("Button Voice:", {});
+        lblsvoice.setText("Voice Button:", {});
         addLabelAndSetStyle(lblsvoice, true);
         lblsvoice.setBounds(margin, margin + 100, 150, 20);
 
@@ -2187,7 +2187,7 @@ private:
     juce::Label lblskeyboardtxt{ "No Keyboard" };
     juce::Label lblsgroup{ "Sound Group" };
     juce::Label lblsgrouptxt{ "No Group" };
-    juce::Label lblsvoice{ "Button Voice" };
+    juce::Label lblsvoice{ "Voice Button" };
     juce::Label lblsvoicetxt{ "No Voice" };
     juce::GroupComponent voiceBrowserGroup{ "voiceBrowser", "Voice Categories" };
     juce::GroupComponent voiceSearchGroup{ "voiceSearch", "Voice Search" };
@@ -2615,7 +2615,7 @@ public:
         addLabelAndSetStyle(lblsgrouptxt, false);
         lblsgrouptxt.setBounds(margin, margin + 60, 160, 50);
 
-        lblsvoice.setText("Button Voice:", {});
+        lblsvoice.setText("Voice Button:", {});
         addLabelAndSetStyle(lblsvoice, true);
         lblsvoice.setBounds(margin, margin + 100, 150, 20);
 
@@ -3358,7 +3358,7 @@ private:
     juce::Label lblskeyboardtxt{ "No Keyboard" };
     juce::Label lblsgroup{ "Sound Group" };
     juce::Label lblsgrouptxt{ "No Group" };
-    juce::Label lblsvoice{ "Button Voice" };
+    juce::Label lblsvoice{ "Voice Button" };
     juce::Label lblsvoicetxt{ "No Voice" };
 
     Slider* slvol;
