@@ -7,7 +7,7 @@
       "subDirectory": "MidiGM",
       "moduleFileName": "midigm.json",
       "moduleIdString": "MIDI",
-      "matchStrings": ["MIDI"],
+      "matchStrings": ["MIDI", "VirtualMIDISynth"],
       "defaultVoiceName": "Grand Piano",
       "defaultMSB": 0,
       "defaultLSB": 0,
