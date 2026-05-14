@@ -457,6 +457,7 @@ namespace
         profile.soloChannel = 3;
         profile.mutedChannels[(size_t) 5] = true;
         profile.channels[0].midiChannel = 1;
+        profile.channels[0].outputChannel = 7;
         profile.channels[0].configured = true;
         profile.channels[0].voice = "Organ 1";
         profile.channels[0].program = 42;
@@ -479,6 +480,7 @@ namespace
             || !expectEqual(decoded.soloChannel, profile.soloChannel, "soloChannel roundtrip", details)
             || !expectEqual(decoded.transposeSemitones, profile.transposeSemitones, "transposeSemitones roundtrip", details)
             || !expectEqual(decoded.playbackTempoBpmOverride, profile.playbackTempoBpmOverride, "playbackTempoBpmOverride roundtrip", details)
+            || !expectEqual(decoded.channels[0].outputChannel, profile.channels[0].outputChannel, "outputChannel roundtrip", details)
             || !expectEqual(decoded.channels[0].program, profile.channels[0].program, "program roundtrip", details)
             || !expectEqual(decoded.channels[0].vol, profile.channels[0].vol, "vol roundtrip", details)
             || !expectEqual(decoded.channels[0].effectsDirty, profile.channels[0].effectsDirty, "effectsDirty roundtrip", details))
@@ -2942,6 +2944,36 @@ namespace
         return true;
     }
 
+    bool runPlayerPlaybackChannelOverrideHelper(std::string& details)
+    {
+        const auto noteOn = juce::MidiMessage::noteOn(2, 60, (juce::uint8) 100);
+        auto remapped = PlayerPage::remapPlaybackMessageChannel(noteOn, 9);
+        if (!expectEqual(remapped.getChannel(), 9, "playback channel helper remaps note-on channel", details)
+            || !expectEqual(remapped.getNoteNumber(), 60, "playback channel helper keeps note number", details))
+        {
+            return false;
+        }
+
+        const auto cc = juce::MidiMessage::controllerEvent(4, CCMod, 55);
+        remapped = PlayerPage::remapPlaybackMessageChannel(cc, 1);
+        if (!expectEqual(remapped.getChannel(), 1, "playback channel helper remaps controller channel", details)
+            || !expectEqual(remapped.getControllerNumber(), CCMod, "playback channel helper keeps controller number", details)
+            || !expectEqual(remapped.getControllerValue(), 55, "playback channel helper keeps controller value", details))
+        {
+            return false;
+        }
+
+        const auto unchanged = PlayerPage::remapPlaybackMessageChannel(noteOn, 2);
+        if (!expectEqual(unchanged.getChannel(), 2, "playback channel helper leaves matching channel untouched", details))
+            return false;
+
+        const auto clamped = PlayerPage::remapPlaybackMessageChannel(noteOn, 99);
+        if (!expectEqual(clamped.getChannel(), 16, "playback channel helper clamps output channel", details))
+            return false;
+
+        return true;
+    }
+
     bool runPlayerModuleLiveOutputHelperGuards(std::string& details)
     {
         auto* modules = InstrumentModules::getInstance();
@@ -3832,6 +3864,11 @@ int main()
     {
         std::string details;
         results.push_back({ "Player realtime transpose helper shifts notes and drops out-of-range", runPlayerTransposeRealtimeNoteHelper(details), details });
+    }
+
+    {
+        std::string details;
+        results.push_back({ "Player playback channel override helper remaps outgoing channels", runPlayerPlaybackChannelOverrideHelper(details), details });
     }
 
     {

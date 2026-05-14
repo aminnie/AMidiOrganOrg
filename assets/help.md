@@ -129,11 +129,14 @@ Contact the developer for additional module support.
 
 - Targets the **currently selected Sound Module** outputs for `.mid` playback (orthogonal to Upper/Lower/Bass group mutes; strip **M**/**S** handle playback gating; **P/Along** can override mute gating).
 - Channel strips (`Ch 1..16`) hold per-channel Program/Bank and effect values.
+- Each `Ch 1..16` strip also includes a small numeric output-channel override field (`1..16`) beside the `Ch x` label.
 - Selecting a channel strip sends Program/Bank and Effects immediately on that channel.
 - **Load MIDI** / **Import MIDI**, **Start**/**Stop**, **Continue**, **Bar** start, **P/Along** (Play Along, default OFF, session-only), **Key +/-** transpose (`-6..+6`), **Tempo** override (`0` follows file map), bar/beat transport readout while playing.
   - **Bar** is read-only right after loading MIDI or applying/reloading a profile, then becomes editable after the next successful **Start**.
 - **Reset GM** restores strip voices from loaded MIDI Program Changes using the **first event per channel** and marks profile save actions dirty.
 - During playback, Program Change on configured Player channels is replaced by strip `MSB/LSB/PC`.
+- During playback, outbound MIDI is rewritten to each strip's output-channel override just before Player-module send.
+- Mute/Solo gating still follows the source strip/file channel, not the remapped output channel.
 - `Enable Program Change remap` applies lookup remapping to remaining Program Change traffic.
 - `Scale file CCs with Player strip` is optional (default OFF):
   - Applies only to channels configured from Player tab.
@@ -150,6 +153,7 @@ Contact the developer for additional module support.
   - **Manage Profiles…** trims/renames list entries offline.
   - `Load MIDI Profile` and **Manage Profiles…** include a live text filter for quickly narrowing the profile list.
   - Dirty profile switches prompt to save/discard/cancel as needed.
+- Profiles persist each strip's output-channel override along with the rest of Player strip/profile state.
   - **Bar** and **P/Along** are session controls and are not persisted in profile files.
 - Profiles are saved as sidecar files under `Documents/AMidiOrgan/configs/player_profiles/` and do not rewrite the source `.mid` file.
 - If a profile points to a missing MIDI file, Player reports this in status and leaves the current state unchanged.

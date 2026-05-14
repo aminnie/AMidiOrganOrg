@@ -7641,6 +7641,24 @@ public:
             chLabel->setTooltip("Ch " + String(i + 1) + ": No Program Change events.");
             channelLabels[(size_t) i] = chLabel;
 
+            auto* overrideEditor = addToList(new TextEditor("player.ch.output.input." + String(i + 1)));
+            overrideEditor->setInputRestrictions(2, "0123456789");
+            overrideEditor->setJustification(juce::Justification::centred);
+            overrideEditor->setColour(TextEditor::highlightColourId, Colours::red.withAlpha(0.30f));
+            overrideEditor->setColour(TextEditor::highlightedTextColourId, Colours::white);
+            overrideEditor->setTooltip("Output MIDI channel override (1-16) for Ch " + String(i + 1) + ".");
+            overrideEditor->onReturnKey = [this, i]()
+                {
+                    commitPlayerOutputChannelOverrideFromEditor(i);
+                };
+            overrideEditor->onFocusLost = [this, i]()
+                {
+                    commitPlayerOutputChannelOverrideFromEditor(i);
+                };
+            channelOutputEditors[(size_t) i] = overrideEditor;
+            playerChannelOutputOverride[(size_t) i] = i + 1;
+            refreshPlayerOutputChannelOverrideEditor(i);
+
             auto* button = addToList(new VoiceButton("Ch " + String(i + 1)));
             channelButtons[(size_t) i] = button;
 
@@ -7948,7 +7966,7 @@ public:
 
         const int channelButtonInsetX = 14;
         const int channelLabelInsetY = 16;
-        const int channelLabelHeight = 16;
+        const int channelLabelHeight = 22;
         const int channelLabelToButtonGap = 4;
         const int channelButtonToToggleGap = 2;
         const int channelToggleHeight = 18;
@@ -7963,6 +7981,7 @@ public:
         const int toggleTop = buttonTop + buttonHeight + channelButtonToToggleGap;
         const int channelToggleGap = 4;
         const int toggleWidth = juce::jmax(20, (buttonWidth - channelToggleGap) / 2);
+        const int channelOutputWidth = juce::jmin(36, juce::jmax(28, buttonWidth / 2));
         const int ch2X = channelsGroup->getX() + channelButtonInsetX + (buttonWidth + buttonGap);
 
         const int profileComboLeft = ch2X;
@@ -7985,7 +8004,9 @@ public:
         {
             const int colX = channelsGroup->getX() + channelButtonInsetX + i * (buttonWidth + buttonGap);
             if (auto* lbl = channelLabels[(size_t) i])
-                lbl->setBounds(colX, labelTop, buttonWidth, channelLabelHeight);
+                lbl->setBounds(colX, labelTop, buttonWidth - channelOutputWidth - 2, channelLabelHeight);
+            if (auto* editor = channelOutputEditors[(size_t) i])
+                editor->setBounds(colX + buttonWidth - channelOutputWidth, labelTop, channelOutputWidth, channelLabelHeight);
             if (auto* button = channelButtons[(size_t) i])
                 button->setBounds(colX, buttonTop, buttonWidth, buttonHeight);
             if (auto* muteToggle = channelMuteToggles[(size_t) i])
@@ -8318,6 +8339,49 @@ private:
         setPlayerTransposeSemitones(requested, true);
     }
 
+    static int clampPlayerOutputChannelOverride(int value)
+    {
+        return juce::jlimit(1, 16, value);
+    }
+
+    void refreshPlayerOutputChannelOverrideEditor(int stripIdx)
+    {
+        if (stripIdx < 0 || stripIdx >= playerChannelCount)
+            return;
+
+        if (auto* editor = channelOutputEditors[(size_t) stripIdx])
+        {
+            const bool isDefaultOutputChannel = playerChannelOutputOverride[(size_t) stripIdx] == (stripIdx + 1);
+            editor->setColour(TextEditor::textColourId, isDefaultOutputChannel ? Colours::white : Colours::red);
+            editor->setText(juce::String(playerChannelOutputOverride[(size_t) stripIdx]), dontSendNotification);
+        }
+    }
+
+    void setPlayerOutputChannelOverride(int stripIdx, int outputChannel, bool markDirty)
+    {
+        if (stripIdx < 0 || stripIdx >= playerChannelCount)
+            return;
+
+        const int clamped = clampPlayerOutputChannelOverride(outputChannel);
+        const bool changed = playerChannelOutputOverride[(size_t) stripIdx] != clamped;
+        playerChannelOutputOverride[(size_t) stripIdx] = clamped;
+        refreshPlayerOutputChannelOverrideEditor(stripIdx);
+
+        if (changed && markDirty)
+            markPlayerProfileDirty();
+    }
+
+    void commitPlayerOutputChannelOverrideFromEditor(int stripIdx)
+    {
+        if (stripIdx < 0 || stripIdx >= playerChannelCount)
+            return;
+
+        const int requested = (channelOutputEditors[(size_t) stripIdx] != nullptr)
+            ? channelOutputEditors[(size_t) stripIdx]->getText().trim().getIntValue()
+            : (stripIdx + 1);
+        setPlayerOutputChannelOverride(stripIdx, requested, true);
+    }
+
     void setPlayerTempoOverrideBpm(int value, bool markDirty)
     {
         const int clamped = clampTempoOverrideBpm(value);
@@ -8474,6 +8538,7 @@ private:
             auto source = channelInstruments[(size_t) idx];
             auto& target = profile.channels[(size_t) idx];
             target.midiChannel = idx + 1;
+            target.outputChannel = playerChannelOutputOverride[(size_t) idx];
             target.configured = playerChannelConfigured[(size_t) idx];
             target.voice = source.getVoice();
             target.category = source.getCategory();
@@ -8519,6 +8584,7 @@ private:
         for (int idx = 0; idx < playerChannelCount; ++idx)
         {
             const auto& source = profile.channels[(size_t) idx];
+            setPlayerOutputChannelOverride(idx, source.outputChannel, false);
             Instrument instrument;
             instrument.setVoice(source.voice.isNotEmpty() ? source.voice : ("Ch " + juce::String(idx + 1)));
             instrument.setCategory(source.category);
@@ -8985,6 +9051,29 @@ private:
         return isPlayerChannelSendBlocked(channel);
     }
 
+public:
+    static juce::MidiMessage remapPlaybackMessageChannel(const juce::MidiMessage& message, int outputChannel)
+    {
+        juce::MidiMessage remapped = message;
+        const int sourceChannel = message.getChannel();
+        if (sourceChannel < 1 || sourceChannel > 16)
+            return remapped;
+
+        const int clampedOutputChannel = juce::jlimit(1, 16, outputChannel);
+        if (clampedOutputChannel != sourceChannel)
+            remapped.setChannel(clampedOutputChannel);
+        return remapped;
+    }
+
+private:
+    juce::MidiMessage remapPlaybackMessageToOutputChannel(const juce::MidiMessage& message) const
+    {
+        const int sourceChannel = message.getChannel();
+        if (sourceChannel < 1 || sourceChannel > playerChannelCount)
+            return message;
+        return remapPlaybackMessageChannel(message, playerChannelOutputOverride[(size_t) (sourceChannel - 1)]);
+    }
+
     int buildVoiceButtonProgramSelectMessages(int channel, juce::MidiMessage* outMessages, int maxMessages)
     {
         if (outMessages == nullptr || maxMessages <= 0 || channel < 1 || channel > playerChannelCount)
@@ -9018,6 +9107,7 @@ private:
         if (!tryTransposePlaybackNoteMessage(message, semitoneOffset, routedMessage))
             return;
 
+        routedMessage = remapPlaybackMessageToOutputChannel(routedMessage);
         routedMessage.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
         mididevices->sendToPlayerModuleOnly(routedMessage, playerModuleIdx, true);
     }
@@ -9544,6 +9634,7 @@ private:
 
             channelInstruments[(size_t) i] = instrument;
             playerChannelConfigured[(size_t) i] = false;
+            setPlayerOutputChannelOverride(i, i + 1, false);
 
             if (auto* b = channelButtons[(size_t) i])
             {
@@ -10538,11 +10629,13 @@ private:
     Label* midiMetadataLabel = nullptr;
     Label* midiTransportLabel = nullptr;
     std::array<Label*, playerChannelCount> channelLabels {};
+    std::array<TextEditor*, playerChannelCount> channelOutputEditors {};
     std::array<VoiceButton*, playerChannelCount> channelButtons {};
     std::array<ToggleButton*, playerChannelCount> channelMuteToggles {};
     std::array<ToggleButton*, playerChannelCount> channelSoloToggles {};
     std::array<Instrument, playerChannelCount> channelInstruments {};
     std::array<bool, playerChannelCount> playerChannelConfigured {};
+    std::array<int, playerChannelCount> playerChannelOutputOverride {};
     int selectedChannelIdx = -1;
     int playerModuleIdx = 0;
     /** Module index when the active profile was last applied or saved; -1 if no baseline. Used to warn on Save vs Save As. */

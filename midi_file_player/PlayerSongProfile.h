@@ -9,6 +9,7 @@
 struct PlayerChannelProfile
 {
     int midiChannel = 1;
+    int outputChannel = 1;
     bool configured = false;
     juce::String voice;
     juce::String category;
@@ -31,7 +32,7 @@ struct PlayerChannelProfile
 
 struct PlayerSongProfile
 {
-    static constexpr int schemaVersionCurrent = 5;
+    static constexpr int schemaVersionCurrent = 6;
 
     int schemaVersion = schemaVersionCurrent;
     juce::String profileId;
@@ -186,6 +187,7 @@ inline juce::ValueTree toValueTree(const PlayerSongProfile& profile)
         const auto& channel = profile.channels[(size_t) idx];
         juce::ValueTree channelNode("channel");
         channelNode.setProperty("midiChannel", juce::jlimit(1, 16, channel.midiChannel), nullptr);
+        channelNode.setProperty("outputChannel", juce::jlimit(1, 16, channel.outputChannel), nullptr);
         channelNode.setProperty("configured", channel.configured, nullptr);
         channelNode.setProperty("voice", channel.voice, nullptr);
         channelNode.setProperty("category", channel.category, nullptr);
@@ -294,6 +296,7 @@ inline bool fromValueTree(const juce::ValueTree& root, PlayerSongProfile& outPro
 
             auto& c = profile.channels[(size_t) loaded];
             c.midiChannel = juce::jlimit(1, 16, readInt(channelNode, "midiChannel", loaded + 1));
+            c.outputChannel = juce::jlimit(1, 16, readInt(channelNode, "outputChannel", c.midiChannel));
             c.configured = readBool(channelNode, "configured", false);
             c.voice = channelNode.getProperty("voice").toString();
             c.category = channelNode.getProperty("category").toString();

@@ -90,14 +90,16 @@ Primary implementation files:
   - Playback output uses **`MidiDevices::sendToPlayerModuleOnly(...)`** — matches only MIDI outputs mapped to `playerModuleIdx` (no implicit channel-route fan-out, no MidiView mirror duplication on file traffic)
   - `logPlayerOutputRoutingSummaryAtPlaybackStart()` records module name, matching output devices (`open` vs `closed`), and reinforces routing posture in logs
   - Per-channel (`1..16`) Player strips backed by `channelInstruments`
+  - Per-strip output-channel override editor (`1..16`) next to each `Ch x` label; defaults to identity mapping
   - Program/Bank replacement on configured channels (`MSB`, `LSB`, `PC`), prior to CC merge + generic PC remap traversal
   - Optional Program Change lookup remap (`ProgramChangeRemapper`)
   - Optional CC merge against Player strip trims via `PlayerStripCcMerge::mergeControllerWithStripIfApplicable` when `midiPlayerSettings.enablePlayerStripCcScaling` is enabled
   - Transpose `-6…+6` semitones (note helper drops out-of-range after shift), BPM override remap (`0` keeps file tempo), playback start bar on Player UI/session only (not stored in profiles)
   - Start/Continue transport pair with `MidiFilePlaybackEngine`-backed cue position; **`Continue`** gated when no continuation state exists.
-  - Per-strip **mute** bitmask + exclusivity **`solo`** gating handled in `PlayerPage::isPlaybackMutedForMessage(...)` solo toggles enqueue `sendAllNotesOff()` (All Notes Off + All Sound Off per channel) through the Player-only send path before persisting mute/solo data.
+  - Per-strip **mute** bitmask + exclusivity **`solo`** gating handled in `PlayerPage::isPlaybackMutedForMessage(...)` using source/file channel semantics; solo toggles enqueue `sendAllNotesOff()` (All Notes Off + All Sound Off per channel) through the Player-only send path before persisting mute/solo data.
+  - Final outbound channel rewrite happens in `PlayerPage::sendPlaybackMessage(...)` via `remapPlaybackMessageToOutputChannel(...)` after transpose and before Player-module send
   - Player playback mute gates are **orthogonal** to live button-group mute state (explicit decouple from Upper/Lower/Bass mute pipeline).
-  - ValueTree-backed song profiles persist transpose, tempo override, mute/solo, remap/CC-merge booleans module id, strips, UI metadata
+  - ValueTree-backed song profiles persist transpose, tempo override, mute/solo, remap/CC-merge booleans, module id, strips, per-strip output-channel overrides, and UI metadata
   - `Manage Profiles…` launcher edits sidecar catalogue + **`Load MIDI Profile`** restores referenced `.mid`; both list dialogs support live text filtering
   - Profile index + last-used mapping for auto-load on MIDI identity key
 - **Monitor**
@@ -121,6 +123,7 @@ Primary implementation files:
   - configured-channel Program Change replacement first
   - optional Player-strip CC merge second (selected controllers only)
   - optional generic Program Change remap lookup third
+  - transpose + per-strip output-channel override right before Player-module send
   - default passthrough last
 - Player profile auto-load order:
   - build MIDI identity key on file load
@@ -283,8 +286,8 @@ Config persistence notes:
 - Config root also persists `presetMidiPcInputChannel` and `presetMidiPcValue` for external Program Change preset-next triggering.
 - Config root also persists `uiProfileId` for fixed-size profile selection.
 - MIDI-file settings persist `enablePlayerStripCcScaling` (default `false` when missing for backward compatibility).
-- Player profile schema root: `playerSongProfile` with `midiRef`, `moduleRef`, `playerFlags`, `channels`, and optional `uiState`; flags include transpose (`-6..6`), tempo override (`playbackTempoBpmOverride`), solo/mute bitmask, remap/CC-merge toggles. Legacy `playbackStartBar` in older saves is ignored; Bar is UI/session-only.
-- Player profile schema version starts at `1`; missing/new properties follow defensive defaults for backward compatibility.
+- Player profile schema root: `playerSongProfile` with `midiRef`, `moduleRef`, `playerFlags`, `channels`, and optional `uiState`; flags include transpose (`-6..6`), tempo override (`playbackTempoBpmOverride`), solo/mute bitmask, remap/CC-merge toggles. Channel entries also persist `outputChannel` (`1..16`). Legacy `playbackStartBar` in older saves is ignored; Bar is UI/session-only.
+- Player profile schema is currently version `6`; missing/new properties continue to use defensive defaults for backward compatibility.
 - Each `group` child also persists SysEx-through settings:
   - `sysexThrough` (bool, default `false`)
   - `sysexInputIdentifier` (MIDI input device identifier, default empty)

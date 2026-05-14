@@ -391,6 +391,7 @@ How to use:
    - Use **Reset GM** to restore Player strips from the loaded MIDI file's Program Change scan using the **first Program Change event per channel** (`1..16`).
 2. Choose the **Sound Module** target for file playback.
 3. Select one or more **Ch 1..16** strips and edit voice/effects (or use **Sounds** / **Effects** shortcut buttons for the active strip).
+   - Optional: use the small numeric field beside each `Ch x` label to override that strip's outbound MIDI channel (`1..16`).
 4. Optional: enable `Enable Program Change remap` and/or `Scale file CCs with Player strip`.
 5. Optional: set **Bar** (playback start bar for this session only; after loading MIDI or applying/reloading a profile, Bar is read-only until the next successful **Start**; resets when you apply or reload a profile; `0` or `1` starts at bar 1), **P/Along** (Play Along, default OFF; session-only and not saved in profiles), **Key +/-** (transpose `-6`..`+6` semitones), **Tempo** (`0` = follow file tempo map; otherwise BPM override).
 6. Optional: select or create a profile (`Apply Profile`, `Save Profile`, `Save Profile As`, `Revert Profile`, `Load MIDI Profile`, **Manage Profiles**).
@@ -401,6 +402,8 @@ Behavior:
 - Player strip **Mute/Solo** are independent of Upper/Lower/Bass group mutes; live panel mutes do not silence MIDI-file playback lanes.
 - **Solo** (`S`) plays only the selected channel; **mute** (`M`) drops selected channels. With **P/Along** ON, mute is ignored for Player outbound sends while solo behavior remains unchanged. Toggling **solo** issues **All Notes Off** and **All Sound Off** on all 16 channels through the Player routing path to clear stuck notes when changing which channel is soloed.
 - On configured strips, file Program Change is replaced by strip `MSB` / `LSB` / `PC` before other rewrite steps.
+- Per-strip channel override is applied at final Player send time, after strip processing, so each strip can emit on a different output channel than its file/source channel.
+- Mute/solo decisions remain based on the source strip/file channel, not the remapped output channel.
 - `Enable Program Change remap` still applies to remaining Program Change events via the lookup mapping path.
 - `Scale file CCs with Player strip` is OFF by default and applies only on configured channels.
 - Running **Reset GM** marks the active Player profile state as changed, so **Save Profile** and **Save Profile As** become active for committing that reset layout.
@@ -420,7 +423,7 @@ Profile workflow:
 - `Load MIDI Profile` loads the MIDI path stored in that profile then applies profile state after load.
 - **Manage Profiles** opens maintenance (rename/remove profile entries backed by disk).
 - `Load MIDI Profile` and **Manage Profiles** support a live text filter for quickly narrowing profile lists.
-- Profiles persist transpose, tempo override (`0`=file), mute/solo, remap/CC-merge switches, strips, module id, etc. (**Bar** and **P/Along** are not saved in profiles.)
+- Profiles persist transpose, tempo override (`0`=file), mute/solo, remap/CC-merge switches, strips, per-strip output-channel overrides, module id, etc. (**Bar** and **P/Along** are not saved in profiles.)
 - Profiles are sidecar files (your `.mid` is not rewritten during normal playback).
 - If a profile references a missing MIDI file, Player surfaces an error in status and keeps the loaded session unchanged.
 - Applying a saved profile reapplies voices and effects across the channel strips pulled from disk.
