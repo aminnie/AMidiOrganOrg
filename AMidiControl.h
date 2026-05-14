@@ -12712,8 +12712,15 @@ public:
                 midiInLineCount = 0;
                 midiOutLineCount = 0;
                 monitorStoppedForLineLimit = false;
-                applyMonitorEnableButtonColours();
-                refreshMonitorEnableTooltip();
+
+                // Match Enable-after-clear: refresh counts from editors then arm capture if under cap.
+                syncMonitorLineCountsFromEditors();
+                if (midiInLineCount >= kMonitorLineLimit || midiOutLineCount >= kMonitorLineLimit)
+                {
+                    stopMonitoringDueToLineLimit();
+                    return;
+                }
+                setMonitoringEnabled(true);
             };
 
         addAndMakeVisible(filterMidiClockToggle);
