@@ -25,6 +25,7 @@ struct PlayerChannelProfile
     int rel = 0;
     int bri = 30;
     int pan = 64;
+    int voiceOct = 0;
     int effectsDirty = EffectsMapAll;
 };
 
@@ -201,6 +202,7 @@ inline juce::ValueTree toValueTree(const PlayerSongProfile& profile)
         channelNode.setProperty("rel", clampMidi7(channel.rel), nullptr);
         channelNode.setProperty("bri", clampMidi7(channel.bri), nullptr);
         channelNode.setProperty("pan", clampMidi7(channel.pan), nullptr);
+        channelNode.setProperty("voiceOct", juce::jlimit(-2, 2, channel.voiceOct), nullptr);
         channelNode.setProperty("effectsDirty", channel.effectsDirty, nullptr);
         channelsNode.addChild(channelNode, -1, nullptr);
     }
@@ -308,6 +310,7 @@ inline bool fromValueTree(const juce::ValueTree& root, PlayerSongProfile& outPro
             c.rel = clampMidi7(readInt(channelNode, "rel", 0));
             c.bri = clampMidi7(readInt(channelNode, "bri", 30));
             c.pan = clampMidi7(readInt(channelNode, "pan", 64));
+            c.voiceOct = juce::jlimit(-2, 2, readInt(channelNode, "voiceOct", 0));
             c.effectsDirty = readInt(channelNode, "effectsDirty", EffectsMapAll);
             ++loaded;
         }

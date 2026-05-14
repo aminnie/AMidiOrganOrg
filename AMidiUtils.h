@@ -970,11 +970,12 @@ enum EffectsMap {
     MAPATK = 128,
     MAPREL = 256,
     MAPBRI = 512,
-    MAPPAN = 1024
+    MAPPAN = 1024,
+    MAPOCT = 2048
 };
 
 static constexpr int EffectsMapAll = MAPVOL | MAPEXP | MAPREV | MAPCH0 | MAPMOD
-    | MAPTIM | MAPATK | MAPREL | MAPBRI | MAPPAN;
+    | MAPTIM | MAPATK | MAPREL | MAPBRI | MAPPAN | MAPOCT;
 
 // Index Offset of a Button Group in Panel
 enum IndexButtonGroupsType {

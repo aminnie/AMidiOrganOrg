@@ -1251,6 +1251,7 @@ private:
         static Identifier relType("ccrel");
         static Identifier briType("ccbri");
         static Identifier panType("ccpan");
+        static Identifier voiceOctType("voiceOct");
 
         static Identifier dirtyType("isdirty");
         static Identifier soundConfiguredType("soundConfigured");
@@ -1305,6 +1306,7 @@ private:
             ins.setProperty(relType, instrument.getRel(), nullptr);
             ins.setProperty(briType, instrument.getBri(), nullptr);
             ins.setProperty(panType, instrument.getPan(), nullptr);
+            ins.setProperty(voiceOctType, instrument.getVoiceOctaveTranspose(), nullptr);
 
             ins.setProperty(dirtyType, instrument.getDirty(), nullptr);
             ins.setProperty(soundConfiguredType, pvb->isSoundConfigured(), nullptr);
@@ -1420,6 +1422,7 @@ private:
         static Identifier relType("ccrel");
         static Identifier briType("ccbri");
         static Identifier panType("ccpan");
+        static Identifier voiceOctType("voiceOct");
 
         static Identifier dirtyType("isdirty");
         static Identifier soundConfiguredType("soundConfigured");
@@ -1494,6 +1497,8 @@ private:
                 instrument.setBri(ival);
                 ival = childNode.getProperty(panType);
                 instrument.setPan(ival);
+                ival = (int) childNode.getProperty(voiceOctType, 0);
+                instrument.setVoiceOctaveTranspose(ival);
 
                 ival = childNode.getProperty(dirtyType);
                 instrument.replaceDirtyMask(ival);
@@ -2583,7 +2588,7 @@ public:
 
         getLookAndFeel().setColour(juce::Slider::thumbColourId, juce::Colours::darkred.brighter());
 
-        int xgroup = 220, ygroup = 10, gwidth = 1030, gheight = 260;
+        int xgroup = 220, ygroup = 10, gwidth = 1240, gheight = 260;
         group = addToList(new GroupComponent("group", "Effects for Voice Button"));
         group->setColour(GroupComponent::outlineColourId, Colours::grey.darker());
         group->setBounds(xgroup, ygroup, gwidth, gheight);
@@ -2817,6 +2822,33 @@ public:
                 mididevices->sendToOutputs(ccMessage);
             };
 
+        sloct = addToList(createSlider(false));
+        sloct->setSliderStyle(Slider::Rotary);
+        sloct->setRotaryParameters(MathConstants<float>::pi * 1.2f, MathConstants<float>::pi * 2.8f, false);
+        sloct->setTextBoxStyle(Slider::TextBoxRight, false, 70, 20);
+        sloct->setColour(Slider::ColourIds::rotarySliderFillColourId, juce::Colours::antiquewhite);
+        sloct->setColour(Slider::ColourIds::rotarySliderOutlineColourId, juce::Colours::dimgrey);
+        sloct->setBounds(soundwidth + gmargin + 5 * sleffectwidth, gmargin, sleffectwidth, sleffectheight);
+        sloct->setRange(-2.0, 2.0, 1.0);
+        sloct->setDoubleClickReturnValue(true, 0.0);
+        sloct->setTextValueSuffix(" Oct");
+        sloct->textFromValueFunction = [](double value)
+            {
+                const int octave = static_cast<int>(std::round(value));
+                return juce::String(octave > 0 ? "+" : "") + juce::String(octave);
+            };
+        sloct->valueFromTextFunction = [](const juce::String& text)
+            {
+                return static_cast<double>(text.getIntValue());
+            };
+        sloct->onValueChange = [=]()
+            {
+                const int octave = juce::jlimit(-2, 2, static_cast<int>(std::round(sloct->getValue())));
+                if (octave != static_cast<int>(std::round(sloct->getValue())))
+                    sloct->setValue(octave, dontSendNotification);
+                changeVoiceOctave(panelbuttonidx, octave);
+            };
+
         tbroute = addToList(new TextButton("To Upper"));
         tbroute->setColour(TextButton::textColourOffId, Colours::black);
         tbroute->setColour(TextButton::textColourOnId, Colours::black);
@@ -2842,6 +2874,7 @@ public:
                     effrel = playerWorkingInstrument.getRel();
                     effbri = playerWorkingInstrument.getBri();
                     effpan = playerWorkingInstrument.getPan();
+                    effoct = playerWorkingInstrument.getVoiceOctaveTranspose();
                     beffectsupdated = true;
                     tabs.setCurrentTabIndex(PTPlayer, true);
                     tbroute->setEnabled(false);
@@ -2911,6 +2944,7 @@ public:
         slrel->setComponentID("eff.slider.rel");
         slbri->setComponentID("eff.slider.bri");
         slpan->setComponentID("eff.slider.pan");
+        sloct->setComponentID("eff.slider.oct");
 
         registerUiProfileComponent(*group);
         registerUiProfileComponent(lblskeyboard);
@@ -2931,6 +2965,7 @@ public:
         registerUiProfileComponent(*slrel);
         registerUiProfileComponent(*slbri);
         registerUiProfileComponent(*slpan);
+        registerUiProfileComponent(*sloct);
 
         applyCurrentUiProfile();
     }
@@ -2975,6 +3010,35 @@ public:
         effpan = midinstr.getPan();
         slpan->setValue(effpan, dontSendNotification);
 
+        effoct = midinstr.getVoiceOctaveTranspose();
+        sloct->setValue(effoct, dontSendNotification);
+
+        return true;
+    }
+
+    bool changeVoiceOctave(int panelbtnidx, int octave)
+    {
+        const int clampedOctave = juce::jlimit(-2, 2, octave);
+
+        if (currenttabidx == PTPlayer && playerRouteActive)
+        {
+            playerWorkingInstrument.setVoiceOctaveTranspose(clampedOctave);
+            playerWorkingInstrument.setDirty(MAPOCT);
+            tbroute->setEnabled(true);
+            updateToRouteButtonDirtyStyle();
+            return true;
+        }
+
+        instrumentpanel->getVoiceButton(panelbtnidx)->getInstrumentPtr()->setVoiceOctaveTranspose(clampedOctave);
+        instrumentpanel->getVoiceButton(panelbtnidx)->getInstrumentPtr()->setDirty(MAPOCT);
+
+        // Effects changes are applied immediately; mark panel save pending even if user
+        // leaves the Effects tab via tab header/hotkeys instead of route/cancel buttons.
+        bpendingEffectsEdit = true;
+        if (gNotifyPanelSaveAvailabilityChanged)
+            gNotifyPanelSaveAvailabilityChanged();
+
+        updateToRouteButtonDirtyStyle();
         return true;
     }
 
@@ -3141,6 +3205,9 @@ public:
             mididevices->sendToOutputs(ccMessage);
         }
 
+        if (dirty & MAPOCT)
+            instrumentpanel->getVoiceButton(panelbtnidx)->getInstrumentPtr()->setVoiceOctaveTranspose(effoct);
+
         updateToRouteButtonDirtyStyle();
         return true;
     }
@@ -3238,6 +3305,7 @@ public:
         effrel = instrument.getRel();
         effbri = instrument.getBri();
         effpan = instrument.getPan();
+        effoct = instrument.getVoiceOctaveTranspose();
         ptrvoicebutton = nullptr;
         hasPanelContextFlag = true;
         return true;
@@ -3303,6 +3371,7 @@ private:
     Slider* slrel;
     Slider* slbri;
     Slider* slpan;
+    Slider* sloct;
 
     int effvol;
     int effexp;
@@ -3314,6 +3383,7 @@ private:
     int effrel;
     int effbri;
     int effpan;
+    int effoct;
     UiProfileDefinition currentProfile = resolveUiProfile(getAppState().uiProfileId);
     UiProfileFontLookAndFeel uiProfileLookAndFeel;
     std::vector<juce::Component*> uiProfileComponents;
@@ -3341,6 +3411,7 @@ private:
         effrel = inst->getRel();
         effbri = inst->getBri();
         effpan = inst->getPan();
+        effoct = inst->getVoiceOctaveTranspose();
     }
 
     bool effectsValuesDifferFromSnapshot() const
@@ -3352,7 +3423,7 @@ private:
             return w.getVol() != b.getVol() || w.getExp() != b.getExp() || w.getRev() != b.getRev()
                 || w.getCho() != b.getCho() || w.getMod() != b.getMod() || w.getTim() != b.getTim()
                 || w.getAtk() != b.getAtk() || w.getRel() != b.getRel() || w.getBri() != b.getBri()
-                || w.getPan() != b.getPan();
+                || w.getPan() != b.getPan() || w.getVoiceOctaveTranspose() != b.getVoiceOctaveTranspose();
         }
 
         if (instrumentpanel == nullptr || panelbuttonidx < 0)
@@ -3365,7 +3436,7 @@ private:
         return inst->getVol() != effvol || inst->getExp() != effexp || inst->getRev() != effrev
             || inst->getCho() != effcho || inst->getMod() != effmod || inst->getTim() != efftim
             || inst->getAtk() != effatk || inst->getRel() != effrel || inst->getBri() != effbri
-            || inst->getPan() != effpan;
+            || inst->getPan() != effpan || inst->getVoiceOctaveTranspose() != effoct;
     }
 
     /** Same red “pending save” style as panel Save/Load (see updatePanelSaveButtonsPendingStyle). */
@@ -8419,6 +8490,7 @@ private:
             target.rel = source.getRel();
             target.bri = source.getBri();
             target.pan = source.getPan();
+            target.voiceOct = source.getVoiceOctaveTranspose();
             target.effectsDirty = source.getDirty();
         }
         return profile;
@@ -8464,6 +8536,7 @@ private:
             instrument.setRel(source.rel);
             instrument.setBri(source.bri);
             instrument.setPan(source.pan);
+            instrument.setVoiceOctaveTranspose(source.voiceOct);
             instrument.replaceDirtyMask(source.effectsDirty);
 
             channelInstruments[(size_t) idx] = instrument;
@@ -8933,8 +9006,16 @@ private:
         if (isPlaybackMutedForMessage(message))
             return;
 
+        int semitoneOffset = playerTransposeSemitones;
+        if (message.isNoteOnOrOff())
+        {
+            const int channel = message.getChannel();
+            if (channel >= 1 && channel <= playerChannelCount)
+                semitoneOffset += juce::jlimit(-2, 2, channelInstruments[(size_t) (channel - 1)].getVoiceOctaveTranspose()) * 12;
+        }
+
         juce::MidiMessage routedMessage;
-        if (!tryTransposePlaybackNoteMessage(message, playerTransposeSemitones, routedMessage))
+        if (!tryTransposePlaybackNoteMessage(message, semitoneOffset, routedMessage))
             return;
 
         routedMessage.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
@@ -15038,6 +15119,7 @@ private:
         for (i = 0; i < 17; i++) {
             for (j = 0; j < 5; j++) {
                 mididevices->iomap[i][j] = 0;
+                mididevices->iomapLayerGroup[i][j] = -1;
             }
         }
 
@@ -15093,6 +15175,7 @@ private:
 
                 if (mididevices->iomap[midiin][j] == 0) {
                     mididevices->iomap[midiin][j] = midiout;
+                    mididevices->iomapLayerGroup[midiin][j] = i;
                     break;
                 }
                 j++;
@@ -15768,6 +15851,41 @@ public:
         getAppState().lastSelectedPanelButtonIdx = -1;
         getAppState().hasExplicitVoiceSelection = false;
 
+        if (auto* midiDevices = MidiDevices::getInstance())
+        {
+            midiDevices->setVoiceOctaveSemitonesResolver([](int midiInChan, int layerSlot)
+                {
+                    auto* devices = MidiDevices::getInstance();
+                    auto* panel = InstrumentPanel::getInstance();
+                    if (devices == nullptr || panel == nullptr)
+                        return 0;
+                    if (midiInChan < 1 || midiInChan > 16 || layerSlot < 0 || layerSlot >= 5)
+                        return 0;
+
+                    const int groupIdx = devices->iomapLayerGroup[midiInChan][layerSlot];
+                    if (groupIdx < 0 || groupIdx >= numberbuttongroups)
+                        return 0;
+
+                    auto* group = panel->getButtonGroup(groupIdx);
+                    if (group == nullptr)
+                        return 0;
+
+                    const int panelButtonIdx = group->getActiveVoiceButton();
+                    if (panelButtonIdx < 0 || panelButtonIdx >= numbervoicebuttons)
+                        return 0;
+
+                    auto* voiceButton = panel->getVoiceButton(panelButtonIdx);
+                    if (voiceButton == nullptr)
+                        return 0;
+
+                    auto* instrument = voiceButton->getInstrumentPtr();
+                    if (instrument == nullptr)
+                        return 0;
+
+                    return juce::jlimit(-2, 2, instrument->getVoiceOctaveTranspose()) * 12;
+                });
+        }
+
         gNotifyPanelSaveAvailabilityChanged = std::move(refreshKbPanelSaves);
 
         std::function<void()> syncManualRotaryKb = [this]()
@@ -15864,6 +15982,9 @@ public:
 
     ~MenuTabs() override
     {
+        if (auto* midiDevices = MidiDevices::getInstance())
+            midiDevices->setVoiceOctaveSemitonesResolver({});
+
         gNotifyPanelSaveAvailabilityChanged = {};
         gNotifyManualRotarySyncFromAppState = {};
         gNotifyPresetRotarySyncFromButtonGroups = {};

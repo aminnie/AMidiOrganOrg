@@ -273,10 +273,12 @@ How to use:
 Effect parameters:
 
 - `VOL`, `EXP`, `REV`, `CHO`, `MOD`, `TIM`, `ATK`, `REL`, `BRI`, `PAN`
+- `OCT` per-voice transpose: `-2`, `-1`, `0`, `+1`, `+2` octaves
 
 Important:
 
 - `VOL`, `EXP`, and `BRI` set to `0` can result in no audible output for some voices/modules.
+- `OCT` affects note pitch only (it does not send a MIDI CC); the selected value is saved and restored with panel voice data.
 
 Expected result:
 

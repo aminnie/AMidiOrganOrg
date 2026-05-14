@@ -66,6 +66,7 @@ Primary implementation files:
 - **Effects**
   - Per-voice effect editing in real time
   - Sends CC updates on group output channel
+  - Per-voice octave transpose control (`-2..+2`) applied during note rewrite (no CC emission)
   - Content border title includes module name when available
 - **Config**
   - Button-group routing and behavior settings
@@ -191,7 +192,7 @@ Decision points:
 
 1. User opens Effects for selected voice context.
 2. Existing per-voice effect values are loaded into controls.
-3. Control changes emit CC updates on output channel.
+3. CC-backed controls emit updates on output channel; octave transpose updates voice note-rewrite state.
 4. Changes persist in panel state and survive save/reload.
 
 ### 4.5 Mute Lifecycle

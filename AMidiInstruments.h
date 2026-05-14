@@ -159,6 +159,14 @@ public:
         pan = val;
     }
 
+    int getVoiceOctaveTranspose() {
+        return voiceOctaveTranspose;
+    }
+
+    void setVoiceOctaveTranspose(int val) {
+        voiceOctaveTranspose = juce::jlimit(-2, 2, val);
+    }
+
     // Dirty is treated a bitmap to indicate which effects have been changed
     int getDirty() {
         return isdirty;
@@ -210,6 +218,7 @@ private:
     int rel = 0;
     int bri = 30;
     int pan = 64;
+    int voiceOctaveTranspose = 0;
 
     int isdirty = 0;
 

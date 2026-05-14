@@ -148,6 +148,9 @@ On startup, the app also attempts to auto-restore the last used panel and config
 - The following MIDI effects that can be changed on each voice button:
   - VOL, EXP, REV, CHO, MOD
   - TIM, ATK, REL, BRI, PAN
+- Per-voice transposition control:
+  - OCT (`-2`, `-1`, `0`, `+1`, `+2`) shifts outgoing Note On/Off by octaves for the active voice on that layer.
+  - OCT is saved with the voice and restored when panel data is reloaded.
 
 #### Config
 

@@ -84,6 +84,7 @@ Contact the developer for additional module support.
   - REL
   - BRI
   - PAN
+  - OCT (`-2`, `-1`, `0`, `+1`, `+2` octaves, per-voice note transpose)
 
 ### Config
 

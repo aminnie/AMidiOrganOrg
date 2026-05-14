@@ -826,6 +826,12 @@ namespace
             if (!expectEqual(devices->velocityout[i] ? 1 : 0, 1, "velocityout default true", details))
                 return false;
 
+            for (int j = 0; j < 5; ++j)
+            {
+                if (!expectEqual(devices->iomapLayerGroup[i][j], -1, "iomap layer-group default", details))
+                    return false;
+            }
+
             const int expectedPassthrough = (i == 16) ? 1 : 0;
             if (!expectEqual(devices->passthroughin[i] ? 1 : 0, expectedPassthrough, "passthrough defaults", details))
                 return false;
@@ -1756,17 +1762,23 @@ namespace
 
         devices->octxpose[5] = 1;
         devices->velocityout[5] = false;
+        devices->setVoiceOctaveSemitonesResolver([](int midiInChan, int layerSlot)
+            {
+                return (midiInChan == 3 && layerSlot == 1) ? 12 : 0;
+            });
 
         const auto noteOn = MidiMessage::noteOn(1, 60, static_cast<juce::uint8>(100));
-        if (!expectEqual(devices->rewriteSendNoteMessage(noteOn, 5) ? 1 : 0, 1, "rewriteSendNoteMessage note-on succeeds", details))
+        if (!expectEqual(devices->rewriteSendNoteMessage(noteOn, 5, 3, 1) ? 1 : 0, 1, "rewriteSendNoteMessage note-on succeeds", details))
         {
             devices->testSendHook = nullptr;
+            devices->setVoiceOctaveSemitonesResolver({});
             return false;
         }
 
         if (!expectEqual(static_cast<int>(sentMessages.size()), 1, "one note-on message emitted", details))
         {
             devices->testSendHook = nullptr;
+            devices->setVoiceOctaveSemitonesResolver({});
             return false;
         }
 
@@ -1779,36 +1791,41 @@ namespace
 
         const auto& rewrittenOn = sentMessages[0];
         if (!expectEqual(rewrittenOn.getChannel(), 5, "rewritten note-on channel", details) ||
-            !expectEqual(rewrittenOn.getNoteNumber(), 72, "rewritten note-on transpose", details) ||
+            !expectEqual(rewrittenOn.getNoteNumber(), 84, "rewritten note-on transpose with voice octave", details) ||
             !expectEqual(readVelocityByte(rewrittenOn), defvelocityout, "rewritten note-on fixed velocity", details))
         {
             devices->testSendHook = nullptr;
+            devices->setVoiceOctaveSemitonesResolver({});
             return false;
         }
 
         const auto noteOff = MidiMessage::noteOff(1, 60, static_cast<juce::uint8>(45));
-        if (!expectEqual(devices->rewriteSendNoteMessage(noteOff, 5) ? 1 : 0, 1, "rewriteSendNoteMessage note-off succeeds", details))
+        if (!expectEqual(devices->rewriteSendNoteMessage(noteOff, 5, 3, 1) ? 1 : 0, 1, "rewriteSendNoteMessage note-off succeeds", details))
         {
             devices->testSendHook = nullptr;
+            devices->setVoiceOctaveSemitonesResolver({});
             return false;
         }
 
         if (!expectEqual(static_cast<int>(sentMessages.size()), 2, "note-off message emitted", details))
         {
             devices->testSendHook = nullptr;
+            devices->setVoiceOctaveSemitonesResolver({});
             return false;
         }
 
         const auto& rewrittenOff = sentMessages[1];
         if (!expectEqual(rewrittenOff.getChannel(), 5, "rewritten note-off channel", details) ||
-            !expectEqual(rewrittenOff.getNoteNumber(), 72, "rewritten note-off transpose", details) ||
+            !expectEqual(rewrittenOff.getNoteNumber(), 84, "rewritten note-off transpose with voice octave", details) ||
             !expectEqual(readVelocityByte(rewrittenOff), 45, "rewritten note-off keeps velocity", details))
         {
             devices->testSendHook = nullptr;
+            devices->setVoiceOctaveSemitonesResolver({});
             return false;
         }
 
         devices->testSendHook = nullptr;
+        devices->setVoiceOctaveSemitonesResolver({});
         return true;
     }
 
@@ -1866,6 +1883,7 @@ namespace
         instrument->setRel(71);
         instrument->setBri(89);
         instrument->setPan(64);
+        instrument->setVoiceOctaveTranspose(2);
 
         if (!instrumentPanel->saveInstrumentPanel(testDir, panelFile))
         {
@@ -1887,6 +1905,7 @@ namespace
         instrument->setRel(11);
         instrument->setBri(12);
         instrument->setPan(13);
+        instrument->setVoiceOctaveTranspose(-2);
 
         if (!instrumentPanel->loadInstrumentPanel(testDir, panelFile, false))
         {
@@ -1908,7 +1927,8 @@ namespace
             !expectEqual(loadedInstrument->getAtk(), 12, "roundtrip attack", details) ||
             !expectEqual(loadedInstrument->getRel(), 71, "roundtrip release", details) ||
             !expectEqual(loadedInstrument->getBri(), 89, "roundtrip brightness", details) ||
-            !expectEqual(loadedInstrument->getPan(), 64, "roundtrip pan", details))
+            !expectEqual(loadedInstrument->getPan(), 64, "roundtrip pan", details) ||
+            !expectEqual(loadedInstrument->getVoiceOctaveTranspose(), 2, "roundtrip voice octave transpose", details))
         {
             restoreAppState(snapshot);
             return false;

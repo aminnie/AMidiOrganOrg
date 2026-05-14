@@ -276,6 +276,11 @@ public:
         return outputChannelMuted[outchan];
     }
 
+    void setVoiceOctaveSemitonesResolver(std::function<int(int, int)> resolver)
+    {
+        voiceOctaveSemitonesResolver = std::move(resolver);
+    }
+
     void clearSysExThroughRoutes()
     {
         const juce::SpinLock::ScopedLockType routeLock(sysexThroughRoutesLock);
@@ -407,7 +412,7 @@ public:
                 continue;
             }
 
-            rewriteSendNoteMessage(message, outchan);
+            rewriteSendNoteMessage(message, outchan, inchan, i);
 
             DBG("*** handleIncomingMidiMessage(): Layering midi message to " + std::to_string(outchan));
 
@@ -419,7 +424,7 @@ public:
     // Change the channel on Note On and Off Messages to be layered
     // and transpose octave if Button Group so configured
     //-------------------------------------------------------------------------
-    bool rewriteSendNoteMessage(MidiMessage message, int midioutchan) {
+    bool rewriteSendNoteMessage(MidiMessage message, int midioutchan, int midiinchan = 0, int layerSlot = -1) {
 
         MidiMessage newmessage;
 
@@ -433,7 +438,9 @@ public:
         // Get the Input Note and Octave transpose if required for Output Channel
         // Ignore transposes larger than -3 and +3.
         int outchan = midioutchan;
-        auto note = getTransposedNoteForOutput(message.getNoteNumber(), outchan);
+        int note = getTransposedNoteForOutput(message.getNoteNumber(), outchan);
+        if (voiceOctaveSemitonesResolver != nullptr)
+            note = juce::jlimit(0, 127, note + voiceOctaveSemitonesResolver(midiinchan, layerSlot));
         juce::uint8 velocity = 0;
         if (message.getRawDataSize() >= 3)
             velocity = message.getRawData()[2];
@@ -555,6 +562,7 @@ public:
         for (int i = 0; i < 17; i++) {
             for (int j = 0; j < 5; j++) {
                 iomap[i][j] = 0;
+                iomapLayerGroup[i][j] = -1;
             }
         }
 
@@ -603,6 +611,7 @@ public:
 
     // Array 17, so that we can keep mapping at the 1 -16 channels instead of zero based
     int iomap[17][5];
+    int iomapLayerGroup[17][5];
     int octxpose[17];
     int splitout[17];
     juce::Array<int> moduleout[17];
@@ -632,6 +641,7 @@ public:
 
 private:
     std::atomic<bool> suppressMidiViewEchoForPerfKeyboardTabs { false };
+    std::function<int(int, int)> voiceOctaveSemitonesResolver;
 
     bool sendToMappedOutputsForRouteChannel(const MidiMessage& msg,
                                             int routeChannel,
